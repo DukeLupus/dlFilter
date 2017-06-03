@@ -30,6 +30,7 @@ This avoids problems where other scripts halt events preventing this scripts eve
           Enable / disable now global
           Custom filter Add / Remove button enable / disable
           Custom filter list multi-select
+        Menu code cleanup
 */
 
 alias DLF.SetVersion {
@@ -139,66 +140,96 @@ on *:unload: {
   DLF.Status Unloading complete. $crlf
 }
 
+; ========== Menus - Main DLF functionality ==========
 menu channel {
   -
-  $iif($me !isop #, $style(2)) Send onotice: {
-    var %chatwindow = @ $+ $chan
-    if (!$window(%chatwindow)) {
-      window -eg1k1l12mSw %chatwindow
-      if ((%DLF.o.log == 1) && ($exists($+(",$logdir,%chatwindow,.log,")))) {
-        write $+(",$logdir,%chatwindow,.log,") $crlf
-        write $+(",$logdir,%chatwindow,.log,") $+($chr(91) $+ $fulldate $+ $chr(93),$chr(32) ----- Session started -----)
-        write $+(",$logdir,%chatwindow,.log,") $crlf
-        .loadbuf -r %chatwindow $+(",$logdir,%chatwindow,.log,")
-      }
-    }
-  }
+  ;$iif($me !isop #, $style(2)) Send onotice: DLF.oNotice.Send
+  Send onotice: DLF.oNotice.Send
   -
   DLFilter
-  ..Options: dialog -md DLF.Options.GUI DLF.Options.GUI
-  ..$iif($chan isin %DLF.channels,Remove,Add) this channel: {
-    var %chan = $chan
-    if (%chan !isin %DLF.channels) {
-      if (%DLF.channels != $chr(35)) %DLF.channels = $addtok(%DLF.channels,%chan,44)
-      else %DLF.channels = %chan
-      echo -a 4,15 $chr(91) $+ DLFilter $+ $chr(93) 6Channels set to4 %DLF.channels
-    }
-    else {
-      %DLF.channels = $remtok(%DLF.channels,%chan,1,44)
-      echo -a 4,15 $chr(91) $+ DLFilter $+ $chr(93) 6Channels set to4 %DLF.channels
-    }
-  }
-  ..$iif(%DLF.channels == $chr(35), $style(3)) Set to all channels: {
-    %DLF.channels = $chr(35)
-    echo -a 4,15 $chr(91) $+ DLFilter $+ $chr(93) 6Channels set to4 all
+  ..Options: DLF.Options.Show
+  ..$iif($chan isin %DLF.channels,Remove,Add) this channel: DLF.AddRemoveChannel
+  ..$iif(%DLF.channels == #, $style(3)) Set to all channels: {
+    %DLF.channels = #
+    DLF.Status $c(6,Channels set to $c(4,%DLF.channels))
   }
   ..-
-  ..$iif(%DLF.showfiltered == 1,$style(1)) Show filtered lines: {
-    if (%DLF.showfiltered == 1 ) {
-      set %DLF.showfiltered 0
-      /window -c @DLF.filtered
-    }
-    else {
-      set %DLF.showfiltered 1
-    }
-  }
+  ..$iif(%DLF.showfiltered == 1,$style(1)) Show filtered lines: DLF.filter.showlines
 }
+
 menu menubar {
   DLFilter
-  .Options: dialog -md DLF.Options.GUI DLF.Options.GUI
-  .$iif(%DLF.showfiltered == 1,$style(1)) Show filtered lines: {
-    if (%DLF.showfiltered == 1 ) {
-      set %DLF.showfiltered 0
-      /window -c @DLF.filtered
-    }
-    else {
-      set %DLF.showfiltered 1
-    }
-  }
-  .Visit filter website: .url -an http://dukelupus.com/
+  .Options: DLF.Options.Show
+  .$iif(%DLF.showfiltered == 1,$style(1)) Show filtered lines: DLF.filter.showlines
+  .Visit filter website: .url -an http://dukelupus.com/dlfilter
   .-
-  .Unload DLFilter: if ($?!="Do you want to unload DLFilter?" == $true) .unload -rs $+(",$script,")
+  .Unload DLFilter: if ($?!="Do you want to unload DLFilter?" == $true) .unload -rs $qt($script)
 }
+
+menu @DLF.Filtered {
+  Clear: /clear
+  Search: {
+    var %searchstring = $?="Enter search string"
+    if (%searchstring == $null) halt
+    else FilteredSearch %searchstring
+  }
+  $iif(%DLF.filtered.timestamp == 1,$style(1)) Timestamp: DLF.Option.Toggle filtered.timestamp
+  $iif(%DLF.filtered.strip == 1,$style(1)) Strip codes: DLF.Option.Toggle filtered.strip
+  $iif(%DLF.filtered.wrap == 1,$style(1)) Wrap lines: DLF.Option.Toggle filtered.wrap
+  $iif(%DLF.filtered.limit == 1,$style(1)) Limit number of lines: DLF.Option.Toggle filtered.limit
+  $iif(%DLF.filtered.log == 1,$style(1)) Log: DLF.Option.Toggle filtered.log
+  -
+  Options: DLF.Options.Show
+  Close: {
+    %DLF.showfiltered = 0
+    window -c @DLF.Filtered
+  }
+  -
+}
+
+menu @DLF.Server {
+  Clear: /clear
+  Search: {
+    var %searchstring = $?="Enter search string"
+    if (%searchstring == $null) halt
+    else ServerSearch %searchstring
+  }
+  $iif(%DLF.server.timestamp == 1,$style(1)) Timestamp: DLF.Option.Toggle server.timestamp
+  $iif(%DLF.server.strip == 1,$style(1)) Strip codes: DLF.Option.Toggle server.strip
+  $iif(%DLF.server.wrap == 1,$style(1)) Wrap lines: DLF.Option.Toggle server.wrap
+  $iif(%DLF.server.limit == 1,$style(1)) Limit number of lines: DLF.Option.Toggle server.limit
+  $iif(%DLF.server.log == 1,$style(1)) Log: DLF.Option.Toggle server.log
+  -
+  Options: DLF.Options.Show
+  Close: window -c @DLF.Server
+  -
+}
+
+alias DLF.AddRemoveChannel {
+  var %chan = $chan
+  if (%chan !isin %DLF.channels) {
+    if (%DLF.channels != #) %DLF.channels = $addtok(%DLF.channels,%chan,$asc($comma))
+    else %DLF.channels = %chan
+  }
+  else {
+    %DLF.channels = $remtok(%DLF.channels,%chan,1,$asc($comma))
+  }
+  DLF.Status $c(6,Channels set to $c(4,%DLF.channels))
+}
+
+alias DLF.filter.showlines {
+  if (%DLF.showfiltered == 1) window -c @DLF.filtered
+  DLF.Option.Toggle showfiltered
+}
+
+alias DLF.Option.Toggle {
+  var %newval = 1 - DLF. [ $+ $1 ]
+  DLF. [ $+ $1 ] = %newval
+  ;if ($2 != $null) did
+  if (%newval) DLF.Status Option $1 set
+  else DLF.status Option $1 cleared
+}
+
 menu @DLF.@find.Results,@DLF.NewReleases {
   .-
   .Copy line(s): {
@@ -283,113 +314,6 @@ menu @DLF.@find.Results,@DLF.NewReleases {
   .-
   Close: /window -c $active
   .-
-}
-menu @DLF.Filtered {
-  Clear: /clear
-  Search: {
-    var %searchstring = $?="Enter search string"
-    if (%searchstring == $null) halt
-    else FilteredSearch %searchstring
-  }
-  $iif(%DLF.filtered.timestamp == 1,$style(1)) Timestamp: {
-    if (%DLF.filtered.timestamp == 1 ) {
-      set %DLF.filtered.timestamp 0
-    }
-    else {
-      set %DLF.filtered.timestamp 1
-    }
-  }
-  $iif(%DLF.filtered.strip == 1,$style(1)) Strip codes: {
-    if (%DLF.filtered.strip == 1 ) {
-      set %DLF.filtered.strip 0
-    }
-    else {
-      set %DLF.filtered.strip 1
-    }
-  }
-  $iif(%DLF.filtered.wrap == 1,$style(1)) Wrap lines: {
-    if (%DLF.filtered.wrap == 1 ) {
-      set %DLF.filtered.wrap 0
-    }
-    else {
-      set %DLF.filtered.wrap 1
-    }
-  }
-  $iif(%DLF.filtered.limit == 1,$style(1)) Limit number of lines: {
-    if (%DLF.filtered.limit == 1 ) {
-      set %DLF.filtered.limit 0
-    }
-    else {
-      set %DLF.filtered.limit 1
-    }
-  }
-  $iif(%DLF.filtered.log == 1,$style(1)) Log: {
-    if (%DLF.filtered.log == 1) {
-      set %DLF.filtered.log 0
-    }
-    else {
-      set %DLF.filtered.log 1
-    }
-  }
-  -
-  Options: dialog -md DLF.Options.GUI DLF.Options.GUI
-  Close: {
-    %DLF.showfiltered = 0
-    /window -c @DLF.Filtered
-  }
-  -
-}
-menu @DLF.Server {
-  Clear: /clear
-  Search: {
-    var %searchstring = $?="Enter search string"
-    if (%searchstring == $null) halt
-    else ServerSearch %searchstring
-  }
-  $iif(%DLF.server.timestamp == 1,$style(1)) Timestamp: {
-    if (%DLF.server.timestamp == 1 ) {
-      set %DLF.server.timestamp 0
-    }
-    else {
-      set %DLF.server.timestamp 1
-    }
-  }
-  $iif(%DLF.server.strip == 1,$style(1)) Strip codes: {
-    if (%DLF.server.strip == 1 ) {
-      set %DLF.server.strip 0
-    }
-    else {
-      set %DLF.server.strip 1
-    }
-  }
-  $iif(%DLF.server.wrap == 1,$style(1)) Wrap lines: {
-    if (%DLF.server.wrap == 1 ) {
-      set %DLF.server.wrap 0
-    }
-    else {
-      set %DLF.server.wrap 1
-    }
-  }
-  $iif(%DLF.server.limit == 1,$style(1)) Limit number of lines: {
-    if (%DLF.server.limit == 1 ) {
-      set %DLF.server.limit 0
-    }
-    else {
-      set %DLF.server.limit 1
-    }
-  }
-  $iif(%DLF.server.log == 1,$style(1)) Log: {
-    if (%DLF.server.log == 1) {
-      set %DLF.server.log 0
-    }
-    else {
-      set %DLF.server.log 1
-    }
-  }
-  -
-  Options: dialog -md DLF.Options.GUI DLF.Options.GUI
-  Close: window -c @DLF.Server
-  -
 }
 menu @DLF.*.search {
   Copy line: {
