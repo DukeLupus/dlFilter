@@ -36,6 +36,9 @@ This avoids problems where other scripts halt events preventing this scripts eve
         Allow msgs from Chanserv etc. and self
         Cleanup menu code
         Files now always accepted from Regular users who are in DCC Trust List
+        Allow user to choose whether to delete configuration variables on unload
+        Limit load/start/connect update check to once per 7 days.
+          (Options update check runs every time.)
 
       TODO
         Fuller implementation of script groups to enable / disable events
@@ -49,8 +52,7 @@ This avoids problems where other scripts halt events preventing this scripts eve
         Right click menu items for changing options base on line clicked
         Right click menu items for adding to custom filters
         More menu options equivalent to dialog options
-        Allow user to choose whether to delete configuration variables on unload
-        Limit update check to once per x days.
+        Make all (or most) aliases and dialogues local (-l flag)
 */
 
 alias DLF.SetVersion {
@@ -59,83 +61,20 @@ alias DLF.SetVersion {
 }
 
 ; ========== Initialisation / Termination ==========
-alias DLF.init {
-  if ($version < 6) {
-    DLF.Error DLFilter requires mIRC 6+. Loading stopped.
-    .unload -rs $script
-  }
-  if ($script(onotice.mrc)) .unload -rs onotice.mrc
-  if ($script(onotice.txt)) .unload -rs onotice.txt
-  ; Initialise hashtables
-  DLF.SetHashTables
-}
-
 on *:start: {
-  DLF.init
   ; Reload script if needed to be first to execute
   if ($script != $script(1)) .reload -rs1 $qt($script)
+  if (%DLF.JustLoaded) return
+  DLF.Initialise
 }
 
 on *:load: {
-  DLF.init
   ; Reload script if needed to be first to execute
   if ($script != $script(1)) .load -rs1 $qt($script)
 
-  ; Announce ourself
-  DLF.Status Loading $c(4,$+(version,$space,$DLF.SetVersion)) by DukeLupus
-  DLF.Status Please check DLFilter homepage $br($c(12,9,$u(http://dukelupus.com/dlfilter))) for help.
-
-  ; Initialise variables
-  if (%DLF.enabled == $null) %DLF.enabled = 1
-  if (%DLF.ads == $null) %DLF.ads = 1
-  if (%DLF.requests == $null) %DLF.requests = 1
-  if (%DLF.joins == $null) %DLF.joins = 0
-  if (%DLF.parts == $null) %DLF.parts = 0
-  if (%DLF.quits == $null) %DLF.quits = 0
-  if (%DLF.nicks == $null) %DLF.nicks = 0
-  if (%DLF.kicks == $null) %DLF.kicks = 0
-  if (%DLF.chmode == $null) %DLF.chmode = 0
-  if (%DLF.showstatus == $null) %DLF.showstatus = 0
-  if (%DLF.showfiltered == $null) %DLF.showfiltered = 1
-  if (%DLF.away == $null) %DLF.away = 1
-  if (%DLF.usrmode == $null) %DLF.usrmode = 0
-  if (%DLF.privrequests == $null) %DLF.privrequests = 1
-  if (%DLF.server == $null) %DLF.server = 1
-  if (%DLF.searchresults == $null) %DLF.searchresults = 1
-  if (%DLF.newreleases == $null) %DLF.newreleases = 1
-  if (%DLF.chspam == $null) %DLF.chspam = 1
-  if (%DLF.chspam.opnotify == $null) %DLF.chspam.opnotify = 1
-  if (%DLF.privspam == $null) %DLF.privspam = 1
-  if (%DLF.privspam.opnotify == $null) %DLF.privspam.opnotify = 1
-  if (%DLF.spam.addignore == $null) %DLF.spam.addignore = 0
-  if (%DLF.nocomchan == $null) %DLF.nocomchan = 1
-  if (%DLF.nocomchan.dcc == $null) %DLF.nocomchan.dcc = 1
-  if (%DLF.askregfile == $null) %DLF.askregfile = 0
-  if (%DLF.askregfile.type == $null) %DLF.askregfile.type = 0
-  if (%DLF.noregmsg == $null) %DLF.noregmsg = 0
-  if (%DLF.custom.enabled == $null) %DLF.custom.enabled = 1
-  if (%DLF.colornicks == $null) %DLF.colornicks = 0
-  if (%DLF.server.limit == $null) %DLF.server.limit = 1
-  if (%DLF.filtered.limit == $null) %DLF.filtered.limit = 1
-  if (%DLF.server.timestamp == $null) %DLF.server.timestamp = 1
-  if (%DLF.filtered.timestamp == $null) %DLF.filtered.timestamp = 1
-  if (%DLF.server.wrap == $null) %DLF.server.wrap = 1
-  if (%DLF.filtered.wrap == $null) %DLF.filtered.wrap = 0
-  if (%DLF.server.strip == $null) %DLF.server.strip = 0
-  if (%DLF.filtered.strip == $null) %DLF.filtered.strip = 0
-  if (%DLF.o.enabled == $null) %DLF.o.enabled = 1
-  if (%DLF.o.timestamp == $null) %DLF.o.timestamp = 1
-  if (%DLF.o.log == $null) %DLF.o.log = 1
-  if (%DLF.custom.chantext == $null) {
-    %DLF.custom.chantext = $addtok(%DLF.custom.chantext,*bonga*,$asc($comma))
-    %DLF.custom.chantext = $addtok(%DLF.custom.chantext,*agnob*,$asc($comma))
-    %DLF.custom.chantext = $addtok(%DLF.custom.chantext,*meep*,$asc($comma))
-  }
-  if (%DLF.channels == $null) {
-    DLF.Status Setting channels to $c(4,all) $+ .
-    %DLF.channels = #
-    DLF.Options.Show
-  }
+  set -u1 %DLF.JustLoaded 1
+  DLF.Initialise
+  DLF.Options.Show
   DLF.Status Loading complete.
   return
 
@@ -143,12 +82,31 @@ on *:load: {
   DLF.Error During load: $qt($error)
 }
 
+alias DLF.Initialise {
+  ; Delete obsolete variables
+  .unset %DLF.custom.selected
+
+  if ($version < 6) {
+    DLF.Error DLFilter requires mIRC 6+. Loading stopped.
+    .unload -rs $script
+  }
+  if ($script(onotice.mrc)) .unload -rs onotice.mrc
+  if ($script(onotice.txt)) .unload -rs onotice.txt
+  DLF.Status $iif(%DLF.JustLoaded,Loading,Starting) $c(4,version $DLF.SetVersion) by DukeLupus
+  DLF.Status Please check DLFilter homepage $br($c(12,9,$u(http://dukelupus.com/dlfilter))) for help.
+  DLF.CreateHashTables
+  DLF.Options.Initialise
+}
+
 ctcp *:VERSION: .ctcpreply $nick VERSION $c(1,9,$logo version $DLF.SetVersion by DukeLupus.) $c(1,15,Get it from $c(12,15,$u(http://dukelupus.com/dlfilter)))
 
 on *:unload: {
+  var %keepvars = $?!="Do you want to keep your dlFilter configuration?"
   DLF.Status Unloading $c(4,9,version $DLF.SetVersion) by DukeLupus.
-  DLF.Status Unsetting variables..
-  .unset %DLF.*
+  if (%keepvars == $false) {
+    DLF.Status Unsetting variables..
+    .unset %DLF.*
+  }
   DLF.Status Closing open DLFilter windows
   if ($dialog(DLF.Options.GUI)) .dialog -x DLF.Options.GUI DLF.Options.GUI
   if ($window(@DLF.filtered)) window -c @DLF.filtered
@@ -157,7 +115,10 @@ on *:unload: {
   if ($window(@DLF.server.search)) window -c @DLF.server.search
   if ($window(@DLF.@find.results)) window -c @DLF.@find.results
   close -@ @#*
-  DLF.Status Unloading complete. $crlf
+  DLF.Status Unloading complete.
+  DLF.Status $space
+  DLF.Status To reload run /load -rs1 $qt($script)
+  DLF.Status $space
 }
 
 ; ========== Menus - Main DLF functionality ==========
@@ -452,6 +413,59 @@ dialog DLF.Options.GUI {
   list 51, 4 74 144 123, tab 3 hsbar vsbar size sort extsel
 }
 
+; Initialise variables
+alias DLF.Options.Initialise {
+  if (%DLF.enabled == $null) %DLF.enabled = 1
+  if (%DLF.ads == $null) %DLF.ads = 1
+  if (%DLF.requests == $null) %DLF.requests = 1
+  if (%DLF.joins == $null) %DLF.joins = 0
+  if (%DLF.parts == $null) %DLF.parts = 0
+  if (%DLF.quits == $null) %DLF.quits = 0
+  if (%DLF.nicks == $null) %DLF.nicks = 0
+  if (%DLF.kicks == $null) %DLF.kicks = 0
+  if (%DLF.chmode == $null) %DLF.chmode = 0
+  if (%DLF.showstatus == $null) %DLF.showstatus = 0
+  if (%DLF.showfiltered == $null) %DLF.showfiltered = 1
+  if (%DLF.away == $null) %DLF.away = 1
+  if (%DLF.usrmode == $null) %DLF.usrmode = 0
+  if (%DLF.privrequests == $null) %DLF.privrequests = 1
+  if (%DLF.server == $null) %DLF.server = 1
+  if (%DLF.searchresults == $null) %DLF.searchresults = 1
+  if (%DLF.newreleases == $null) %DLF.newreleases = 1
+  if (%DLF.chspam == $null) %DLF.chspam = 1
+  if (%DLF.chspam.opnotify == $null) %DLF.chspam.opnotify = 1
+  if (%DLF.privspam == $null) %DLF.privspam = 1
+  if (%DLF.privspam.opnotify == $null) %DLF.privspam.opnotify = 1
+  if (%DLF.spam.addignore == $null) %DLF.spam.addignore = 0
+  if (%DLF.nocomchan == $null) %DLF.nocomchan = 1
+  if (%DLF.nocomchan.dcc == $null) %DLF.nocomchan.dcc = 1
+  if (%DLF.askregfile == $null) %DLF.askregfile = 0
+  if (%DLF.askregfile.type == $null) %DLF.askregfile.type = 0
+  if (%DLF.noregmsg == $null) %DLF.noregmsg = 0
+  if (%DLF.custom.enabled == $null) %DLF.custom.enabled = 1
+  if (%DLF.colornicks == $null) %DLF.colornicks = 0
+  if (%DLF.server.limit == $null) %DLF.server.limit = 1
+  if (%DLF.filtered.limit == $null) %DLF.filtered.limit = 1
+  if (%DLF.server.timestamp == $null) %DLF.server.timestamp = 1
+  if (%DLF.filtered.timestamp == $null) %DLF.filtered.timestamp = 1
+  if (%DLF.server.wrap == $null) %DLF.server.wrap = 1
+  if (%DLF.filtered.wrap == $null) %DLF.filtered.wrap = 0
+  if (%DLF.server.strip == $null) %DLF.server.strip = 0
+  if (%DLF.filtered.strip == $null) %DLF.filtered.strip = 0
+  if (%DLF.o.enabled == $null) %DLF.o.enabled = 1
+  if (%DLF.o.timestamp == $null) %DLF.o.timestamp = 1
+  if (%DLF.o.log == $null) %DLF.o.log = 1
+  if (%DLF.custom.chantext == $null) {
+    %DLF.custom.chantext = $addtok(%DLF.custom.chantext,*bonga*,$asc($comma))
+    %DLF.custom.chantext = $addtok(%DLF.custom.chantext,*agnob*,$asc($comma))
+    %DLF.custom.chantext = $addtok(%DLF.custom.chantext,*meep*,$asc($comma))
+  }
+  if (%DLF.channels == $null) {
+    DLF.Status Setting channels to $c(4,all) $+ .
+    %DLF.channels = #
+  }
+}
+
 on *:dialog:DLF.Options.GUI:init:0: {
   DLF.SetVersion
   did -o DLF.Options.GUI 6 1 %DLF.Channels
@@ -498,9 +512,8 @@ on *:dialog:DLF.Options.GUI:init:0: {
   did -a DLF.Options.GUI 37 Private notice
   did -a DLF.Options.GUI 37 Private ctcp
   did -c DLF.Options.GUI 37 1
-  didtok DLF.Options.GUI 51 44 %DLF.custom.chantext
-  %DLF.custom.selected = Channel text
-  DLF.Update
+  DLF.Options.SetCustomType
+  DLF.Update.Run
 }
 
 ; Change enabled state
@@ -545,7 +558,6 @@ on *:dialog:DLF.Options.GUI:sclick:4: {
   %DLF.colornicks = $did(62).state
   %DLF.o.enabled = $did(61).state
   %DLF.custom.enabled = $did(36).state
-  .unset %DLF.custom.selected
 }
 
 ; Show / hide filtered messages check box
@@ -570,7 +582,6 @@ on *:dialog:DLF.Options.GUI:sclick:75: {
 
 ; Select custom message type
 on *:dialog:DLF.Options.GUI:sclick:37: {
-  %DLF.custom.selected = $did(37).seltext
   DLF.Options.SetCustomType $did(37).seltext
 }
 
@@ -1278,12 +1289,20 @@ raw 301:*: {
 
 ; ========== Check version for updates ==========
 on *:connect: {
-  DLF.Update
+  DLF.Update.Check
+}
+
+alias DLF.Update.Check {
+  var %days = $calc($int(($ctime - %DLF.LastUpdateCheck) / 60 / 60 / 24))
+  if (%days >= 7) DLF.Update.Run
+}
+
+alias DLF.Update.Run {
+  sockopen -e DLF.Update.Socket raw.githubusercontent.com 443
+  return
   :error
   DLF.Error During update: $qt($error)
 }
-
-alias DLF.Update sockopen -e DLF.Update.Socket raw.githubusercontent.com 443
 
 on *:sockopen:DLF.Update.Socket: {
   if ($sockerr > 0) DLF.Update.Error
@@ -1301,9 +1320,10 @@ on *:sockread:DLF.Update.Socket: {
     if ((%br > 0) && ($gettok(%t,1,$asc($eq)) == DLFilter)) {
       var %ver = $gettok(%t,2,$asc($eq))
       if (%ver > $DLF.SetVersion) DLF.Update.StatusMsg Please update DLFilter to version %ver
-      elseif (%ver == $DLF.SetVersion) DLF.Update.StatusMsg You have current version of DLFilter
-      else DLF.Update.StatusMsg You have a newer version $br($DLF.SetVersion) than website $br(%ver)
+      elseif (%ver == $DLF.SetVersion) DLF.Update.StatusMsg Running current version of DLFilter
+      else DLF.Update.StatusMsg Running a newer version $br($DLF.SetVersion) than website $br(%ver)
       .sockclose DLF.Update.Socket
+      set %DLF.LastUpdateCheck $ctime
       return
     }
   }
@@ -1315,7 +1335,7 @@ alias DLF.Update.Error {
 }
 
 alias DLF.Update.StatusMsg {
-  DLF.Warning $1-
+  else DLF.Warning $1-
   if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 $1-
 }
 
@@ -1334,7 +1354,8 @@ alias DLF.hadd {
   hadd %h %n $2-
 }
 
-alias DLF.SetHashTables {
+alias DLF.CreateHashTables {
+  var %matches = 0
   if ($hget(DLF.text.ads)) hfree DLF.text.ads
   DLF.hadd text.ads *Type*@*
   DLF.hadd text.ads *Trigger*@*
@@ -1435,12 +1456,12 @@ alias DLF.SetHashTables {
   DLF.hadd text.ads *rßP£a*sk*n*
   DLF.hadd text.ads *rßPLåY*
   DLF.hadd text.ads *<*>*!*
-  DLF.Status Added $hget(DLF.text.ads,0).item matches for $b(adverts) as text
+  inc %matches $hget(DLF.text.ads,0).item
 
   if ($hget(DLF.text.cmds)) hfree DLF.text.cmds
   DLF.hadd text.cmds !*
   DLF.hadd text.cmds @*
-  DLF.Status Added $hget(DLF.text.cmds,0).item matches for $b(user requests)
+  inc %matches $hget(DLF.text.cmds,0).item
 
   if ($hget(DLF.text.away)) hfree DLF.text.away
   DLF.hadd text.away *KeepTrack*de adisoru*
@@ -1488,7 +1509,7 @@ alias DLF.SetHashTables {
   DLF.hadd text.away *[Away]*SysReset*
   DLF.hadd text.away *Back*Duration*
   DLF.hadd text.away *MisheBORG*SendStat*v.*
-  DLF.Status Added $hget(DLF.text.away,0).item matches for $b(away spam) as text
+  inc %matches $hget(DLF.text.away,0).item
 
   if ($hget(DLF.text.newrels)) hfree DLF.text.newrels
   DLF.hadd text.newrels *NEW from the excellent proofers of*
@@ -1496,7 +1517,7 @@ alias DLF.SetHashTables {
   DLF.hadd text.newrels N E W *
   DLF.hadd text.newrels *-=NEW=-*
   DLF.hadd text.newrels *-=NEW RELEASE=-*
-  DLF.Status Added $hget(DLF.text.newrels,0).item matches for $b(new release spam) as text
+  inc %matches $hget(DLF.text.newrels,0).item
 
   if ($hget(DLF.text.always)) hfree DLF.text.always
   DLF.hadd text.always 2find *
@@ -1507,7 +1528,7 @@ alias DLF.SetHashTables {
   DLF.hadd text.always ---*MB*s*
   DLF.hadd text.always #find *
   DLF.hadd text.always "find *
-  DLF.Status Added $hget(DLF.text.always,0).item matches for $b(always filter) items
+  inc %matches $hget(DLF.text.always,0).item
 
   if ($hget(DLF.action.away)) hfree DLF.action.away
   DLF.hadd action.away *has taken a seat on the channel couch*Couch v*by Kavey*
@@ -1534,12 +1555,12 @@ alias DLF.SetHashTables {
   DLF.hadd action.away *is currently boogying away to*
   DLF.hadd action.away *is listening to*Kbps*KHz*
   DLF.hadd action.away *Now*Playing*Kbps*KHz*
-  DLF.Status Added $hget(DLF.action.away,0).item matches for $b(away spam) as actions
+  inc %matches $hget(DLF.action.away,0).item
 
   if ($hget(DLF.action.ads)) hfree DLF.action.ads
   DLF.hadd action.ads *FTP*port*user*pass*
   DLF.hadd action.ads *get AMIP*plug-in at http*amip.tools-for.net*
-  DLF.Status Added $hget(DLF.action.ads,0).item matches for $b(adverts) as actions
+  inc %matches $hget(DLF.action.ads,0).item
 
   if ($hget(DLF.notice.server)) hfree DLF.notice.server
   DLF.hadd notice.server *I have added*
@@ -1615,13 +1636,13 @@ alias DLF.SetHashTables {
   DLF.hadd notice.server *Send Complete*File*Sent*times*
   DLF.hadd notice.server *Sent*Files Allowed per day*User Class*BWI-Limits*
   DLF.hadd notice.server *Now I have received*DragonServe*
-  DLF.Status Added $hget(DLF.notice.server,0).item matches for $b(server messages) as notices
+  inc %matches $hget(DLF.notice.server,0).item
 
   if ($hget(DLF.ctcp.reply)) hfree DLF.ctcp.reply
   DLF.hadd ctcp.reply *SLOTS*
   DLF.hadd ctcp.reply *ERRMSG*
   DLF.hadd ctcp.reply *MP3*
-  DLF.Status Added $hget(DLF.ctcp.reply,0).item matches for $b(ctcp replies)
+  inc %matches $hget(DLF.ctcp.reply,0).item
 
   if ($hget(DLF.priv.spam)) hfree DLF.priv.spam
   DLF.hadd priv.spam *www*sex*
@@ -1633,7 +1654,7 @@ alias DLF.SetHashTables {
   DLF.hadd priv.spam *sex*http*
   DLF.hadd priv.spam *xxx*http*
   DLF.hadd priv.spam *porn*http*
-  DLF.Status Added $hget(DLF.priv.spam,0).item matches for $b(spam) as private message
+  inc %matches $hget(DLF.priv.spam,0).item
 
   if ($hget(DLF.search.headers)) hfree DLF.search.headers
   DLF.hadd search.headers *Search Result*OmeNServE*
@@ -1670,7 +1691,7 @@ alias DLF.SetHashTables {
   DLF.hadd search.headers *Search Results*Found*matches for*Type @*to download my list*
   DLF.hadd search.headers *I have found*file*for your query*Displaying*
   DLF.hadd search.headers *From list*found*displaying*
-  DLF.Status Added $hget(DLF.search.headers,0).item matches for $b(search headers) as private message
+  inc %matches $hget(DLF.search.headers,0).item
 
   if ($hget(DLF.priv.server)) hfree DLF.priv.server
   DLF.hadd priv.server Sorry, I'm making a new list right now, please try later*
@@ -1689,7 +1710,7 @@ alias DLF.SetHashTables {
   DLF.hadd priv.server *Empieza transferencia*IMPORTANTE*dccallow*
   DLF.hadd priv.server *Sorry, I'm too busy to send my list right now, please try later*
   DLF.hadd priv.server *Please standby for acknowledgement. I am using a secure query event*
-  DLF.Status Added $hget(DLF.priv.server,0).item matches for $b(server messages) as private message
+  inc %matches $hget(DLF.priv.server,0).item
 
   if ($hget(DLF.priv.away)) hfree DLF.priv.away
   DLF.hadd priv.away *AFK, auto away after*minutes. Gone*
@@ -1702,13 +1723,15 @@ alias DLF.SetHashTables {
   DLF.hadd priv.away *Dacia Script v1.2*
   DLF.hadd priv.away *Away*SysReset*
   DLF.hadd priv.away *automated msg*
-  DLF.Status Added $hget(DLF.priv.away,0).item matches for $b(away spam) as private message
+  inc %matches $hget(DLF.priv.away,0).item
+
+  DLF.Status Added %matches wildcard templates
 }
 
 ; ========== Status and error messages ==========
 alias -l DLF.logo return $rev([DLFilter])
-alias DLF.Status echo -s $c(1,9,$DLF.logo $1-)
-alias DLF.Warning echo -as $c(1,9,$DLF.logo $1-)
+alias DLF.Status echo -ts $c(1,9,$DLF.logo $1-)
+alias DLF.Warning echo -tas $c(1,9,$DLF.logo $1-)
 alias DLF.Error DLF.Warning $c(4,$b(Error:)) $1-
 
 ; ========== Identifiers instead of $chr(xx) - more readable ==========
