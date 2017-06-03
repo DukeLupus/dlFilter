@@ -34,6 +34,7 @@ This avoids problems where other scripts halt events preventing this scripts eve
         Check update against GitHub
         User groups to enable / disable DLF event handling
         Allow msgs from Chanserv etc. and self
+        Cleanup menu code
 */
 
 alias DLF.SetVersion {
@@ -246,122 +247,133 @@ menu @DLF.*.search {
 
 menu @DLF.@find.Results,@DLF.NewReleases {
   .-
-  .Copy line(s): {
-    var %lines = $sline($active,0)
-    if (!%lines) halt
-    var %allines = $line($active,0)
-    var %cnter1 = 1
-    while (%cnter1 <= %allines) {
-      cline $color(text) $active %cnter1
-      inc %cnter1
-    }
-    var %cnter = 1
-    clipboard
-    while (%cnter <= %lines) {
-      if (%cnter == 1) {
-        var %line = $gettok($sline($active,1),1,32) $+ $chr(32) $+ $DLF.GetFileName($gettok($sline($active,1),2-,32))
-        clipboard %line
-        cline 14 $active $sline($active,1).ln
-      }
-      else {
-        clipboard -a $chr(13) $+ $chr(10)
-        var %line = $gettok($sline($active,%cnter),1,32) $+ $chr(32) $+ $DLF.GetFileName($gettok($sline($active,%cnter),2-,32))
-        clipboard -a %line
-        cline 14 $active $sline($active,%cnter).ln
-      }
-      inc %cnter
-    }
-    if ($active == @DLF.@find.Results) titlebar $active -=- $line(@DLF.@find.Results,0) results so far -=- $calc(%cnter - 1) line(s) copied into clipboard
-    else titlebar $active -=- New Releases -=- $calc(%cnter - 1) line(s) copied into clipboard
-  }
-  $iif(!$script(AutoGet.mrc), $style(2)) Send to AutoGet: {
-    var %lines = $sline($active,0)
-    if (!%lines) halt
-    if ($fopen(MTlisttowaiting)) .fclose MTlisttowaiting
-    .fopen MTlisttowaiting $+(",$remove($script(AutoGet.mrc),Autoget.mrc),AGwaiting.ini,")
-    set %MTpath %MTdefaultfolder
-    var %i = 1
-    var %j = 0
-    while (%i <= $sline($active,0)) {
-      var %temp = $MTlisttowaiting($replace($sline($active,%i),$chr(160),$chr(32)))
-      var %j = $calc(%j + $gettok(%temp,1,32))
-      if ($sbClient.Online($sline($active,%i)) == 1) { cline 10 $active $sline($active,%i).ln }
-      else { cline 6 $active $sline($active,%i).ln }
-      inc %i
-    }
-    .fclose MTlisttowaiting
-    unset %MTpath
-    if (%MTautorequest == 1) { MTkickstart $gettok(%temp,2,32) }
-    MTwhosinque
-    echo -s %MTlogo Added %j File(s) To Waiting List From DLFilter
-    if ($active == @DLF.@find.Results) titlebar $active -=- $line($active,0) results so far -=- %j line(s) sent to AutoGet
-    else titlebar $active -=- New releases -=- %j line(s) sent to AutoGet
-  }
-  $iif(!$script(vPowerGet.net.mrc), $style(2)) Send to vPowerGet.NET: {
-    var %lines = $sline($active,0)
-    if (!%lines) halt
-    var %allines = $line($active,0)
-    var %cnter1 = 1
-    while (%cnter1 <= %allines) {
-      cline $color(text) $active %cnter1
-      inc %cnter1
-    }
-    var %cnter = 1
-    while (%cnter <= %lines) {
-      if ($com(vPG.NET,AddFiles,1,bstr,$sline($active,%cnter)) == 0) {
-        echo -s vPG.NET: AddFiles failed
-      }
-      cline 14 $active $sline($active,%cnter).ln
-      inc %cnter
-    }
-    if ($active == @DLF.@find.Results) titlebar $active -=- $line(@DLF.@find.Results,0) results so far -=- $calc(%cnter - 1) line(s) sent to vPowerGet.NET
-    else titlebar $active -=- New releases -=- $calc(%cnter - 1) line(s) sent to vPowerGet.NET
-  }
-  Save results: {
-    var %filename = $sfile($mircdir,Save $active contents,Save)
-    if (!%filename) haltdef
-    %filename = $chr(34) $+ $remove(%filename,.txt) $+ .txt $+ $chr(34)
-    savebuf $active %filename
-  }
-  Options: dialog -md DLF.Options.GUI DLF.Options.GUI
+  .Copy line(s): DLF.@find.CopyLines
+  $iif(!$script(AutoGet.mrc), $style(2)) Send to AutoGet: DLF.@find.SendToAutoGet
+  $iif(!$script(vPowerGet.net.mrc), $style(2)) Send to vPowerGet.NET: DLF.@find.SendTovPowerGet
+  Save results: DLF.@find.SaveResults
+  Options: DLF.Options.Show
   Clear: /clear
   .-
   Close: /window -c $active
   .-
 }
 
+alias DLF.@find.CopyLines {
+  var %lines = $sline($active,0)
+  if (!%lines) halt
+  var %allines = $line($active,0)
+  var %cnter1 = 1
+  while (%cnter1 <= %allines) {
+    cline $color(text) $active %cnter1
+    inc %cnter1
+  }
+  var %cnter = 1
+  clipboard
+  while (%cnter <= %lines) {
+    if (%cnter == 1) {
+      var %line = $gettok($sline($active,1),1,$asc($space)) $DLF.GetFileName($gettok($sline($active,1),2-,$asc($space)))
+      clipboard %line
+      cline 14 $active $sline($active,1).ln
+    }
+    else {
+      clipboard -a $crlf
+      var %line = $gettok($sline($active,%cnter),1,$asc($space)) $DLF.GetFileName($gettok($sline($active,%cnter),2-,$asc($space)))
+      clipboard -a %line
+      cline 14 $active $sline($active,%cnter).ln
+    }
+    inc %cnter
+  }
+  if ($active == @DLF.@find.Results) titlebar $active -=- $line(@DLF.@find.Results,0) results so far -=- $calc(%cnter - 1) line(s) copied into clipboard
+  else titlebar $active -=- New Releases -=- $calc(%cnter - 1) line(s) copied into clipboard
+}
+
+alias DLF.@find.SendToAutoGet {
+  var %lines = $sline($active,0)
+  if (!%lines) halt
+  if ($fopen(MTlisttowaiting)) .fclose MTlisttowaiting
+  .fopen MTlisttowaiting $+(",$remove($script(AutoGet.mrc),Autoget.mrc),AGwaiting.ini,")
+  set %MTpath %MTdefaultfolder
+  var %i = 1
+  var %j = 0
+  while (%i <= $sline($active,0)) {
+    var %temp = $MTlisttowaiting($replace($sline($active,%i),$nbsp,$space))
+    var %j = $calc(%j + $gettok(%temp,1,$asc($space)))
+    if ($sbClient.Online($sline($active,%i)) == 1) cline 10 $active $sline($active,%i).ln
+    else cline 6 $active $sline($active,%i).ln
+    inc %i
+  }
+  .fclose MTlisttowaiting
+  unset %MTpath
+  if (%MTautorequest == 1) MTkickstart $gettok(%temp,2,$asc($space))
+  MTwhosinque
+  echo -s %MTlogo Added %j File(s) To Waiting List From DLFilter
+  if ($active == @DLF.@find.Results) titlebar $active -=- $line($active,0) results so far -=- %j line(s) sent to AutoGet
+  else titlebar $active -=- New releases -=- %j line(s) sent to AutoGet
+}
+
+alias DLF.@find.SendTovPowerGet {
+  var %lines = $sline($active,0)
+  if (!%lines) halt
+  var %allines = $line($active,0)
+  var %cnter1 = 1
+  while (%cnter1 <= %allines) {
+    cline $color(text) $active %cnter1
+    inc %cnter1
+  }
+  var %cnter = 1
+  while (%cnter <= %lines) {
+    if ($com(vPG.NET,AddFiles,1,bstr,$sline($active,%cnter)) == 0) {
+      echo -s vPG.NET: AddFiles failed
+    }
+    cline 14 $active $sline($active,%cnter).ln
+    inc %cnter
+  }
+  if ($active == @DLF.@find.Results) titlebar $active -=- $line(@DLF.@find.Results,0) results so far -=- $calc(%cnter - 1) line(s) sent to vPowerGet.NET
+  else titlebar $active -=- New releases -=- $calc(%cnter - 1) line(s) sent to vPowerGet.NET
+}
+
+alias DLF.@find.SaveResults {
+  var %filename = $sfile($mircdir,Save $active contents,Save)
+  if (!%filename) haltdef
+  %filename = $qt($remove(%filename,.txt) $+ .txt)
+  savebuf $active %filename
+}
+
+; onotice windows
 menu @#* {
   Clear: /clear
-  $iif(%DLF.o.timestamp == 1,$style(1)) Timestamp: {
-    if (%DLF.o.timestamp == 1) {
-      set %DLF.o.timestamp 0
-    }
-    else {
-      set %DLF.o.timestamp 1
-    }
-  }
-  $iif(%DLF.o.log == 1,$style(1)) Logging: {
-    if (%DLF.o.log == 1) {
-      set %DLF.o.log 0
-    }
-    else {
-      .log off $active
-      set %DLF.o.log 1
-    }
-  }
-  Options: dialog -md DLF.Options.GUI DLF.Options.GUI
+  $iif(%DLF.o.timestamp == 1,$style(1)) Timestamp: DLF.Option.Toggle o.timestamp
+  $iif(%DLF.o.log == 1,$style(1)) Logging: DLF.Option.Toggle o.log
+  Options: DLF.Options.Show
   -
-  Close: {
-    var %chatwindow = $active
-    if ((%DLF.o.log == 1) && ($exists($+(",$logdir,%chatwindow,.log,")))) {
-      write $+(",$logdir,%chatwindow,.log,") $crlf
-      write $+(",$logdir,%chatwindow,.log,") $+($chr(91) $+ $fulldate $+ $chr(93),$chr(32) ----- Session closed -----)
-      write $+(",$logdir,%chatwindow,.log,") $crlf
-    }
-    window -c $active
-  }
+  Close: DLF.onotice.Close
   -
 }
+
+alias DLF.oNotice.Send {
+  var %chatwindow = @ $+ $chan
+  if (!$window(%chatwindow)) {
+    window -eg1k1l12mSw %chatwindow
+    var %log = $qt($+($logdir,%chatwindow,.log))
+    if ((%DLF.o.log == 1) && ($exists(%log))) {
+      write %log $crlf
+      write %log $sqbr($fulldate) ----- Session started -----
+      write %log $crlf
+      .loadbuf -r %chatwindow %log
+    }
+  }
+}
+
+alias DLF.onotice.Close {
+  var %chatwindow = $active, %log = $qt($+($logdir,%chatwindow,.log))
+  if ((%DLF.o.log == 1) && ($exists(%log))) {
+    write %log $crlf
+    write %log $sqbr($fulldate) ----- Session closed -----
+    write %log $crlf
+  }
+  window -c $active
+}
+
 ; ========== DLF Options Dialog ==========
 alias DLF.Options.Show dialog $iif($dialog(DLF.Options.GUI),-v,-md) DLF.Options.GUI DLF.Options.GUI
 
