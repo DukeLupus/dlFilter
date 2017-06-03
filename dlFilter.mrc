@@ -24,6 +24,7 @@ This avoids problems where other scripts halt events preventing this scripts eve
         Use custom identifiers for creating bold, colour etc.
         Use custom identifiers instead of $chr(xx)
         Use alias for status messages
+        Hash tables for message matching
 */
 
 alias DLF.SetVersion {
@@ -31,19 +32,34 @@ alias DLF.SetVersion {
   return %DLF.version
 }
 
-on *:start: {
+; ========== Initialisation / Termination ==========
+alias DLF.init {
+  if ($version < 6) {
+    DLF.Error DLFilter requires mIRC 6+. Loading stopped.
+    .unload -rs $script
+  }
   if ($script(onotice.mrc)) .unload -rs onotice.mrc
   if ($script(onotice.txt)) .unload -rs onotice.txt
+  ; Initialise hashtables
+  DLF.SetHashTables
+}
+
+on *:start: {
+  DLF.init
+  ; Reload script if needed to be first to execute
+  if ($script != $script(1)) .reload -rs1 $qt($script)
 }
 
 on *:load: {
-  if ($version < 6) {
-    echo -a 1,9[DLFilter] Sorry, but this script requires mIRC 6+. Loading stopped.
-    .unload -rs $script
-  }
-  if ($script != $script(1)) .load -rs1 $+(",$scriptdir,DLFilter.mrc,")
-  echo -s 1,9Loading [DLFilter] version $Set.DLF.version by DukeLupus
-  echo -s 1,9[DLFilter] Please check DLFilter homepage (12,9http://dukelupus.com1,9) for help.
+  DLF.init
+  ; Reload script if needed to be first to execute
+  if ($script != $script(1)) .load -rs1 $qt($script)
+
+  ; Announce ourself
+  DLF.Status Loading $c(4,$+(version,$space,$DLF.SetVersion)) by DukeLupus
+  DLF.Status Please check DLFilter homepage $br($c(12,9,$u(http://dukelupus.com/dlfilter))) for help.
+
+  ; Initialise variables
   if (%DLF.enabled == $null) %DLF.enabled = 1
   if (%DLF.ads == $null) %DLF.ads = 1
   if (%DLF.requests == $null) %DLF.requests = 1
@@ -84,21 +100,23 @@ on *:load: {
   if (%DLF.o.enabled == $null) %DLF.o.enabled = 1
   if (%DLF.o.timestamp == $null) %DLF.o.timestamp = 1
   if (%DLF.o.log == $null) %DLF.o.log = 1
-  %DLF.custom.chantext = $addtok(%DLF.custom.chantext,*bonga*,44)
-  %DLF.custom.chantext = $addtok(%DLF.custom.chantext,*agnob*,44)
-  %DLF.custom.chantext = $addtok(%DLF.custom.chantext,*meep*,44)
-
-
-  if ($script(onotice.mrc)) .unload -rs onotice.mrc
-  if ($script(onotice.txt)) .unload -rs onotice.txt
-  if (%DLF.channels == $null) {
-    echo -s 1,9[DLFilter] Setting channels to 4all
-    %DLF.channels = $chr(35)
-    dialog -md DLFilter_GUI DLFilter_GUI
+  if (%DLF.custom.chantext == $null) {
+    %DLF.custom.chantext = $addtok(%DLF.custom.chantext,*bonga*,$asc($comma))
+    %DLF.custom.chantext = $addtok(%DLF.custom.chantext,*agnob*,$asc($comma))
+    %DLF.custom.chantext = $addtok(%DLF.custom.chantext,*meep*,$asc($comma))
   }
+  if (%DLF.channels == $null) {
+    DLF.Status Setting channels to $c(4,all) $+ .
+    %DLF.channels = #
+    DLF.Options.Show
+  }
+  DLF.Status Loading complete.
+  return
+
   :error
-  echo -s 1,9Loading [DLFilter] complete.
+  DLF.Error During load: $qt($error)
 }
+
 ctcp *:VERSION: .ctcpreply $nick VERSION 1,9[DLFilter] version $Set.DLF.version by DukeLupus.1,15 Get it from 12,15http://dukelupus.com/
 on *:unload: {
   echo -s 1,9Unloading [DLFilter] version $Set.DLF.version by DukeLupus
@@ -1658,6 +1676,385 @@ on *:sockread:dlf: {
       .sockclose dlf
     }
   }
+}
+
+; ========== Define message matching hash tables ==========
+alias DLF.hadd {
+  var %h = DLF. $+ $1
+  if (!$hget(%h)) hmake %h
+  var %n = $hget($1, 0)
+  hadd %h %n $2-
+}
+
+alias DLF.SetHashTables {
+  if ($hget(DLF.text.ads)) hfree DLF.text.ads
+  DLF.hadd text.ads *Type*@*
+  DLF.hadd text.ads *Trigger*@*
+  DLF.hadd text.ads *List*@*
+  DLF.hadd text.ads *Type*!*to get this*
+  DLF.hadd text.ads *[BWI]*@*
+  DLF.hadd text.ads *Trigger*ctcp*
+  DLF.hadd text.ads *@*Finålity*
+  DLF.hadd text.ads *@*SDFind*
+  DLF.hadd text.ads *I have just finished sending*to*Empty*
+  DLF.hadd text.ads *§kÎn§*ßy*§hådõ*
+  DLF.hadd text.ads *-SpR-*
+  DLF.hadd text.ads *Escribe*@*
+  DLF.hadd text.ads *±*
+  DLF.hadd text.ads *Escribe*!*
+  DLF.hadd text.ads *-SpR skin used by PepsiScript*
+  DLF.hadd text.ads *Type*!*.*
+  DLF.hadd text.ads *Empty! Grab one fast!*
+  DLF.hadd text.ads *Random Play MP3*Now Activated*
+  DLF.hadd text.ads *The Dcc Transfer to*has gone under*Transfer*
+  DLF.hadd text.ads *just left*Sending file Aborted*
+  DLF.hadd text.ads *has just received*for a total of*
+  DLF.hadd text.ads *There is a Slot Opening*Grab it Fast*
+  DLF.hadd text.ads *Tapez*Pour avoir ce Fichier*
+  DLF.hadd text.ads *Tapez*Pour Ma Liste De*Fichier En Attente*
+  DLF.hadd text.ads *left irc and didn't return in*min. Sending file Aborted*
+  DLF.hadd text.ads *FTP*address*port*login*password*
+  DLF.hadd text.ads *I have sent a total of*files and leeched a total of*since*
+  DLF.hadd text.ads *I have just finished sending*I have now sent a total of*files since*
+  DLF.hadd text.ads *I have just finished recieving*from*I have now recieved a total of*
+  DLF.hadd text.ads *Proofpack Server*Looking for new scans to proof*@proofpack for available proofing packs*
+  DLF.hadd text.ads *SpR JUKEBOX*filesize*
+  DLF.hadd text.ads *I have spent a total time of*sending files and a total time of*recieving files*
+  DLF.hadd text.ads *Tape*@*
+  DLF.hadd text.ads *Tape*!*MB*
+  DLF.hadd text.ads *Tape*!*.mp3*
+  DLF.hadd text.ads *§*DCC Send Failed*to*§*
+  DLF.hadd text.ads *Wireless*mb*br*
+  DLF.hadd text.ads *Sent*OS-Limits V*
+  DLF.hadd text.ads *File Servers Online*Polaris*
+  DLF.hadd text.ads *There is a*Open*Say's Grab*
+  DLF.hadd text.ads *left*and didn't return in*mins. Sending file Aborted*
+  DLF.hadd text.ads *to*just got timed out*slot*Empty*
+  DLF.hadd text.ads *Softwind*Softwind*
+  DLF.hadd text.ads *Statistici 1*by Un_DuLciC*
+  DLF.hadd text.ads *tìnkërßëll`s collection*Love Quotes*
+  DLF.hadd text.ads *I-n-v-i-s-i-o-n*
+  DLF.hadd text.ads *DCC SEND COMPLETE*to*slot*
+  DLF.hadd text.ads *« * » -*
+  DLF.hadd text.ads *¥*Mp3s*¥*
+  DLF.hadd text.ads *DCC GET COMPLETE*from*slot*open*
+  DLF.hadd text.ads *Je viens juste de terminer l'envoi de*Prenez-en un vite*
+  DLF.hadd text.ads *Random Play MP3 filez Now Plugged In*
+  DLF.hadd text.ads *a recu*pour un total de*fichiers*
+  DLF.hadd text.ads *vient d'etre interrompu*Dcc Libre*
+  DLF.hadd text.ads *failed*DCC Send Failed of*to*failed*
+  DLF.hadd text.ads *is playing*info*secs*
+  DLF.hadd text.ads *--PepsiScript--*
+  DLF.hadd text.ads *«Scøøp MP3»*
+  DLF.hadd text.ads *~*~SpR~*~*
+  DLF.hadd text.ads *SpR*[*mp3*]*
+  DLF.hadd text.ads *©§©*
+  DLF.hadd text.ads *I am opening up*more slot*Taken*
+  DLF.hadd text.ads *.mp3*t×PLåY6*
+  DLF.hadd text.ads *!*.mp3*SpR*
+  DLF.hadd text.ads *SPr*!*.mp3*
+  DLF.hadd text.ads *Successfully*Tx.Track*
+  DLF.hadd text.ads *[Mp3xBR]*
+  DLF.hadd text.ads *OmeNServE*©^OmeN^*
+  DLF.hadd text.ads *@*DragonServe*
+  DLF.hadd text.ads *Now Sending*QwIRC*
+  DLF.hadd text.ads *sent*to*size*speed*time*sent*
+  DLF.hadd text.ads *Bandwith*Usage*Current*Record*
+  DLF.hadd text.ads *Files In List*slots open*Queued*Next Send*
+  DLF.hadd text.ads *Rank*~*x*~*
+  DLF.hadd text.ads *Total Offered*Files*Total Sent*Files*Total Sent Today*Files*
+  DLF.hadd text.ads *Control*IRC Client*CTCPSERV*
+  DLF.hadd text.ads *Download this exciting book*
+  DLF.hadd text.ads *» Port «*»*
+  DLF.hadd text.ads *Tasteazã*@*
+  DLF.hadd text.ads *File Servers Online*Trigger*Accessed*Served*
+  DLF.hadd text.ads *- DCC Transfer Status -*
+  DLF.hadd text.ads *Enter @*to see the menu*
+  DLF.hadd text.ads *User Slots*Sends*Queues*Next Send Available*¤UControl¤*
+  DLF.hadd text.ads *Total*File Transfer in Progress*slot*empty*
+  DLF.hadd text.ads *!*MB*Kbps*Khz*
+  DLF.hadd text.ads *I have just finished sending*.mp3 to*
+  DLF.hadd text.ads *Files*free Slots*Queued*Speed*Served*
+  DLF.hadd text.ads *I am using*SpR JUKEBOX*http://spr.darkrealms.org*
+  DLF.hadd text.ads *FTP service*FTP*port*bookz*
+  DLF.hadd text.ads *<><><*><><>*
+  DLF.hadd text.ads *To serve and to be served*@*
+  DLF.hadd text.ads *send - to*at*cps*complete*left*
+  DLF.hadd text.ads *DCC Send Failed of*to*
+  DLF.hadd text.ads *[Fserve Active]*
+  DLF.hadd text.ads *File Server Online*Triggers*Sends*Queues*
+  DLF.hadd text.ads *Teclea: @*
+  DLF.hadd text.ads *rßP£a*sk*n*
+  DLF.hadd text.ads *rßPLåY*
+  DLF.hadd text.ads *<*>*!*
+  DLF.Status Added $hget(DLF.text.ads,0).item matches for $b(adverts) as text
+
+  if ($hget(DLF.text.cmds)) hfree DLF.text.cmds
+  DLF.hadd text.cmds !*
+  DLF.hadd text.cmds @*
+  DLF.Status Added $hget(DLF.text.cmds,0).item matches for $b(user requests)
+
+  if ($hget(DLF.text.away)) hfree DLF.text.away
+  DLF.hadd text.away *KeepTrack*de adisoru*
+  DLF.hadd text.away *Leaving*reason*auto away after*
+  DLF.hadd text.away *I am AWAY*Reason*To page me*
+  DLF.hadd text.away *sets away*auto idle away*since*
+  DLF.hadd text.away *away*since*pager*
+  DLF.hadd text.away *Thanks for the +v*
+  DLF.hadd text.away *I have just finished receiving*from*
+  DLF.hadd text.away *We have just finished receiving*From The One And Only*
+  DLF.hadd text.away *Thank You*for serving in*
+  DLF.hadd text.away *Thanks for the @*
+  DLF.hadd text.away *Thanks*For*The*Voice*
+  DLF.hadd text.away *I am AWAY*Reason*I have been Away for*
+  DLF.hadd text.away *HêåvêñlyAway*
+  DLF.hadd text.away *[F][U][N]*
+  DLF.hadd text.away *Tx TIMEOUT*
+  DLF.hadd text.away *Receive Successful*Thanks for*
+  DLF.hadd text.away *Thanks*for Supplying an server in*
+  DLF.hadd text.away *have just finished recieving*from*I have leeched a total*
+  DLF.hadd text.away *DCC Send Failed of*to*Starting next in Que*
+  DLF.hadd text.away *KeepTrack*by*^OmeN*
+  DLF.hadd text.away *Message*SysReset*
+  DLF.hadd text.away *YAY* Another brave soldier in the war to educate the masses*Onward Comrades*
+  DLF.hadd text.away *WaS auTo-VoiCeD THaNX FoR SHaRiNG HeRe iN*
+  DLF.hadd text.away *I have just received*from*leeched since*
+  DLF.hadd text.away *mp3 server detected*
+  DLF.hadd text.away *KiLLJarX*channel policy is that we are a*
+  DLF.hadd text.away *rbPlay20.mrc*
+  DLF.hadd text.away *rßPLåY2.0*
+  DLF.hadd text.away *I have just finished receiving*from*have now received a total*
+  DLF.hadd text.away *ROLL TIDE*Now Playing*mp3*
+  DLF.hadd text.away *Tocmai am primit*KeepTrack*
+  DLF.hadd text.away *Total Received*Files*Total Received Today*Files*
+  DLF.hadd text.away *BJFileTracker V06 by BossJoe*
+  DLF.hadd text.away *Just Sent To*Filename*Slots Free*Queued*
+  DLF.hadd text.away *Received*From*Size*Speed*Time*since*
+  DLF.hadd text.away *I have just received*from*for a total of*KeepTrack*
+  DLF.hadd text.away *« Ë×Çü®§îöñ »*
+  DLF.hadd text.away *Thanks*For The*@*
+  DLF.hadd text.away *get - from*at*cps*complete*
+  DLF.hadd text.away *Je viens juste de terminer de recevoir*de*Prenez-en un vite*
+  DLF.hadd text.away *§ÐfíñÐ âÐÐ-øñ§*
+  DLF.hadd text.away *Welcome back to #* operator*.*
+  DLF.hadd text.away *[Away]*SysReset*
+  DLF.hadd text.away *Back*Duration*
+  DLF.hadd text.away *MisheBORG*SendStat*v.*
+  DLF.Status Added $hget(DLF.text.away,0).item matches for $b(away spam) as text
+
+  if ($hget(DLF.text.newrels)) hfree DLF.text.newrels
+  DLF.hadd text.newrels *NEW from the excellent proofers of*
+  DLF.hadd text.newrels *N e w release*
+  DLF.hadd text.newrels N E W *
+  DLF.hadd text.newrels *-=NEW=-*
+  DLF.hadd text.newrels *-=NEW RELEASE=-*
+  DLF.Status Added $hget(DLF.text.newrels,0).item matches for $b(new release spam) as text
+
+  if ($hget(DLF.text.always)) hfree DLF.text.always
+  DLF.hadd text.always 2find *
+  DLF.hadd text.always Sign in to turn on 1-Click ordering.
+  DLF.hadd text.always ---*KB
+  DLF.hadd text.always ---*MB
+  DLF.hadd text.always ---*KB*s*
+  DLF.hadd text.always ---*MB*s*
+  DLF.hadd text.always #find *
+  DLF.hadd text.always "find *
+  DLF.Status Added $hget(DLF.text.always,0).item matches for $b(always filter) items
+
+  if ($hget(DLF.action.away)) hfree DLF.action.away
+  DLF.hadd action.away *has taken a seat on the channel couch*Couch v*by Kavey*
+  DLF.hadd action.away *has stumbled to the channel couch*Couch v*by Kavey*
+  DLF.hadd action.away *has returned from*I was gone for*
+  DLF.hadd action.away *is gone. Away after*minutes of inactivity*
+  DLF.hadd action.away *is away*Reason*since*
+  DLF.hadd action.away *is BACK from*auto-away*
+  DLF.hadd action.away *is back*From*Gone for*
+  DLF.hadd action.away *sets away*Auto Idle Away after*
+  DLF.hadd action.away *is back from*Gone*
+  DLF.hadd action.away *is BACK from*Away*
+  DLF.hadd action.away *asculta*
+  DLF.hadd action.away *is AWAY*auto-away*
+  DLF.hadd action.away *Avertisseur*Journal*
+  DLF.hadd action.away *I-n-v-i-s-i-o-n*
+  DLF.hadd action.away *is back*from*Auto IdleAway*
+  DLF.hadd action.away *way*since*pager*
+  DLF.hadd action.away *[Backing Up]*
+  DLF.hadd action.away *está away*pager*
+  DLF.hadd action.away *uses cracked software*I will respond to the following commands*
+  DLF.hadd action.away *I Have Send My List*Times*Files*Times*
+  DLF.hadd action.away *Type Or Copy*Paste*To Get This Song*
+  DLF.hadd action.away *is currently boogying away to*
+  DLF.hadd action.away *is listening to*Kbps*KHz*
+  DLF.hadd action.away *Now*Playing*Kbps*KHz*
+  DLF.Status Added $hget(DLF.action.away,0).item matches for $b(away spam) as actions
+
+  if ($hget(DLF.action.ads)) hfree DLF.action.ads
+  DLF.hadd action.ads *FTP*port*user*pass*
+  DLF.hadd action.ads *get AMIP*plug-in at http*amip.tools-for.net*
+  DLF.Status Added $hget(DLF.action.ads,0).item matches for $b(adverts) as actions
+
+  if ($hget(DLF.notice.server)) hfree DLF.notice.server
+  DLF.hadd notice.server *I have added*
+  DLF.hadd notice.server *After waiting*min*
+  DLF.hadd notice.server *This makes*times*
+  DLF.hadd notice.server *is on the way!*
+  DLF.hadd notice.server *has been sent sucessfully*
+  DLF.hadd notice.server *send will be initiated as soon as possible*
+  DLF.hadd notice.server *«SoftServe»*
+  DLF.hadd notice.server *You are the successful downloader number*
+  DLF.hadd notice.server *You are in*
+  DLF.hadd notice.server *Request Denied*
+  DLF.hadd notice.server *OmeNServE v*
+  DLF.hadd notice.server *«OmeN»*
+  DLF.hadd notice.server *is not found*
+  DLF.hadd notice.server *file not located*
+  DLF.hadd notice.server *I don't have the file*
+  DLF.hadd notice.server *is on its way*
+  DLF.hadd notice.server *±*
+  DLF.hadd notice.server *Transfer Started*File*
+  DLF.hadd notice.server *is on it's way!*
+  DLF.hadd notice.server *Requested File's*
+  DLF.hadd notice.server *Please make a resume request!*
+  DLF.hadd notice.server *File Transfer of*
+  DLF.hadd notice.server *Please reinitiate File-transfer!*
+  DLF.hadd notice.server *on its way*
+  DLF.hadd notice.server *OS-Limits*
+  DLF.hadd notice.server *Transfer Complete*I have successfully sent*QwIRC
+  DLF.hadd notice.server *Request Accepted*File*Queue position*
+  DLF.hadd notice.server *Le Transfert de*Est Completé*
+  DLF.hadd notice.server *Query refused*in*seconds*
+  DLF.hadd notice.server *Keeptrack*omen*
+  DLF.hadd notice.server *U Got A File From Me*files since*
+  DLF.hadd notice.server *Transfer Complete*sent*
+  DLF.hadd notice.server *Transmision de*finalizada*
+  DLF.hadd notice.server *Send Failed*at*Please make a resume request*
+  DLF.hadd notice.server *t×PLåY*
+  DLF.hadd notice.server *OS-Limites V*t×PLåY*
+  DLF.hadd notice.server *rßPLåY2*
+  DLF.hadd notice.server Request Accepted*Has Been Placed In The Priority Queue At Position*
+  DLF.hadd notice.server *esta en camino!*
+  DLF.hadd notice.server *Envio cancelado*
+  DLF.hadd notice.server *de mi lista de espera*
+  DLF.hadd notice.server *Después de esperar*min*
+  DLF.hadd notice.server *veces que he enviado*
+  DLF.hadd notice.server *archivos, Disfrutalo*
+  DLF.hadd notice.server Thank you for*.*!
+  DLF.hadd notice.server *veces que env*
+  DLF.hadd notice.server *zip va en camino*
+  DLF.hadd notice.server *Enviando*(*)*
+  DLF.hadd notice.server *Unable to locate any files with*associated within them*
+  DLF.hadd notice.server *Has Been Placed In The Priority Queue At Position*Omenserve*
+  DLF.hadd notice.server *Thanks*for sharing*with me*
+  DLF.hadd notice.server *«[RDC]»*
+  DLF.hadd notice.server *Your send of*was successfully completed*
+  DLF.hadd notice.server *AFK, auto away after*minutes*
+  DLF.hadd notice.server *Envío completo*DragonServe*
+  DLF.hadd notice.server *Empieza transferencia*DragonServe*
+  DLF.hadd notice.server *Ahora has recibido*DragonServe*
+  DLF.hadd notice.server *Starting Transfer*DragonServe*
+  DLF.hadd notice.server *You have now received*from me*for a total of*sent since*
+  DLF.hadd notice.server *Thanks For File*It is File*That I have recieved*
+  DLF.hadd notice.server *Thank You*I have now received*file*from you*for a total of*
+  DLF.hadd notice.server *You Are Downloader Number*Overall Downloader Number*
+  DLF.hadd notice.server *DCC Get of*FAILED Please Re-Send file*
+  DLF.hadd notice.server *request for*acknowledged*send will be initiated as soon as possible*
+  DLF.hadd notice.server *file not located*
+  DLF.hadd notice.server *t×PLÅY*
+  DLF.hadd notice.server *I'm currently away*your message has been logged*
+  DLF.hadd notice.server *If your message is urgent, you may page me by typing*PAGE*
+  DLF.hadd notice.server *Gracias*Ahora he recibido*DragonServe*
+  DLF.hadd notice.server *Request Accepted*List Has Been Placed In The Priority Queue At Position*
+  DLF.hadd notice.server *Send Complete*File*Sent*times*
+  DLF.hadd notice.server *Sent*Files Allowed per day*User Class*BWI-Limits*
+  DLF.hadd notice.server *Now I have received*DragonServe*
+  DLF.Status Added $hget(DLF.notice.server,0).item matches for $b(server messages) as notices
+
+  if ($hget(DLF.ctcp.reply)) hfree DLF.ctcp.reply
+  DLF.hadd ctcp.reply *SLOTS*
+  DLF.hadd ctcp.reply *ERRMSG*
+  DLF.hadd ctcp.reply *MP3*
+  DLF.Status Added $hget(DLF.ctcp.reply,0).item matches for $b(ctcp replies)
+
+  if ($hget(DLF.priv.spam)) hfree DLF.priv.spam
+  DLF.hadd priv.spam *www*sex*
+  DLF.hadd priv.spam *www*xxx*
+  DLF.hadd priv.spam *http*sex*
+  DLF.hadd priv.spam *http*xxx*
+  DLF.hadd priv.spam *sex*www*
+  DLF.hadd priv.spam *xxx*www*
+  DLF.hadd priv.spam *sex*http*
+  DLF.hadd priv.spam *xxx*http*
+  DLF.hadd priv.spam *porn*http*
+  DLF.Status Added $hget(DLF.priv.spam,0).item matches for $b(spam) as private message
+
+  if ($hget(DLF.search.headers)) hfree DLF.search.headers
+  DLF.hadd search.headers *Search Result*OmeNServE*
+  DLF.hadd search.headers *OmeN*Search Result*ServE*
+  DLF.hadd search.headers *Matches for*Copy and paste in channel*
+  DLF.hadd search.headers *Total*files found*
+  DLF.hadd search.headers *Search Results*QwIRC*
+  DLF.hadd search.headers *Search Result*Too many files*Type*
+  DLF.hadd search.headers *@Find Results*SysReset*
+  DLF.hadd search.headers *End of @Find*
+  DLF.hadd search.headers *I have*match*for*in listfile*
+  DLF.hadd search.headers *SoftServe*Search result*
+  DLF.hadd search.headers *Tengo*coincidencia* para*
+  DLF.hadd search.headers *I have*match*for*Copy and Paste*
+  DLF.hadd search.headers *Too many results*@*
+  DLF.hadd search.headers *Tengo*resultado*slots*
+  DLF.hadd search.headers *I have*matches for*You might want to get my list by typing*
+  DLF.hadd search.headers *Résultat De Recherche*OmeNServE*
+  DLF.hadd search.headers *Resultados De Busqueda*OmenServe*
+  DLF.hadd search.headers *Total de*fichier*Trouvé*
+  DLF.hadd search.headers *Fichier* Correspondant pour*Copie*
+  DLF.hadd search.headers *Search Result*Matches For*Copy And Paste*
+  DLF.hadd search.headers *Resultados de la búsqueda*DragonServe*
+  DLF.hadd search.headers *Results for your search*DragonServe*
+  DLF.hadd search.headers *«SoftServe»*
+  DLF.hadd search.headers *search for*returned*results on list*
+  DLF.hadd search.headers *List trigger:*Slots*Next Send*CPS in use*CPS Record*
+  DLF.hadd search.headers *Searched*files and found*matching*To get a file, copy !*
+  DLF.hadd search.headers *Note*Hey look at what i found!*
+  DLF.hadd search.headers *Note*MP3-MP3*
+  DLF.hadd search.headers *Search Result*Matches For*Get My List Of*Files By Typing @*
+  DLF.hadd search.headers *Resultado Da Busca*Arquivos*Pegue A Minha Lista De*@*
+  DLF.hadd search.headers *J'ai Trop de Résultats Correspondants*@*
+  DLF.hadd search.headers *Search Results*Found*matches for*Type @*to download my list*
+  DLF.hadd search.headers *I have found*file*for your query*Displaying*
+  DLF.hadd search.headers *From list*found*displaying*
+  DLF.Status Added $hget(DLF.search.headers,0).item matches for $b(search headers) as private message
+
+  if ($hget(DLF.priv.server)) hfree DLF.priv.server
+  DLF.hadd priv.server Sorry, I'm making a new list right now, please try later*
+  DLF.hadd priv.server *Request Denied*OmeNServE*
+  DLF.hadd priv.server *Sorry for cancelling this send*OmeNServE*
+  DLF.hadd priv.server Lo Siento, no te puedo enviar mi lista ahora, intenta despues*
+  DLF.hadd priv.server Lo siento, pero estoy creando una nueva lista ahora*
+  DLF.hadd priv.server I have successfully sent you*OS*
+  DLF.hadd priv.server *Petición rechazada*DragonServe*
+  DLF.hadd priv.server *I don't have*Please check your spelling or get my newest list by typing @* in the channel*
+  DLF.hadd priv.server *you already have*in my que*has NOT been added to my que*
+  DLF.hadd priv.server *You already have*in my que*Type @*-help for more info*
+  DLF.hadd priv.server *Request Denied*Reason: *DragonServe*
+  DLF.hadd priv.server *You already have*requests in my queue*is not queued*
+  DLF.hadd priv.server *Queue Status*File*Position*Waiting Time*OmeNServE*
+  DLF.hadd priv.server *Empieza transferencia*IMPORTANTE*dccallow*
+  DLF.hadd priv.server *Sorry, I'm too busy to send my list right now, please try later*
+  DLF.hadd priv.server *Please standby for acknowledgement. I am using a secure query event*
+  DLF.Status Added $hget(DLF.priv.server,0).item matches for $b(server messages) as private message
+
+  if ($hget(DLF.priv.away)) hfree DLF.priv.away
+  DLF.hadd priv.away *AFK, auto away after*minutes. Gone*
+  DLF.hadd priv.away *Away*Reason*Auto Away*
+  DLF.hadd priv.away *Away*Reason*Duration*
+  DLF.hadd priv.away *Away*Reason*Gone for*Pager*
+  DLF.hadd priv.away *^Auto-Thanker^*
+  DLF.hadd priv.away *If i didn't know any better*I would have thought you were flooding me*
+  DLF.hadd priv.away *Message's from strangers are Auto-Rejected*
+  DLF.hadd priv.away *Dacia Script v1.2*
+  DLF.hadd priv.away *Away*SysReset*
+  DLF.hadd priv.away *automated msg*
+  DLF.Status Added $hget(DLF.priv.away,0).item matches for $b(away spam) as private message
 }
 
 ; ========== Status and error messages ==========
