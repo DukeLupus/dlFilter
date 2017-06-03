@@ -32,6 +32,7 @@ This avoids problems where other scripts halt events preventing this scripts eve
           Custom filter list multi-select
         Menu code cleanup
         Check update against GitHub
+        User groups to enable / disable DLF event handling
 */
 
 alias DLF.SetVersion {
@@ -617,6 +618,9 @@ on *:dialog:DLF.Options.GUI:sclick:52: {
 on *:dialog:DLF.Options.GUI:sclick:67: url -an http://dukelupus.com/dlfilter
 on *:dialog:DLF.Options.GUI:sclick:66: url -an http://www.dukelupus.pri.ee/download.php?f=187932020
 
+; ========== Start of DLF enabled group ==========
+#dlf_enabled on
+
 ctcp *:*SLOTS*:%DLF.channels: {
   if (%DLF.colornicks == 1) DLFSetNickColor $chan $nick
   haltdef
@@ -722,6 +726,9 @@ on ^*:text:*:%DLF.channels: {
     }
   }
 }
+
+#dlf_enabled end
+; ========== End of DLF enabled group ==========
 
 alias TextSetNickColor {
   if ((%DLF.colornicks == 1) && ($nick($1,$2).color == $color(nicklist))) cline 2 $1 $2
