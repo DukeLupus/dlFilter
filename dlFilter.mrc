@@ -239,9 +239,9 @@ menu @DLF.*.search {
     .clipboard $sline($active,1)
     cline 14 $active $sline($active,1).ln
   }
-  Clear: /clear
-  Close: /window -c $active
-  Options: dialog -md DLF.Options.GUI DLF.Options.GUI
+  Clear: clear
+  Close: window -c $active
+  Options: DLF.Options.Show
 }
 
 menu @DLF.@find.Results,@DLF.NewReleases {
@@ -658,10 +658,10 @@ ctcp *:*MP*:%DLF.channels: {
 ctcp *:*ping*:%DLF.channels: haltdef
 ctcp *:*:%DLF.channels: {
   if ((%DLF.custom.enabled == 1) && (%DLF.custom.chanctcp)) {
-    var %nr = $numtok(%DLF.custom.chanctcp,44)
+    var %nr = $numtok(%DLF.custom.chanctcp,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.chanctcp,%cnter,44) iswm $1-) DLF_textfilter $target $nick $1-
+      if ($gettok(%DLF.custom.chanctcp,%cnter,$asc($comma)) iswm $1-) DLF_textfilter $target $nick $1-
       inc %cnter
     }
   }
@@ -875,65 +875,72 @@ on ^*:notice:*:?: {
 }
 
 on ^*:action:*:?: {
-  if (%DLF.enabled == 0) got anotenabled
   DoCheckComChan $nick $1-
   if ((%DLF.noregmsg == 1) && ($CheckRegular($nick) == IsRegular)) {
-    echo -s 1,9[DLFilter] Regular user $nick ( $+ $address $+ ) tried to:4,15 $1-
-    echo -a 1,9[DLFilter] Regular user $nick ( $+ $address $+ ) tried to:4,15 $1-
+    DLF.Warning Regular user $nick $br($address) tried to send you an action: $1-
     .window -c $1
     .close -m $1
-    haltdef
     halt
   }
   if ((%DLF.custom.enabled == 1) && (%DLF.custom.privaction)) {
-    var %nr = $numtok(%DLF.custom.privaction,44)
+    var %nr = $numtok(%DLF.custom.privaction,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.privaction,%cnter,44) iswm $strip($1-)) DLF_actionfilter Private $nick $1-
+      if ($gettok(%DLF.custom.privaction,%cnter,$asc($comma)) iswm $strip($1-)) DLF_actionfilter Private $nick $1-
       inc %cnter
     }
   }
-  :anotenabled
 }
 
 ctcp *:*:?: {
-  if (%DLF.enabled == 0) goto DLFnoctcp
   if ((%DLF.nocomchan.dcc == 1) && ($1-2 === DCC CHAT)) {
     %DLF.accepthis = $nick
-    goto DLFnoctcp
+    goto :return
   }
   if (%DLF.nocomchan == 1) DoCheckComChan $nick $1-
   if ((%DLF.askregfile == 1) && (DCC SEND isin $1-)) {
     if ($CheckRegular($nick) == IsRegular) {
-      if (%DLF.askregfile.type == 1) {
-        var %ext = $right($nopath($filename),4)
-        if ($pos(%ext,$chr(46),1) == 2) %ext = $right(%ext,3)
-        if ((.exe == %ext) || (.com == %ext) || (.bat == %ext) || (.scr == %ext) || (.mrc == %ext) || (.pif == %ext) || (.vbs == %ext) || (.js == %ext) || (.doc == %ext)) {
-        }
-        else {
-          goto DLFnoctcp
+      ; Allow files from regular users if nickname is in mIRC DCC trust list
+      var %addr = $address($nick,5)
+      if (%addr != $null) {
+        %rcntr = $trust(0)
+        while (%rcntr) {
+          echo -s $trust(%rcntr) %addr
+          if ($trust(%rcntr) iswm %addr) goto :return
+          dec %rcntr
         }
       }
-      echo -s 1,9[DLFilter] Regular user $nick ( $+ $address $+ ) tried to send you file " $+ $gettok($1-,3-$numtok($1-,32), 32) $+ ".
-      haltdef
+      ; If not in trust list check for dangerous filetypes
+      if (%DLF.askregfile.type == 1) {
+        var %ext = $right($nopath($filename),4)
+        if ($pos(%ext,$period,1) == 2) %ext = $right(%ext,3)
+        if ((%ext != .exe) $&
+         && (%ext != .com) $&
+         && (%ext != .bat) $&
+         && (%ext != .scr) $&
+         && (%ext != .mrc) $&
+         && (%ext != .pif) $&
+         && (%ext != .vbs) $&
+         && (%ext != .doc) $&
+         && (%ext != .js)) goto :return
+      }
+      DLF.Status $c(3,Regular user $nick $br($address) tried to send you a file $qt($gettok($1-,3-$numtok($1-,$asc($space)), $asc($space))))
       halt
     }
   }
   if ((%DLF.noregmsg == 1) && (($CheckRegular($nick) == IsRegular)) && (DCC send !isin $1-)) {
-    echo -s 1,9[DLFilter] Regular user $nick ( $+ $address $+ ) tried to:4,15 $1-
-    echo -a 1,9[DLFilter] Regular user $nick ( $+ $address $+ ) tried to:4,15 $1-
-    haltdef
+    DLF.Warning Regular user $nick $br($address) tried to: $1-
     halt
   }
   if ((%DLF.custom.enabled == 1) && (%DLF.custom.privctcp)) {
-    var %nr = $numtok(%DLF.custom.privctcp,44)
+    var %nr = $numtok(%DLF.custom.privctcp,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.privctcp,%cnter,44) iswm $1-) DLF_textfilter Private $nick $1-
+      if ($gettok(%DLF.custom.privctcp,%cnter,$asc($comma)) iswm $1-) DLF_textfilter Private $nick $1-
       inc %cnter
     }
   }
-  :DLFnoctcp
+  :return
 }
 
 #dlf_enabled end
@@ -943,16 +950,17 @@ alias TextSetNickColor {
   if ((%DLF.colornicks == 1) && ($nick($1,$2).color == $color(nicklist))) cline 2 $1 $2
   DLF_textfilter $1-
 }
+
 alias DLF_textfilter {
-  if (%DLF.filtered.log == 1) write $+(",$logdir,DLF.Filtered,.log,") $+($chr(91),$fulldate,$chr(93)) $+ $chr(32) $+ $chr(91) $+ $1 $+ $chr(93) $+ $chr(32) $+ $chr(60) $+ $2 $+ $chr(62) $+ $chr(32) $+ $strip($3-)
+  if (%DLF.filtered.log == 1) write $qt($logdir $+ DLF.Filtered.log) $sqbr($fulldate) $sqbr($1) $tag($2) $strip($3-)
   if (%DLF.showfiltered == 1) {
     if (!$window(@DLF.Filtered)) {
       window -k0nwz @DLF.filtered
       titlebar @DLF.filtered -=- Right-click for options
     }
-    var %line = $chr(91) $+ $1 $+ $chr(93) $+ $chr(32) $+ $chr(60) $+ $2 $+ $chr(62) $+ $chr(32) $+ $3-
+    var %line = $sqbr($1) $tag($2) $3-
     if ((%DLF.filtered.limit == 1) && ($line(@DLF.filtered,0) >= 5000)) dline @DLF.Filtered 1-100
-    if (%DLF.filtered.timestamp == 1) %line = $timestamp $+ $chr(32) $+ %line
+    if (%DLF.filtered.timestamp == 1) %line = $timestamp %line
     if (%DLF.filtered.strip == 1) %line = $strip(%line)
     if (%DLF.filtered.wrap == 1) aline -p @DLF.filtered %line
     else aline @DLF.filtered %line
@@ -961,15 +969,15 @@ alias DLF_textfilter {
 }
 
 alias DLF_actionfilter {
-  if (%DLF.filtered.log == 1) write $+(",$logdir,DLF.Filtered,.log,") $+($chr(91),$fulldate,$chr(93)) $+ $chr(32) $+ $chr(91) $+ $1 $+ $chr(93) $+ $chr(32) $+ $chr(42) $+ $chr(32) $+ $2 $+ $chr(32) $+ $strip($3-)
+  if (%DLF.filtered.log == 1) write $qt($logdir $+ DLF.Filtered.log) $sqbr($fulldate) $sqbr($1) $star $2 $strip($3-)
   if (%DLF.showfiltered == 1) {
     if (!$window(@DLF.Filtered)) {
       window -k0nwz @DLF.Filtered
       titlebar @DLF.Filtered -=- Right-click for options
     }
-    var %line = $chr(91) $+ $1 $+ $chr(93) $+ $chr(32) $+ $chr(42) $+ $chr(32) $+ $2 $+ $chr(32) $+ $3-
+    var %line = $sqbr($1) $star $2-
     if ((%DLF.filtered.limit == 1) && ($line(@DLF.Filtered,0) >= 5000)) dline @DLF.Filtered 1-100
-    if (%DLF.filtered.timestamp == 1) %line = $timestamp $+ $chr(32) $+ %line
+    if (%DLF.filtered.timestamp == 1) %line = $timestamp %line
     if (%DLF.filtered.strip == 1) %line = $strip(%line)
     if (%DLF.filtered.wrap == 1) aline -p $color(action) @DLF.Filtered %line
     else aline $color(action) @DLF.Filtered %line
@@ -981,11 +989,12 @@ on *:input:@DLF.Filtered.Search: FilteredSearch $1-
 
 alias FilteredSearch {
   window -ealbk0wz @DLF.filtered.search
-  var %sstring = $chr(42) $+ $1- $+ $chr(42)
+  var %sstring = $+($star,$1-,$star)
   titlebar @DLF.filtered.search -=- Searching for %sstring
   filter -wwbpc @DLF.filtered @DLF.Filtered.search %sstring
-  if ($line(@DLF.Filtered.search,0) == 0) titlebar @DLF.filtered.search -=- Search finished. No matches for " $+ %sstring $+ " found.
-  else titlebar @DLF.filtered.search -=- Search finished. $line(@DLF.Filtered.search,0) matches found for " $+ %sstring $+ ".
+  var %found = $line(@DLF.Filtered.search,0)
+  var %matches = $iif(%found == 0,No matches,$iif(%found == 1,One match,%found matches))
+  titlebar @DLF.filtered.search -=- Search finished. %matches found for $qt(%sstring)
 }
 
 alias CheckPrivText {
@@ -1041,7 +1050,7 @@ on *:input:@#* {
   if ((/ == $left($1,1)) && ($ctrlenter == $false) && ($1 != /me)) return
   if (($1 != /me) || ($ctrlenter == $true)) {
     var %omsg = $tag($me) $1-
-    if (%DLF.o.timestamp == 1) var %omsg = $timestamp $+ $chr(32) $+ %omsg
+    if (%DLF.o.timestamp == 1) var %omsg = $timestamp %omsg
     aline -p $color(text) $active %omsg
     aline -nl $color(nicklist) $active $me
     window -S $active
@@ -1050,8 +1059,8 @@ on *:input:@#* {
     if (%DLF.o.log == 1) write $+(",$logdir,$active,.log") %omsg
   }
   else {
-    var %omsg = $chr(42) $+ $chr(32) $+ $me $+ $chr(32) $+ $2-
-    if (%DLF.o.timestamp == 1) var %omsg = $timestamp $+ $chr(32) $+ %omsg
+    var %omsg = $star $me $2-
+    if (%DLF.o.timestamp == 1) var %omsg = $timestamp %omsg
     aline -p $color(action) $active %omsg
     aline -nl $color(nicklist) $active $me
     window -S $active
