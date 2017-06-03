@@ -25,6 +25,11 @@ This avoids problems where other scripts halt events preventing this scripts eve
         Use custom identifiers instead of $chr(xx)
         Use alias for status messages
         Hash tables for message matching
+        Options dialog improvements
+          Layout
+          Enable / disable now global
+          Custom filter Add / Remove button enable / disable
+          Custom filter list multi-select
 */
 
 alias DLF.SetVersion {
@@ -124,7 +129,7 @@ on *:unload: {
   DLF.Status Unsetting variables..
   .unset %DLF.*
   DLF.Status Closing open DLFilter windows
-  if ($dialog(DLFilter_GUI)) .dialog -x DLFilter_GUI DLFilter_GUI
+  if ($dialog(DLF.Options.GUI)) .dialog -x DLF.Options.GUI DLF.Options.GUI
   if ($window(@DLF.filtered)) window -c @DLF.filtered
   if ($window(@DLF.filtered.search)) window -c @DLF.filtered.search
   if ($window(@DLF.server)) window -c @DLF.server
@@ -150,7 +155,7 @@ menu channel {
   }
   -
   DLFilter
-  ..Options: dialog -md DLFilter_GUI DLFilter_GUI
+  ..Options: dialog -md DLF.Options.GUI DLF.Options.GUI
   ..$iif($chan isin %DLF.channels,Remove,Add) this channel: {
     var %chan = $chan
     if (%chan !isin %DLF.channels) {
@@ -180,7 +185,7 @@ menu channel {
 }
 menu menubar {
   DLFilter
-  .Options: dialog -md DLFilter_GUI DLFilter_GUI
+  .Options: dialog -md DLF.Options.GUI DLF.Options.GUI
   .$iif(%DLF.showfiltered == 1,$style(1)) Show filtered lines: {
     if (%DLF.showfiltered == 1 ) {
       set %DLF.showfiltered 0
@@ -273,7 +278,7 @@ menu @DLF.@find.Results,@DLF.NewReleases {
     %filename = $chr(34) $+ $remove(%filename,.txt) $+ .txt $+ $chr(34)
     savebuf $active %filename
   }
-  Options: dialog -md DLFilter_GUI DLFilter_GUI
+  Options: dialog -md DLF.Options.GUI DLF.Options.GUI
   Clear: /clear
   .-
   Close: /window -c $active
@@ -327,7 +332,7 @@ menu @DLF.Filtered {
     }
   }
   -
-  Options: dialog -md DLFilter_GUI DLFilter_GUI
+  Options: dialog -md DLF.Options.GUI DLF.Options.GUI
   Close: {
     %DLF.showfiltered = 0
     /window -c @DLF.Filtered
@@ -382,7 +387,7 @@ menu @DLF.Server {
     }
   }
   -
-  Options: dialog -md DLFilter_GUI DLFilter_GUI
+  Options: dialog -md DLF.Options.GUI DLF.Options.GUI
   Close: window -c @DLF.Server
   -
 }
@@ -394,7 +399,7 @@ menu @DLF.*.search {
   }
   Clear: /clear
   Close: /window -c $active
-  Options: dialog -md DLFilter_GUI DLFilter_GUI
+  Options: dialog -md DLF.Options.GUI DLF.Options.GUI
 }
 menu @#* {
   Clear: /clear
@@ -415,7 +420,7 @@ menu @#* {
       set %DLF.o.log 1
     }
   }
-  Options: dialog -md DLFilter_GUI DLFilter_GUI
+  Options: dialog -md DLF.Options.GUI DLF.Options.GUI
   -
   Close: {
     var %chatwindow = $active
@@ -428,113 +433,132 @@ menu @#* {
   }
   -
 }
-dialog DLFilter_GUI {
-  title DLFilter v $+ $Set.DLF.version
+; ========== DLF Options Dialog ==========
+alias DLF.Options.Show dialog $iif($dialog(DLF.Options.GUI),-v,-md) DLF.Options.GUI DLF.Options.GUI
+
+dialog DLF.Options.GUI {
+  ; Main dialogue
+  title DLFilter v $+ $DLF.SetVersion
   size -1 -1 152 225
   option dbu notheme
-  tab "Main", 1, 1 2 151 202
-  tab "Capturing/Spam/Security", 2
-  tab "Custom", 3
+  check "Enable/disable DLFilter", 5, 2 2 66 8
+  tab "Main", 1, 1 10 151 196, disable
+  tab "Capturing/Spam/Security", 2, disable
+  tab "Custom", 3, disable
   button "Close", 4, 2 211 43 11, ok
-  check "Enable/disable DLFilter", 5, 7 18 66 8, tab 1
-  edit "", 6, 5 35 144 10, tab 1 autohs %DLF.channels
-  text "Channels (comma separated, use # for all):", 7, 6 27 125 8, tab 1
-  text "Filter...", 8, 5 46 50 8, tab 1
-  check "..ads and announcements", 9, 7 56 80 9, tab 1
-  check "..requests and searches", 10, 7 65 69 8, tab 1
-  box "User related", 11, 3 92 145 89, tab 1
-  check "..joins", 12, 7 99 50 9, tab 1
-  check "..parts", 13, 7 109 50 9, tab 1
-  check "..quits", 14, 7 119 50 9, tab 1
-  check "..nick changes", 15, 7 129 50 9, tab 1
-  check "..kicks", 16, 7 139 50 9, tab 1
-  check "..channel mode changes", 17, 7 73 75 9, tab 1
-  check "..but show them in Status window.", 18, 27 149 95 9, tab 1
-  check "..away and thank-you messages", 19, 7 159 95 9, tab 1
-  check "..user mode changes", 20, 7 169 62 9, tab 1
   check "Show/hide filtered lines", 21, 47 211 103 11, push
-  box "Capturing", 22, 4 16 144 55, tab 2
-  check "Capture server notices to separate window", 23, 10 26 120 9, tab 2
-  check "Group @find/@locator results", 24, 10 37 118 8, tab 2
-  check "Capture 'New Release' to separate window", 25, 10 48 123 8, tab 2
-  box "Spam and security", 26, 4 75 145 116, tab 2
-  check "Filter spam on channel", 27, 10 82 87 10, tab 2
-  check "Notify, if you are an op", 28, 18 93 72 8, tab 2
-  check "Filter private spam", 29, 10 102 58 9, tab 2
-  check "Notify, if you are an op in common channel", 30, 18 112 117 8, tab 2
-  check "Add spammer to /ignore for 1h (asks confirmation)", 31, 18 121 130 9, tab 2
-  check "Don't accept any messages or files from users with whom you do not have a common channel", 32, 10 131 136 19, tab 2 multi
-  check "..requests sent to you in pm (@yournick, !yournick)", 33, 7 82 133 8, tab 1
-  check "Do not accept files from regular users", 34, 10 160 135 8, tab 2
-  check "Do not accept private messages from regulars", 35, 10 178 135 9, tab 2
-  check "Enable custom strings", 36, 5 20 100 8, tab 3
-  combo 37, 7 40 65 35, tab 3 drop
-  text "Filtering type:", 42, 5 30 50 8, tab 3
-  edit "", 41, 4 53 144 10, tab 3 autohs
-  button "Add", 46, 5 64 67 12, tab 3 flat
-  button "Remove", 52, 79 64 68 12, tab 3 flat
-  list 51, 5 78 144 123, tab 3 hsbar vsbar size sort
-  check "Color uncolored fileservers", 62, 10 192 138 10, tab 2
-  check "Capture onotices to separate @#window (OpsTalk)", 61, 10 58 132 8, tab 2
+  ; tab 1 Main
+  text "Channels (comma separated, use # for all):", 7, 6 27 125 8, tab 1
+  edit "", 6, 5 35 144 10, tab 1 autohs %DLF.channels
+  box " Filters ", 8, 4 46 144 47, tab 1
+  check "Ads and announcements", 9, 7 55 80 8, tab 1
+  check "Requests and searches", 10, 7 64 69 8, tab 1
+  check "Channel mode changes", 17, 7 73 75 8, tab 1
+  check "Requests sent to you in pm (@yournick, !yournick)", 33, 7 82 133 8, tab 1
+  box " User events ", 11, 4 96 144 84, tab 1
+  check "Joins", 12, 7 105 50 9, tab 1
+  check "Parts", 13, 7 114 50 9, tab 1
+  check "Quits", 14, 7 123 50 9, tab 1
+  check "Nick changes", 15, 7 132 50 9, tab 1
+  check "Kicks", 16, 7 141 50 9, tab 1
+  check "... but show them in Status window.", 18, 15 150 95 9, tab 1
+  check "Away and thank-you messages", 19, 7 159 95 9, tab 1
+  check "User mode changes", 20, 7 168 62 9, tab 1
   text "Checking for DLFilter updates...", 56, 5 182 144 8, tab 1
   button "DLFilter website", 67, 4 191 70 12, tab 1 flat
-  button "Direct download", 66, 78 191 70 12, tab 1 flat multi
-  check "...but accept DCC chats", 72, 18 151 86 8, tab 2
-  check "..block only potentially dangerous filetypes", 75, 18 169 127 8, tab 2
+  button "Direct download", 66, 78 191 70 12, tab 1 flat
+  ; Tab 2 Capturing / Spam / Security
+  box " Capturing ", 22, 4 25 144 50, tab 2
+  check "Capture server notices to separate window", 23, 7 35 120 8, tab 2
+  check "Group @find/@locator results", 24, 7 44 118 8, tab 2
+  check "Capture 'New Release' to separate window", 25, 7 53 123 8, tab 2
+  check "Capture onotices to separate @#window (OpsTalk)", 61, 7 62 132 8, tab 2
+  box " Spam and security ", 26, 4 79 145 115, tab 2
+  check "Filter spam on channel", 27, 7 88 87 8, tab 2
+  check "Notify, if you are an op", 28, 15 97 72 8, tab 2
+  check "Filter private spam", 29, 7 106 58 8, tab 2
+  check "Notify, if you are an op in common channel", 30, 15 115 117 8, tab 2
+  check "Add spammer to /ignore for 1h (asks confirmation)", 31, 15 124 130 8, tab 2
+  check "Don't accept any messages or files from users with whom you do not have a common channel", 32, 7 132 136 16, tab 2 multi
+  check "... but accept DCC chats", 72, 15 148 86 8, tab 2
+  check "Do not accept files from regular users (except mIRC trusted users)", 34, 7 157 115 16, tab 2 multi
+  check "... block only potentially dangerous filetypes", 75, 15 173 127 8, tab 2
+  check "Do not accept private messages from regulars", 35, 7 182 135 8, tab 2
+  check "Color uncolored fileservers", 62, 4 196 138 8, tab 2
+  ; tab 3 Custom
+  check "Enable custom strings", 36, 5 27 100 8, tab 3
+  text "Message type:", 42, 5 36 50 8, tab 3
+  combo 37, 45 36 65 35, tab 3 drop
+  edit "", 41, 4 47 144 12, tab 3 autohs
+  button "Add", 46, 5 61 67 12, tab 3 flat disable
+  button "Remove", 52, 79 61 68 12, tab 3 flat disable
+  list 51, 4 74 144 123, tab 3 hsbar vsbar size sort extsel
 }
-on *:dialog:DLFilter_GUI:init:0: {
-  Set.DLF.version
-  did -o DLFilter_GUI 6 1 %DLF.Channels
-  if (%DLF.enabled == 1) did -c DLFilter_GUI 5
-  if (%DLF.ads == 1) did -c DLFilter_GUI 9
-  if (%DLF.requests == 1) did -c DLFilter_GUI 10
-  if (%DLF.joins == 1) did -c DLFilter_GUI 12
-  if (%DLF.parts == 1) did -c DLFilter_GUI 13
-  if (%DLF.quits == 1) did -c DLFilter_GUI 14
-  if (%DLF.nicks == 1) did -c DLFilter_GUI 15
-  if (%DLF.kicks == 1) did -c DLFilter_GUI 16
-  if (%DLF.chmode == 1) did -c DLFilter_GUI 17
-  if (%DLF.showstatus == 1) did -c DLFilter_GUI 18
-  if (%DLF.away == 1) did -c DLFilter_GUI 19
-  if (%DLF.usrmode == 1) did -c DLFilter_GUI 20
-  if (%DLF.privrequests == 1) did -c DLFilter_GUI 33
-  if (%DLF.showfiltered == 1) did -c DLFilter_GUI 21
-  if (%DLF.server == 1) did -c DLFilter_GUI 23
-  if (%DLF.searchresults == 1) did -c DLFilter_GUI 24
-  if (%DLF.newreleases == 1) did -c DLFilter_GUI 25
-  if (%DLF.chspam == 1) did -c DLFilter_GUI 27
-  if (%DLF.chspam.opnotify == 1) did -c DLFilter_GUI 28
-  if (%DLF.privspam == 1) did -c DLFilter_GUI 29
-  if (%DLF.privspam.opnotify == 1) did -c DLFilter_GUI 30
-  if (%DLF.spam.addignore == 1) did -c DLFilter_GUI 31
-  if (%DLF.nocomchan == 1) did -c DLFilter_GUI 32
-  if (%DLF.nocomchan.dcc == 1) did -c DLFilter_GUI 72
+
+on *:dialog:DLF.Options.GUI:init:0: {
+  DLF.SetVersion
+  did -o DLF.Options.GUI 6 1 %DLF.Channels
+  if (%DLF.enabled == 1) did -c DLF.Options.GUI 5
+  if (%DLF.ads == 1) did -c DLF.Options.GUI 9
+  if (%DLF.requests == 1) did -c DLF.Options.GUI 10
+  if (%DLF.joins == 1) did -c DLF.Options.GUI 12
+  if (%DLF.parts == 1) did -c DLF.Options.GUI 13
+  if (%DLF.quits == 1) did -c DLF.Options.GUI 14
+  if (%DLF.nicks == 1) did -c DLF.Options.GUI 15
+  if (%DLF.kicks == 1) did -c DLF.Options.GUI 16
+  if (%DLF.chmode == 1) did -c DLF.Options.GUI 17
+  if (%DLF.showstatus == 1) did -c DLF.Options.GUI 18
+  if (%DLF.away == 1) did -c DLF.Options.GUI 19
+  if (%DLF.usrmode == 1) did -c DLF.Options.GUI 20
+  if (%DLF.privrequests == 1) did -c DLF.Options.GUI 33
+  if (%DLF.showfiltered == 1) did -c DLF.Options.GUI 21
+  if (%DLF.server == 1) did -c DLF.Options.GUI 23
+  if (%DLF.searchresults == 1) did -c DLF.Options.GUI 24
+  if (%DLF.newreleases == 1) did -c DLF.Options.GUI 25
+  if (%DLF.chspam == 1) did -c DLF.Options.GUI 27
+  if (%DLF.chspam.opnotify == 1) did -c DLF.Options.GUI 28
+  if (%DLF.privspam == 1) did -c DLF.Options.GUI 29
+  if (%DLF.privspam.opnotify == 1) did -c DLF.Options.GUI 30
+  if (%DLF.spam.addignore == 1) did -c DLF.Options.GUI 31
+  if (%DLF.nocomchan == 1) did -c DLF.Options.GUI 32
+  if (%DLF.nocomchan.dcc == 1) did -c DLF.Options.GUI 72
   if (%DLF.askregfile.type == 1) {
-    did -c DLFilter_GUI 75
+    did -c DLF.Options.GUI 75
     %DLF.askregfile = 1
   }
-  if (%DLF.askregfile == 1) did -c DLFilter_GUI 34
+  if (%DLF.askregfile == 1) did -c DLF.Options.GUI 34
   else %DLF.askregfile.type = 0
-  if (%DLF.noregmsg == 1) did -c DLFilter_GUI 35
-  if (%DLF.colornicks == 1) did -c DLFilter_GUI 62
-  if (%DLF.o.enabled == 1) did -c DLFilter_GUI 61
-  if (%DLF.custom.enabled == 1) did -c DLFilter_GUI 36
-  did -a DLFilter_GUI 37 Channel text
-  did -a DLFilter_GUI 37 Channel action
-  did -a DLFilter_GUI 37 Channel notice
-  did -a DLFilter_GUI 37 Channel ctcp
-  did -a DLFilter_GUI 37 Private text
-  did -a DLFilter_GUI 37 Private action
-  did -a DLFilter_GUI 37 Private notice
-  did -a DLFilter_GUI 37 Private ctcp
-  did -c DLFilter_GUI 37 1
-  didtok DLFilter_GUI 51 44 %DLF.custom.chantext
+  if (%DLF.noregmsg == 1) did -c DLF.Options.GUI 35
+  if (%DLF.colornicks == 1) did -c DLF.Options.GUI 62
+  if (%DLF.o.enabled == 1) did -c DLF.Options.GUI 61
+  if (%DLF.custom.enabled == 1) did -c DLF.Options.GUI 36
+  did -a DLF.Options.GUI 37 Channel text
+  did -a DLF.Options.GUI 37 Channel action
+  did -a DLF.Options.GUI 37 Channel notice
+  did -a DLF.Options.GUI 37 Channel ctcp
+  did -a DLF.Options.GUI 37 Private text
+  did -a DLF.Options.GUI 37 Private action
+  did -a DLF.Options.GUI 37 Private notice
+  did -a DLF.Options.GUI 37 Private ctcp
+  did -c DLF.Options.GUI 37 1
+  didtok DLF.Options.GUI 51 44 %DLF.custom.chantext
   %DLF.custom.selected = Channel text
-  DLF.update
+  DLF.Update
 }
-on *:dialog:DLFilter_GUI:sclick:4: {
-  %DLF.Channels = $did(6).text
+
+; Change enabled state
+on *:dialog:DLF.Options.GUI:sclick:5: DLF.Options.setEnabledState
+
+alias DLF.Options.setEnabledState {
   %DLF.enabled = $did(5).state
+  if (%DLF.enabled) .enable #dlf_enabled
+  else .disable #dlf_enabled
+}
+
+; Close button click
+on *:dialog:DLF.Options.GUI:sclick:4: {
+  DLF.Options.setEnabledState
+  %DLF.Channels = $did(6).text
   %DLF.ads = $did(9).state
   %DLF.requests = $did(10).state
   %DLF.joins = $did(12).state
@@ -566,91 +590,108 @@ on *:dialog:DLFilter_GUI:sclick:4: {
   %DLF.custom.enabled = $did(36).state
   .unset %DLF.custom.selected
 }
-on *:dialog:DLFilter_GUI:sclick:21: {
+
+; Show / hide filtered messages check box
+on *:dialog:DLF.Options.GUI:sclick:21: {
   %DLF.showfiltered = $did(21).state
   if (%DLF.showfiltered == 0) window -c @DLF.filtered
 }
-on *:dialog:DLFilter_GUI:sclick:75: {
+
+; Do not accept files from regular users checkbox
+on *:dialog:DLF.Options.GUI:sclick:34: {
+  if (($did(34).state == 0) && ($did(75).state == 1)) did -u DLF.Options.GUI 75
+}
+
+; Block only potentially dangerous filetypes checkbox
+on *:dialog:DLF.Options.GUI:sclick:75: {
   if ($did(75).state == 1) {
     %DLF.askregfile = 1
-    did -c DLFilter_GUI 34
+    did -c DLF.Options.GUI 34
   }
-  else {
-    %DLF.askregfile = 0
-    did -u DLFilter_GUI 34
-  }
+  else %DLF.askregfile = 0
 }
-on *:dialog:DLFilter_GUI:sclick:34: {
-  if (($did(34).state == 0) && ($did(75).state == 1)) did -u DLFilter_GUI 75
-}
-on *:dialog:DLFilter_GUI:sclick:37: {
+
+; Select custom message type
+on *:dialog:DLF.Options.GUI:sclick:37: {
   %DLF.custom.selected = $did(37).seltext
-  did -r DLFilter_GUI 51
-  if (%DLF.custom.selected == Channel text) didtok DLFilter_GUI 51 44 %DLF.custom.chantext
-  if (%DLF.custom.selected == Channel action) didtok DLFilter_GUI 51 44 %DLF.custom.chanaction
-  if (%DLF.custom.selected == Channel notice) didtok DLFilter_GUI 51 44 %DLF.custom.channotice
-  if (%DLF.custom.selected == Channel ctcp) didtok DLFilter_GUI 51 44 %DLF.custom.chanctcp
-  if (%DLF.custom.selected == Private text) didtok DLFilter_GUI 51 44 %DLF.custom.privtext
-  if (%DLF.custom.selected == Private action) didtok DLFilter_GUI 51 44 %DLF.custom.privaction
-  if (%DLF.custom.selected == Private notice) didtok DLFilter_GUI 51 44 %DLF.custom.privnotice
-  if (%DLF.custom.selected == Private ctcp) didtok DLFilter_GUI 51 44 %DLF.custom.privctcp
+  DLF.Options.SetCustomType $did(37).seltext
 }
-on *:dialog:DLFilter_GUI:sclick:46: {
-  var %new = $did(41).text
-  if (!%new) halt
-  var %c = 1
-  %new = $chr(42) $+ %new $+ $chr(42)
-  while (%c <= 3) {
-    %new = $replace(%new,$chr(33),$chr(42),$chr(35),$chr(42),$chr(36),$chr(42),$chr(37),$chr(42),$chr(38),$chr(42),$chr(40),$chr(42),$chr(41),$chr(42),$chr(47),$chr(42),$chr(58),$chr(42),$chr(59),$chr(42),$chr(60),$chr(42),$chr(61),$chr(42),$chr(62),$chr(42),$chr(91),$chr(42),$chr(93),$chr(42),$chr(123),$chr(42),$chr(124),$chr(42),$chr(125),$chr(42),$chr(42) $+ $chr(42), $chr(42))
-    %new = $replace(%new,$chr(32) $+ $chr(32),$chr(42))
-    %new = $replace(%new,$chr(46), $chr(42))
-    %new = $replace(%new,$chr(44), $chr(42))
-    %new = $replace(%new,$chr(42) $+ $chr(32),$chr(42))
-    %new = $replace(%new,$chr(32) $+ $chr(42),$chr(42))
-    %new = $replace(%new,$chr(42) $+ $chr(42), $chr(42),$chr(42) $+ $chr(42), $chr(42))
-    inc %c
+
+alias DLF.Options.SetCustomType {
+  did -r DLF.Options.GUI 51
+  if ($1- == Channel text) didtok DLF.Options.GUI 51 44 %DLF.custom.chantext
+  if ($1- == Channel action) didtok DLF.Options.GUI 51 44 %DLF.custom.chanaction
+  if ($1- == Channel notice) didtok DLF.Options.GUI 51 44 %DLF.custom.channotice
+  if ($1- == Channel ctcp) didtok DLF.Options.GUI 51 44 %DLF.custom.chanctcp
+  if ($1- == Private text) didtok DLF.Options.GUI 51 44 %DLF.custom.privtext
+  if ($1- == Private action) didtok DLF.Options.GUI 51 44 %DLF.custom.privaction
+  if ($1- == Private notice) didtok DLF.Options.GUI 51 44 %DLF.custom.privnotice
+  if ($1- == Private ctcp) didtok DLF.Options.GUI 51 44 %DLF.custom.privctcp
+}
+
+; Enable / disable Add custom message button
+on *:dialog:DLF.Options.GUI:edit:41: DLF.Options.SetAddButton
+alias DLF.Options.SetAddButton {
+  if ($did(41)) did -te DLF.Options.GUI 46
+  else {
+    did -b DLF.Options.GUI 46
+    did -t DLF.Options.GUI 4
   }
-  if (%DLF.custom.selected == Channel text) %DLF.custom.chantext = $addtok(%DLF.custom.chantext,%new,44)
-  if (%DLF.custom.selected == Channel action) %DLF.custom.chanaction = $addtok(%DLF.custom.chanaction,%new,44)
-  if (%DLF.custom.selected == Channel notice) %DLF.custom.channotice = $addtok(%DLF.custom.channotice,%new,44)
-  if (%DLF.custom.selected == Channel ctcp) %DLF.custom.chanctcp = $addtok(%DLF.custom.chanctcp,%new,44)
-  if (%DLF.custom.selected == Private text) %DLF.custom.privtext = $addtok(%DLF.custom.privtext,%new,44)
-  if (%DLF.custom.selected == Private action) %DLF.custom.privaction = $addtok(%DLF.custom.privaction,%new,44)
-  if (%DLF.custom.selected == Private notice) %DLF.custom.privnotice = $addtok(%DLF.custom.privnotice,%new,44)
-  if (%DLF.custom.selected == Private ctcp) %DLF.custom.privctcp = $addtok(%DLF.custom.privctcp,%new,44)
-  did -r DLFilter_GUI 51
-  if (%DLF.custom.selected == Channel text) didtok DLFilter_GUI 51 44 %DLF.custom.chantext
-  if (%DLF.custom.selected == Channel action) didtok DLFilter_GUI 51 44 %DLF.custom.chanaction
-  if (%DLF.custom.selected == Channel notice) didtok DLFilter_GUI 51 44 %DLF.custom.channotice
-  if (%DLF.custom.selected == Channel ctcp) didtok DLFilter_GUI 51 44 %DLF.custom.chanctcp
-  if (%DLF.custom.selected == Private text) didtok DLFilter_GUI 51 44 %DLF.custom.privtext
-  if (%DLF.custom.selected == Private action) didtok DLFilter_GUI 51 44 %DLF.custom.privaction
-  if (%DLF.custom.selected == Private notice) didtok DLFilter_GUI 51 44 %DLF.custom.privnotice
-  if (%DLF.custom.selected == Private ctcp) didtok DLFilter_GUI 51 44 %DLF.custom.privctcp
 }
-on *:dialog:DLFilter_GUI:sclick:52: {
-  var %seltext = $did(51).seltext
-  if (!%seltext) halt
-  if (%DLF.custom.selected == Channel text) %DLF.custom.chantext = $remtok(%DLF.custom.chantext,%seltext,1,44)
-  if (%DLF.custom.selected == Channel action) %DLF.custom.chanaction = $remtok(%DLF.custom.chanaction,%seltext,1,44)
-  if (%DLF.custom.selected == Channel notice) %DLF.custom.channotice = $remtok(%DLF.custom.channotice,%seltext,1,44)
-  if (%DLF.custom.selected == Channel ctcp) %DLF.custom.chanctcp = $remtok(%DLF.custom.chanctcp,%seltext,1,44)
-  if (%DLF.custom.selected == Private text) %DLF.custom.privtext = $remtok(%DLF.custom.privtext,%seltext,1,44)
-  if (%DLF.custom.selected == Private action) %DLF.custom.privaction = $remtok(%DLF.custom.privaction,%seltext,1,44)
-  if (%DLF.custom.selected == Private notice) %DLF.custom.privnotice = $remtok(%DLF.custom.privnotice,%seltext,1,44)
-  if (%DLF.custom.selected == Private ctcp) %DLF.custom.privctcp = $remtok(%DLF.custom.privctcp,%seltext,1,44)
-  did -r DLFilter_GUI 51
-  if (%DLF.custom.selected == Channel text) didtok DLFilter_GUI 51 44 %DLF.custom.chantext
-  if (%DLF.custom.selected == Channel action) didtok DLFilter_GUI 51 44 %DLF.custom.chanaction
-  if (%DLF.custom.selected == Channel notice) didtok DLFilter_GUI 51 44 %DLF.custom.channotice
-  if (%DLF.custom.selected == Channel ctcp) didtok DLFilter_GUI 51 44 %DLF.custom.chanctcp
-  if (%DLF.custom.selected == Private text) didtok DLFilter_GUI 51 44 %DLF.custom.privtext
-  if (%DLF.custom.selected == Private action) didtok DLFilter_GUI 51 44 %DLF.custom.privaction
-  if (%DLF.custom.selected == Private notice) didtok DLFilter_GUI 51 44 %DLF.custom.privnotice
-  if (%DLF.custom.selected == Private ctcp) didtok DLFilter_GUI 51 44 %DLF.custom.privctcp
+
+; Enable / disable Remove custom message button
+on *:dialog:DLF.Options.GUI:sclick:51: DLF.Options.SetRemoveButton
+alias DLF.Options.SetRemoveButton {
+  if ($did(51,0).sel > 0) did -te DLF.Options.GUI 52
+  else {
+    did -b DLF.Options.GUI 52
+    DLF.Options.SetAddButton
+  }
 }
-on *:dialog:DLFilter_GUI:sclick:67: url -an http://dukelupus.com/
-on *:dialog:DLFilter_GUI:sclick:66: url -an http://www.dukelupus.pri.ee/download.php?f=187932020
+
+; Customer filter Add button clicked
+on *:dialog:DLF.Options.GUI:sclick:46: {
+  var %new = $did(41).text
+  %new = $+(*,%new,*)
+  %new = $regsubex(%new,$+(/[][!#$%&()/:;<=>.|,$comma,$lcurly,$rcurly,]+/g),$star)
+  %new = $regsubex(%new,/[*] *[*]+/g,$star)
+  if (%new == *) return
+  if (%DLF.custom.selected == Channel text) %DLF.custom.chantext = $addtok(%DLF.custom.chantext,%new,$asc($comma))
+  if (%DLF.custom.selected == Channel action) %DLF.custom.chanaction = $addtok(%DLF.custom.chanaction,%new,$asc($comma))
+  if (%DLF.custom.selected == Channel notice) %DLF.custom.channotice = $addtok(%DLF.custom.channotice,%new,$asc($comma))
+  if (%DLF.custom.selected == Channel ctcp) %DLF.custom.chanctcp = $addtok(%DLF.custom.chanctcp,%new,$asc($comma))
+  if (%DLF.custom.selected == Private text) %DLF.custom.privtext = $addtok(%DLF.custom.privtext,%new,$asc($comma))
+  if (%DLF.custom.selected == Private action) %DLF.custom.privaction = $addtok(%DLF.custom.privaction,%new,$asc($comma))
+  if (%DLF.custom.selected == Private notice) %DLF.custom.privnotice = $addtok(%DLF.custom.privnotice,%new,$asc($comma))
+  if (%DLF.custom.selected == Private ctcp) %DLF.custom.privctcp = $addtok(%DLF.custom.privctcp,%new,$asc($comma))
+  ; Clear edit field, list selection and disable add button
+  did -r DLF.Options.GUI 41
+  DLF.Options.SetAddButton
+  DLF.Options.SetCustomType $did(37).seltext
+}
+
+; Customer filter Remove button clicked
+on *:dialog:DLF.Options.GUI:sclick:52: {
+  var %selcnt = $did(51,0).sel
+  while (%selcnt) {
+    var %seltext = $did(51,$did(51,%selcnt).sel).text
+    if (%DLF.custom.selected == Channel text) %DLF.custom.chantext = $remtok(%DLF.custom.chantext,%seltext,1,$asc($comma))
+    if (%DLF.custom.selected == Channel action) %DLF.custom.chanaction = $remtok(%DLF.custom.chanaction,%seltext,1,$asc($comma))
+    if (%DLF.custom.selected == Channel notice) %DLF.custom.channotice = $remtok(%DLF.custom.channotice,%seltext,1,$asc($comma))
+    if (%DLF.custom.selected == Channel ctcp) %DLF.custom.chanctcp = $remtok(%DLF.custom.chanctcp,%seltext,1,$asc($comma))
+    if (%DLF.custom.selected == Private text) %DLF.custom.privtext = $remtok(%DLF.custom.privtext,%seltext,1,$asc($comma))
+    if (%DLF.custom.selected == Private action) %DLF.custom.privaction = $remtok(%DLF.custom.privaction,%seltext,1,$asc($comma))
+    if (%DLF.custom.selected == Private notice) %DLF.custom.privnotice = $remtok(%DLF.custom.privnotice,%seltext,1,$asc($comma))
+    if (%DLF.custom.selected == Private ctcp) %DLF.custom.privctcp = $remtok(%DLF.custom.privctcp,%seltext,1,$asc($comma))
+    dec %selcnt
+  }
+  did -b DLF.Options.GUI 52
+  DLF.Options.SetCustomType $did(37).seltext
+  DLF.Options.SetRemoveButton
+}
+on *:dialog:DLF.Options.GUI:sclick:67: url -an http://dukelupus.com/dlfilter
+on *:dialog:DLF.Options.GUI:sclick:66: url -an http://www.dukelupus.pri.ee/download.php?f=187932020
+
 ctcp *:*SLOTS*:%DLF.channels: {
   if (%DLF.colornicks == 1) DLFSetNickColor $chan $nick
   haltdef
@@ -1293,7 +1334,7 @@ on *:connect: {
 alias DLF.update { sockopen dlf dukelupus.com 80 }
 on *:sockopen:dlf: {
   if ($sockerr > 0) {
-    if ($dialog(DLFilter_GUI)) did -o DLFilter_GUI 56 1 Connection to DLFilter website failed!
+    if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 Connection to DLFilter website failed!
     else echo -s 4,15[DLFilter]2,15 Connection to DLFilter website failed!
     .sockclose dlf
     halt
@@ -1303,7 +1344,7 @@ on *:sockopen:dlf: {
 }
 on *:sockread:dlf: {
   if ($sockerr > 0) {
-    if ($dialog(DLFilter_GUI)) did -o DLFilter_GUI 56 1 Connection to DLFilter website failed!
+    if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 Connection to DLFilter website failed!
     else echo -s 4,15[DLFilter]2,15 Connection to DLFilter website failed!
     .sockclose dlf
     halt
@@ -1312,17 +1353,17 @@ on *:sockread:dlf: {
     var %t
     sockread %t
     if (($gettok(%t,1,59) == DLFilter) && ($gettok(%t,2,59) > $Set.DLF.version)) {
-      if ($dialog(DLFilter_GUI)) did -o DLFilter_GUI 56 1 You should update! Version $gettok(%t,2,59) is available!
+      if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 You should update! Version $gettok(%t,2,59) is available!
       else echo -a 4,15[DLFilter]2,15 You should update DLFilter. You are using $Set.DLF.version $+ , but version $gettok(%t,2,59) is available from DLFilter website at 12http://dukelupus.com
       .sockclose dlf
     }
     elseif (($gettok(%t,1,59) == DLFilter) && ($gettok(%t,2,59) == $Set.DLF.version)) {
-      if ($dialog(DLFilter_GUI)) did -o DLFilter_GUI 56 1 You have current version of DLFilter
+      if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 You have current version of DLFilter
   ;;     else echo -a 4,15[DLFilter]2,15 You have current version of DLFilter
       .sockclose dlf
     }
     if (($gettok(%t,1,59) == DLFilter) && ($gettok(%t,2,59) < $Set.DLF.version)) {
-      if ($dialog(DLFilter_GUI)) did -o DLFilter_GUI 56 1 You have newer version then website
+      if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 You have newer version then website
 ;;      else echo -a 4,15[DLFilter]2,15 You have newer version then website
       .sockclose dlf
     }
