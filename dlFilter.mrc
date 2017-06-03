@@ -1,17 +1,33 @@
 /*
-to load: use /load -rs DLFilter.mrc
-Note that DLFilter loads itself automatically as a first script (starting from v0.983).
-That helps to avoid a lot of problems with other scripts messing with events.
-Since creation of a good filter is never-ending job, get new versions from http://dukelupus.com/
-Use same site for help about DLFilter.
-If you want to reach me, send mail to dukelupus@hot.ee .
-Trust this script only if you've downloaded it from http://dukelupus.com/ -
-- all other distribution methods and places are not authorized and the script may be tampered.
+DLFilter.mrc - Filter out messages on file sharing channels
+Authors: DukeLupus with recent updates by Sophist
+
+Annoyed by advertising messages from the various file serving bots?
+Fed up with endless channel messages by other users searching for and requesting files?
+Are the responses to your own requests getting lost in the crowd?
+
+This script filters out the crud, leaving only the useful messages displayed in the channel.
+By default, the filtered messages are thrown away, but you can direct them to custom windows if you wish.
+
+Download from: http://dukelupus.com/dlfilter
+or https://raw.githubusercontent.com/SanderSade/dlFilter/master/dlFilter.mrc
+Update regularly to handle new forms of message.
+
+To load: use /load -rs DLFilter.mrc
+
+Note that DLFilter loads itself automatically as a first script.
+This avoids problems where other scripts halt events preventing this scripts events from running.
 */
-alias Set.DLF.version {
-  %DLF.version = 1.16
+
+/* CHANGE LOG
+  1.17  Update opening comments and add change log
+*/
+
+alias DLF.SetVersion {
+  %DLF.version = 1.17
   return %DLF.version
 }
+
 on *:start: {
   if ($script(onotice.mrc)) .unload -rs onotice.mrc
   if ($script(onotice.txt)) .unload -rs onotice.txt
