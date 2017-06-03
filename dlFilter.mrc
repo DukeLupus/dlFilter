@@ -117,21 +117,23 @@ on *:load: {
   DLF.Error During load: $qt($error)
 }
 
-ctcp *:VERSION: .ctcpreply $nick VERSION 1,9[DLFilter] version $Set.DLF.version by DukeLupus.1,15 Get it from 12,15http://dukelupus.com/
+ctcp *:VERSION: .ctcpreply $nick VERSION $c(1,9,$logo version $DLF.SetVersion by DukeLupus.) $c(1,15,Get it from $c(12,15,$u(http://dukelupus.com/dlfilter)))
+
 on *:unload: {
-  echo -s 1,9Unloading [DLFilter] version $Set.DLF.version by DukeLupus
-  echo 10 -s Unsetting variables..
+  DLF.Status Unloading $c(4,9,version $DLF.SetVersion) by DukeLupus.
+  DLF.Status Unsetting variables..
   .unset %DLF.*
-  echo 10 -s Closing open DLFilter windows
+  DLF.Status Closing open DLFilter windows
   if ($dialog(DLFilter_GUI)) .dialog -x DLFilter_GUI DLFilter_GUI
   if ($window(@DLF.filtered)) window -c @DLF.filtered
   if ($window(@DLF.filtered.search)) window -c @DLF.filtered.search
   if ($window(@DLF.server)) window -c @DLF.server
   if ($window(@DLF.server.search)) window -c @DLF.server.search
   if ($window(@DLF.@find.results)) window -c @DLF.@find.results
-  /close -@ @#*
-  echo -s 1,9Unloading [DLFilter] complete.
+  close -@ @#*
+  DLF.Status Unloading complete. $crlf
 }
+
 menu channel {
   -
   $iif($me !isop #, $style(2)) Send onotice: {
