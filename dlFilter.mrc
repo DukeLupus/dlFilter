@@ -31,6 +31,7 @@ This avoids problems where other scripts halt events preventing this scripts eve
           Custom filter Add / Remove button enable / disable
           Custom filter list multi-select
         Menu code cleanup
+        Check update against GitHub
 */
 
 alias DLF.SetVersion {
@@ -1251,47 +1252,54 @@ alias CheckOpStatus {
   else if ($me isop $1) && (%DLF.channels == $chr(35)) && (%DLF.o.enabled == 1) return 1
   else return 0
 }
+; ========== Check version for updates ==========
 on *:connect: {
-  DLF.update
+  DLF.Update
   :error
+  DLF.Error During update: $qt($error)
 }
-alias DLF.update { sockopen dlf dukelupus.com 80 }
-on *:sockopen:dlf: {
-  if ($sockerr > 0) {
-    if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 Connection to DLFilter website failed!
-    else echo -s 4,15[DLFilter]2,15 Connection to DLFilter website failed!
-    .sockclose dlf
-    halt
-  }
-  sockwrite -n $sockname GET /versions.txt HTTP/1.1
-  sockwrite -n $sockname Host: dukelupus.com $+ $crlf $+ $crlf
+
+alias DLF.Update sockopen -e DLF.Update.Socket raw.githubusercontent.com 443
+
+on *:sockopen:DLF.Update.Socket: {
+  if ($sockerr > 0) DLF.Update.Error
+  sockwrite -n $sockname GET /SanderSade/dlFilter/master/dlFilter.version HTTP/1.1
+  sockwrite -n $sockname Host: raw.githubusercontent.com $+ $crlf $+ $crlf
 }
-on *:sockread:dlf: {
-  if ($sockerr > 0) {
-    if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 Connection to DLFilter website failed!
-    else echo -s 4,15[DLFilter]2,15 Connection to DLFilter website failed!
-    .sockclose dlf
-    halt
-  }
-  else {
-    var %t
+
+on *:sockread:DLF.Update.Socket: {
+  if ($sockerr > 0) DLF.Update.Error
+  var %t, %br = -1
+  while (%br != 0) {
     sockread %t
-    if (($gettok(%t,1,59) == DLFilter) && ($gettok(%t,2,59) > $Set.DLF.version)) {
-      if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 You should update! Version $gettok(%t,2,59) is available!
-      else echo -a 4,15[DLFilter]2,15 You should update DLFilter. You are using $Set.DLF.version $+ , but version $gettok(%t,2,59) is available from DLFilter website at 12http://dukelupus.com
-      .sockclose dlf
-    }
-    elseif (($gettok(%t,1,59) == DLFilter) && ($gettok(%t,2,59) == $Set.DLF.version)) {
-      if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 You have current version of DLFilter
-  ;;     else echo -a 4,15[DLFilter]2,15 You have current version of DLFilter
-      .sockclose dlf
-    }
-    if (($gettok(%t,1,59) == DLFilter) && ($gettok(%t,2,59) < $Set.DLF.version)) {
-      if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 You have newer version then website
-;;      else echo -a 4,15[DLFilter]2,15 You have newer version then website
-      .sockclose dlf
+    if ($sockerr > 0) DLF.Update.Error
+    %br = $sockbr
+    if ((%br > 0) && ($gettok(%t,1,$asc($eq)) == DLFilter)) {
+      var %ver = $gettok(%t,2,$asc($eq))
+      if (%ver > $DLF.SetVersion) DLF.Update.StatusMsg Please update DLFilter to version %ver
+      elseif (%ver == $DLF.SetVersion) DLF.Update.StatusMsg You have current version of DLFilter
+      else DLF.Update.StatusMsg You have a newer version $br($DLF.SetVersion) than website $br(%ver)
+      .sockclose DLF.Update.Socket
+      return
     }
   }
+  DLF.Update.ErrorMsg Cannot find existing DLFilter version - please report this at http://www.dukelupus.com!
+}
+
+alias DLF.Update.Error {
+  DLF.Update.ErrorMsg Connection to DLFilter website failed!
+}
+
+alias DLF.Update.StatusMsg {
+  DLF.Warning $1-
+  if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 $1-
+}
+
+alias DLF.Update.ErrorMsg {
+  DLF.Error $1-
+  if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 $1-
+  .sockclose DLF.Update.Socket
+  halt
 }
 
 ; ========== Define message matching hash tables ==========
