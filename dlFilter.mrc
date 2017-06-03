@@ -68,8 +68,8 @@ on *:load: {
   %DLF.custom.chantext = $addtok(%DLF.custom.chantext,*bonga*,44)
   %DLF.custom.chantext = $addtok(%DLF.custom.chantext,*agnob*,44)
   %DLF.custom.chantext = $addtok(%DLF.custom.chantext,*meep*,44)
-  
-  
+
+
   if ($script(onotice.mrc)) .unload -rs onotice.mrc
   if ($script(onotice.txt)) .unload -rs onotice.txt
   if (%DLF.channels == $null) {
@@ -708,13 +708,13 @@ on ^*:text:*:%DLF.channels: {
     if (*Type*!*to get this* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*[BWI]*@* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*Trigger*ctcp* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
-    if (*@*FinÂlity* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
+    if (*@*Fin√•lity* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*@*SDFind* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*I have just finished sending*to*Empty* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
-    if (*ßkŒnß*ﬂy*ßhÂdı* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
+    if (*¬ßk√én¬ß*√üy*¬ßh√•d√µ* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*-SpR-* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Escribe*@* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
-    if (*±* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
+    if (*¬±* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Escribe*!* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*-SpR skin used by PepsiScript* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Type*!*.* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
@@ -737,7 +737,7 @@ on ^*:text:*:%DLF.channels: {
     if (*Tape*@* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*Tape*!*MB* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*Tape*!*.mp3* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
-    if (*ß*DCC Send Failed*to*ß* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
+    if (*¬ß*DCC Send Failed*to*¬ß* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*Wireless*mb*br* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Sent*OS-Limits V* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*File Servers Online*Polaris* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
@@ -746,11 +746,11 @@ on ^*:text:*:%DLF.channels: {
     if (*to*just got timed out*slot*Empty* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*Softwind*Softwind* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Statistici 1*by Un_DuLciC* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
-    if (*tÏnkÎrﬂÎll`s collection*Love Quotes* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
-    if (*óI-n-v-i-s-i-o-nó* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
+    if (*t√¨nk√´r√ü√´ll`s collection*Love Quotes* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
+    if (*‚ÄîI-n-v-i-s-i-o-n‚Äî* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*DCC SEND COMPLETE*to*slot* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
-    if (*´ * ª -* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
-    if (*•*Mp3s*•* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
+    if (*¬´ * ¬ª -* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
+    if (*¬•*Mp3s*¬•* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*DCC GET COMPLETE*from*slot*open* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Je viens juste de terminer l'envoi de*Prenez-en un vite* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Random Play MP3 filez Now Plugged In* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
@@ -759,17 +759,17 @@ on ^*:text:*:%DLF.channels: {
     if (*failed*DCC Send Failed of*to*failed* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*is playing*info*secs* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*--PepsiScript--* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
-    if (*´Sc¯¯p MP3ª* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
+    if (*¬´Sc√∏√∏p MP3¬ª* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*~*~SpR~*~* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*SpR*[*mp3*]* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
-    if (*©ß©* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
+    if (*¬©¬ß¬©* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*I am opening up*more slot*Taken* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
-    if (*.mp3*t◊PLÂY6* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
+    if (*.mp3*t√óPL√•Y6* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*!*.mp3*SpR* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*SPr*!*.mp3* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Successfully*Tx.Track* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*[Mp3xBR]* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
-    if (*OmeNServE*©^OmeN^* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
+    if (*OmeNServE*¬©^OmeN^* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*@*DragonServe* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*Now Sending*QwIRC* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*sent*to*size*speed*time*sent* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
@@ -779,12 +779,12 @@ on ^*:text:*:%DLF.channels: {
     if (*Total Offered*Files*Total Sent*Files*Total Sent Today*Files* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*Control*IRC Client*CTCPSERV* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Download this exciting book* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
-    if (*ª Port ´*ª* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
-    if (*Tasteaz„*@* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
+    if (*¬ª Port ¬´*¬ª* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
+    if (*Tasteaz√£*@* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*File Servers Online*Trigger*Accessed*Served* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*- DCC Transfer Status -* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*Enter @*to see the menu* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
-    if (*User Slots*Sends*Queues*Next Send Available*§UControl§* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
+    if (*User Slots*Sends*Queues*Next Send Available*¬§UControl¬§* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Total*File Transfer in Progress*slot*empty* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*!*MB*Kbps*Khz* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*I have just finished sending*.mp3 to* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
@@ -798,8 +798,8 @@ on ^*:text:*:%DLF.channels: {
     if (*[Fserve Active]* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*File Server Online*Triggers*Sends*Queues* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*Teclea: @* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
-    if (*rﬂP£a*sk*n* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
-    if (*rﬂPLÂY* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
+    if (*r√üP¬£a*sk*n* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
+    if (*r√üPL√•Y* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
     if (*<*>*!* iswm %DLF.txt) TextSetNickColor $chan $nick %DLF.text
   }
   if (%DLF.requests == 1) {
@@ -819,7 +819,7 @@ on ^*:text:*:%DLF.channels: {
     if (*Thanks for the @* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Thanks*For*The*Voice* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*I am AWAY*Reason*I have been Away for* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
-    if (*HÍÂvÍÒlyAway* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
+    if (*H√™√•v√™√±lyAway* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*[F][U][N]* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Tx TIMEOUT* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Receive Successful*Thanks for* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
@@ -834,7 +834,7 @@ on ^*:text:*:%DLF.channels: {
     if (*mp3 server detected* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*KiLLJarX*channel policy is that we are a* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*rbPlay20.mrc* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
-    if (*rﬂPLÂY2.0* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
+    if (*r√üPL√•Y2.0* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*I have just finished receiving*from*have now received a total* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*ROLL TIDE*Now Playing*mp3* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Tocmai am primit*KeepTrack* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
@@ -843,11 +843,11 @@ on ^*:text:*:%DLF.channels: {
     if (*Just Sent To*Filename*Slots Free*Queued* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Received*From*Size*Speed*Time*since* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*I have just received*from*for a total of*KeepTrack* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
-    if (*´ À◊«¸ÆßÓˆÒ ª* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
+    if (*¬´ √ã√ó√á√º¬Æ¬ß√Æ√∂√± ¬ª* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Thanks*For The*@* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*get - from*at*cps*complete* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Je viens juste de terminer de recevoir*de*Prenez-en un vite* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
-    if (*ß–fÌÒ– ‚––-¯Òß* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
+    if (*¬ß√êf√≠√±√ê √¢√ê√ê-√∏√±¬ß* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Welcome back to #* operator*.* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*[Away]*SysReset* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
     if (*Back*Duration* iswm %DLF.txt) DLF_textfilter $chan $nick %DLF.text
@@ -927,14 +927,14 @@ on ^*:action:*:%DLF.channels: {
     if (*is back*from*Auto IdleAway* iswm %DLF.act) DLF_actionfilter $chan $nick %DLF.action
     if (*way*since*pager* iswm %DLF.act) DLF_actionfilter $chan $nick %DLF.action
     if (*[Backing Up]* iswm %DLF.act) DLF_actionfilter $chan $nick %DLF.action
-    if (*est· away*pager* iswm %DLF.act) DLF_actionfilter $chan $nick %DLF.action
+    if (*est√° away*pager* iswm %DLF.act) DLF_actionfilter $chan $nick %DLF.action
     if (*uses cracked software*I will respond to the following commands* iswm %DLF.act) DLF_actionfilter $chan $nick %DLF.action
     if (*I Have Send My List*Times*Files*Times* iswm %DLF.act) DLF_actionfilter $chan $nick %DLF.action
     if (*Type Or Copy*Paste*To Get This Song* iswm %DLF.act) DLF_actionfilter $chan $nick %DLF.action
     if (*is currently boogying away to* iswm %DLF.act) DLF_actionfilter $chan $nick %DLF.action
     if (*is listening to*Kbps*KHz* iswm %DLF.act) DLF_actionfilter $chan $nick %DLF.action
     if (*Now*Playing*Kbps*KHz* iswm %DLF.act) DLF_actionfilter $chan $nick %DLF.action
-    
+
   }
   if ((%DLF.custom.enabled == 1) && (%DLF.custom.chanaction)) {
     var %nr = $numtok(%DLF.custom.chanaction,44)
@@ -1157,14 +1157,14 @@ alias CheckPrivText {
     if (*Too many results*@* iswm %DLF.ptext) FindHeaders $1-
     if (*Tengo*resultado*slots* iswm %DLF.ptext) FindHeaders $1-
     if (*I have*matches for*You might want to get my list by typing* iswm %DLF.ptext) FindHeaders $1-
-    if (*RÈsultat De Recherche*OmeNServE* iswm %DLF.ptext) FindHeaders $1-
+    if (*R√©sultat De Recherche*OmeNServE* iswm %DLF.ptext) FindHeaders $1-
     if (*Resultados De Busqueda*OmenServe* iswm %DLF.ptext) FindHeaders $1-
-    if (*Total de*fichier*TrouvÈ* iswm %DLF.ptext) FindHeaders $1-
+    if (*Total de*fichier*Trouv√©* iswm %DLF.ptext) FindHeaders $1-
     if (*Fichier* Correspondant pour*Copie* iswm %DLF.ptext) FindHeaders $1-
     if (*Search Result*Matches For*Copy And Paste* iswm %DLF.ptext) FindHeaders $1-
-    if (*Resultados de la b˙squeda*DragonServe* iswm %DLF.ptext) FindHeaders $1-
+    if (*Resultados de la b√∫squeda*DragonServe* iswm %DLF.ptext) FindHeaders $1-
     if (*Results for your search*DragonServe* iswm %DLF.ptext) FindHeaders $1-
-    if (*´SoftServeª* iswm %DLF.ptext) FindHeaders $1-
+    if (*¬´SoftServe¬ª* iswm %DLF.ptext) FindHeaders $1-
     if (*search for*returned*results on list* iswm %DLF.ptext) FindHeaders $1-
     if (*List trigger:*Slots*Next Send*CPS in use*CPS Record* iswm %DLF.ptext) FindHeaders $1-
     if (*Searched*files and found*matching*To get a file, copy !* iswm %DLF.ptext) FindHeaders $1-
@@ -1172,7 +1172,7 @@ alias CheckPrivText {
     if (*Note*MP3-MP3* iswm %DLF.ptext) FindHeaders $1-
     if (*Search Result*Matches For*Get My List Of*Files By Typing @* iswm %DLF.ptext) FindHeaders $1-
     if (*Resultado Da Busca*Arquivos*Pegue A Minha Lista De*@* iswm %DLF.ptext) FindHeaders $1-
-    if (*J'ai Trop de RÈsultats Correspondants*@* iswm %DLF.ptext) FindHeaders $1-
+    if (*J'ai Trop de R√©sultats Correspondants*@* iswm %DLF.ptext) FindHeaders $1-
     if (*Search Results*Found*matches for*Type @*to download my list* iswm %DLF.ptext) FindHeaders $1-
     if (*I have found*file*for your query*Displaying* iswm %DLF.ptext) FindHeaders $1-
     if (*From list*found*displaying* iswm %DLF.ptext) FindHeaders $1-
@@ -1189,7 +1189,7 @@ alias CheckPrivText {
     if (Lo Siento, no te puedo enviar mi lista ahora, intenta despues* iswm %DLF.ptext) FindHeaders $1-
     if (Lo siento, pero estoy creando una nueva lista ahora* iswm %DLF.ptext) FindHeaders $1-
     if (I have successfully sent you*OS* iswm %DLF.ptext) FindHeaders $1-
-    if (*PeticiÛn rechazada*DragonServe* iswm %DLF.ptext) FindHeaders $1-
+    if (*Petici√≥n rechazada*DragonServe* iswm %DLF.ptext) FindHeaders $1-
     if (*I don't have*Please check your spelling or get my newest list by typing @* in the channel* iswm %DLF.ptext) FindHeaders $1-
     if (*you already have*in my que*has NOT been added to my que* iswm %DLF.ptext) FindHeaders $1-
     if (*You already have*in my que*Type @*-help for more info* iswm %DLF.ptext) FindHeaders $1-
@@ -1398,17 +1398,17 @@ on ^*:notice:*:?: {
     if (*is on the way!* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*has been sent sucessfully* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*send will be initiated as soon as possible* iswm %DLF.pnotice) ServerFilter $nick $1-
-    if (*´SoftServeª* iswm %DLF.pnotice) ServerFilter $nick $1-
+    if (*¬´SoftServe¬ª* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*You are the successful downloader number* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*You are in* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Request Denied* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*OmeNServE v* iswm %DLF.pnotice) ServerFilter $nick $1-
-    if (*´OmeNª* iswm %DLF.pnotice) ServerFilter $nick $1-
+    if (*¬´OmeN¬ª* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*is not found* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*file not located* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*I don't have the file* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*is on its way* iswm %DLF.pnotice) ServerFilter $nick $1-
-    if (*±* iswm %DLF.pnotice) ServerFilter $nick $1-
+    if (*¬±* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Transfer Started*File* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*is on it's way!* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Requested File's* iswm %DLF.pnotice) ServerFilter $nick $1-
@@ -1419,21 +1419,21 @@ on ^*:notice:*:?: {
     if (*OS-Limits* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Transfer Complete*I have successfully sent*QwIRC iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Request Accepted*File*Queue position* iswm %DLF.pnotice) ServerFilter $nick $1-
-    if (*Le Transfert de*Est CompletÈ* iswm %DLF.pnotice) ServerFilter $nick $1-
+    if (*Le Transfert de*Est Complet√©* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Query refused*in*seconds* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Keeptrack*omen* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*U Got A File From Me*files since* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Transfer Complete*sent* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Transmision de*finalizada* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Send Failed*at*Please make a resume request* iswm %DLF.pnotice) ServerFilter $nick $1-
-    if (*t◊PLÂY* iswm %DLF.pnotice) ServerFilter $nick $1-
-    if (*OS-Limites V*t◊PLÂY* iswm %DLF.pnotice) ServerFilter $nick $1-
-    if (*rﬂPLÂY2* iswm %DLF.pnotice) ServerFilter $nick $1-
+    if (*t√óPL√•Y* iswm %DLF.pnotice) ServerFilter $nick $1-
+    if (*OS-Limites V*t√óPL√•Y* iswm %DLF.pnotice) ServerFilter $nick $1-
+    if (*r√üPL√•Y2* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (Request Accepted*Has Been Placed In The Priority Queue At Position* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*esta en camino!* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Envio cancelado* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*de mi lista de espera* iswm %DLF.pnotice) ServerFilter $nick $1-
-    if (*DespuÈs de esperar*min* iswm %DLF.pnotice) ServerFilter $nick $1-
+    if (*Despu√©s de esperar*min* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*veces que he enviado* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*archivos, Disfrutalo* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (Thank you for*.*! iswm %DLF.pnotice) ServerFilter $nick $1-
@@ -1443,10 +1443,10 @@ on ^*:notice:*:?: {
     if (*Unable to locate any files with*associated within them* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Has Been Placed In The Priority Queue At Position*Omenserve* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Thanks*for sharing*with me* iswm %DLF.pnotice) ServerFilter $nick $1-
-    if (*´[RDC]ª* iswm %DLF.pnotice) ServerFilter $nick $1-
+    if (*¬´[RDC]¬ª* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Your send of*was successfully completed* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*AFK, auto away after*minutes* iswm %DLF.pnotice) ServerFilter $nick $1-
-    if (*EnvÌo completo*DragonServe* iswm %DLF.pnotice) ServerFilter $nick $1-
+    if (*Env√≠o completo*DragonServe* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Empieza transferencia*DragonServe* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Ahora has recibido*DragonServe* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Starting Transfer*DragonServe* iswm %DLF.pnotice) ServerFilter $nick $1-
@@ -1457,7 +1457,7 @@ on ^*:notice:*:?: {
     if (*DCC Get of*FAILED Please Re-Send file* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*request for*acknowledged*send will be initiated as soon as possible* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*file not located* iswm %DLF.pnotice) ServerFilter $nick $1-
-    if (*t◊PL≈Y* iswm %DLF.pnotice) ServerFilter $nick $1-
+    if (*t√óPL√ÖY* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*I'm currently away*your message has been logged* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*If your message is urgent, you may page me by typing*PAGE* iswm %DLF.pnotice) ServerFilter $nick $1-
     if (*Gracias*Ahora he recibido*DragonServe* iswm %DLF.pnotice) ServerFilter $nick $1-
