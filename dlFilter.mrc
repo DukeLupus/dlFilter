@@ -24,17 +24,31 @@ This avoids problems where other scripts halt events preventing this scripts eve
         Use custom identifiers for creating bold, colour etc.
         Use custom identifiers instead of $chr(xx)
         Use alias for status messages
-        Hash tables for message matching
+        Hash tables for message matching instead of lists of ifs
         Options dialog improvements
           Layout
           Enable / disable now global
           Custom filter Add / Remove button enable / disable
           Custom filter list multi-select
         Menu code cleanup
-        Check update against GitHub
-        User groups to enable / disable DLF event handling
+        Use GitHub for version check
+        Use script groups to enable / disable DLF event handling
         Allow msgs from Chanserv etc. and self
         Cleanup menu code
+        Files now always accepted from Regular users who are in DCC Trust List
+
+      TODO
+        Fuller implementation of script groups to enable / disable events
+        Download button to update from GitHub
+        About dialog (using comment at start of this file)
+        Option for separate windows for fileserver ads
+        Custom filters empty on initialisation
+        Add support for mIRC multiple network connections:
+          Allow channels specified as network#channel
+          Option for common @windows or network-specific windows
+        Right click menu items for changing options base on line clicked
+        Right click menu items for adding to custom filters
+        More menu options equivalent to dialog options
 */
 
 alias DLF.SetVersion {
