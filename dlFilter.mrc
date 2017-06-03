@@ -233,6 +233,17 @@ alias DLF.Option.Toggle {
   else DLF.status Option $1 cleared
 }
 
+menu @DLF.*.search {
+  Copy line: {
+    .clipboard
+    .clipboard $sline($active,1)
+    cline 14 $active $sline($active,1).ln
+  }
+  Clear: /clear
+  Close: /window -c $active
+  Options: dialog -md DLF.Options.GUI DLF.Options.GUI
+}
+
 menu @DLF.@find.Results,@DLF.NewReleases {
   .-
   .Copy line(s): {
@@ -318,16 +329,7 @@ menu @DLF.@find.Results,@DLF.NewReleases {
   Close: /window -c $active
   .-
 }
-menu @DLF.*.search {
-  Copy line: {
-    .clipboard
-    .clipboard $sline($active,1)
-    cline 14 $active $sline($active,1).ln
-  }
-  Clear: /clear
-  Close: /window -c $active
-  Options: dialog -md DLF.Options.GUI DLF.Options.GUI
-}
+
 menu @#* {
   Clear: /clear
   $iif(%DLF.o.timestamp == 1,$style(1)) Timestamp: {
@@ -665,46 +667,6 @@ ctcp *:*:%DLF.channels: {
   }
 }
 
-ctcp *:*:?: {
-  if (%DLF.enabled == 0) goto DLFnoctcp
-  if ((%DLF.nocomchan.dcc == 1) && ($1-2 === DCC CHAT)) {
-    %DLF.accepthis = $nick
-    goto DLFnoctcp
-  }
-  if (%DLF.nocomchan == 1) DoCheckComChan $nick $1-
-  if ((%DLF.askregfile == 1) && (DCC SEND isin $1-)) {
-    if ($CheckRegular($nick) == IsRegular) {
-      if (%DLF.askregfile.type == 1) {
-        var %ext = $right($nopath($filename),4)
-        if ($pos(%ext,$chr(46),1) == 2) %ext = $right(%ext,3)
-        if ((.exe == %ext) || (.com == %ext) || (.bat == %ext) || (.scr == %ext) || (.mrc == %ext) || (.pif == %ext) || (.vbs == %ext) || (.js == %ext) || (.doc == %ext)) {
-        }
-        else {
-          goto DLFnoctcp
-        }
-      }
-      echo -s 1,9[DLFilter] Regular user $nick ( $+ $address $+ ) tried to send you file " $+ $gettok($1-,3-$numtok($1-,32), 32) $+ ".
-      haltdef
-      halt
-    }
-  }
-  if ((%DLF.noregmsg == 1) && (($CheckRegular($nick) == IsRegular)) && (DCC send !isin $1-)) {
-    echo -s 1,9[DLFilter] Regular user $nick ( $+ $address $+ ) tried to:4,15 $1-
-    echo -a 1,9[DLFilter] Regular user $nick ( $+ $address $+ ) tried to:4,15 $1-
-    haltdef
-    halt
-  }
-  if ((%DLF.custom.enabled == 1) && (%DLF.custom.privctcp)) {
-    var %nr = $numtok(%DLF.custom.privctcp,44)
-    var %cnter = 1
-    while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.privctcp,%cnter,44) iswm $1-) DLF_textfilter Private $nick $1-
-      inc %cnter
-    }
-  }
-  :DLFnoctcp
-}
-
 on ^*:text:*:%DLF.channels: {
   var %DLF.txt = $strip($1-)
   if ((%DLF.ads == 1) && ($hfind(DLF.text.ads,%DLF.txt,1,W))) TextSetNickColor $chan $nick $1-
@@ -728,29 +690,6 @@ on ^*:text:*:%DLF.channels: {
   }
 }
 
-#dlf_enabled end
-; ========== End of DLF enabled group ==========
-
-alias TextSetNickColor {
-  if ((%DLF.colornicks == 1) && ($nick($1,$2).color == $color(nicklist))) cline 2 $1 $2
-  DLF_textfilter $1-
-}
-alias DLF_textfilter {
-  if (%DLF.filtered.log == 1) write $+(",$logdir,DLF.Filtered,.log,") $+($chr(91),$fulldate,$chr(93)) $+ $chr(32) $+ $chr(91) $+ $1 $+ $chr(93) $+ $chr(32) $+ $chr(60) $+ $2 $+ $chr(62) $+ $chr(32) $+ $strip($3-)
-  if (%DLF.showfiltered == 1) {
-    if (!$window(@DLF.Filtered)) {
-      window -k0nwz @DLF.filtered
-      titlebar @DLF.filtered -=- Right-click for options
-    }
-    var %line = $chr(91) $+ $1 $+ $chr(93) $+ $chr(32) $+ $chr(60) $+ $2 $+ $chr(62) $+ $chr(32) $+ $3-
-    if ((%DLF.filtered.limit == 1) && ($line(@DLF.filtered,0) >= 5000)) dline @DLF.Filtered 1-100
-    if (%DLF.filtered.timestamp == 1) %line = $timestamp $+ $chr(32) $+ %line
-    if (%DLF.filtered.strip == 1) %line = $strip(%line)
-    if (%DLF.filtered.wrap == 1) aline -p @DLF.filtered %line
-    else aline @DLF.filtered %line
-  }
-  halt
-}
 on ^*:action:*:%DLF.channels: {
   var %DLF.action = $strip($1-)
   if ((%DLF.ads == 1) && ($hfind(DLF.action.ads,%DLF.action,1,W))) DLF_actionfilter $chan $nick $1-
@@ -766,32 +705,64 @@ on ^*:action:*:%DLF.channels: {
   }
 }
 
-alias DLF_actionfilter {
-  if (%DLF.filtered.log == 1) write $+(",$logdir,DLF.Filtered,.log,") $+($chr(91),$fulldate,$chr(93)) $+ $chr(32) $+ $chr(91) $+ $1 $+ $chr(93) $+ $chr(32) $+ $chr(42) $+ $chr(32) $+ $2 $+ $chr(32) $+ $strip($3-)
-  if (%DLF.showfiltered == 1) {
-    if (!$window(@DLF.Filtered)) {
-      window -k0nwz @DLF.Filtered
-      titlebar @DLF.Filtered -=- Right-click for options
+on ^*:notice:*:#: {
+  if (%DLF.o.enabled == 1) {
+    var %DLF.o.chan = $chan
+    var %DLF.o.target = @ $+ $chan
+    if ($target == %DLF.o.target) {
+      if (($nick isop %DLF.o.chan) && ($me isop %DLF.o.chan)) {
+        if ($1 != @) var %omsg = $1-
+        if ($1 == @) var %omsg = $2-
+        if ($gettok(%omsg,1,$asc($space)) != /me) {
+          var %chatwindow = @ $+ %DLF.o.chan
+          if (!$window(%chatwindow)) {
+            window -eg1k1l12mnSw %chatwindow
+            if ((%DLF.o.log == 1) && ($exists($+(",$logdir,%chatwindow,.log,")))) {
+              var %log = $qt($+(logdir,%chatwindow,.log))
+              write %log $crlf
+              write %log $sqbr($fulldate) ----- Session started -----
+              write %log $crlf
+              .loadbuf -r %chatwindow $+(",$logdir,%chatwindow,.log,")
+            }
+          }
+          var %omsg = $tag($nick) %omsg
+          if (%DLF.o.timestamp == 1) var %omsg = $timestamp %omsg
+          aline -nl $color(nicklist) %chatwindow $nick
+          window -S %chatwindow
+          aline -ph $color(text) %chatwindow %omsg
+          if (%DLF.o.log == 1) write $+(",$logdir,%chatwindow,.log,") %omsg
+          halt
+        }
+        else {
+          %omsg = $gettok(%omsg,2-,$asc($space))
+          var %chatwindow = @ $+ %DLF.o.chan
+          if (!$window(%chatwindow)) window -eg1k1l12mnSw %chatwindow
+          var %omsg = $star $nick %omsg
+          if (%DLF.o.timestamp == 1) var %omsg = $timestamp %omsg
+          aline -nl $color(nicklist) %chatwindow $nick
+          window -S %chatwindow
+          aline -ph $color(action) %chatwindow %omsg
+          if (%DLF.o.log == 1) write $+(",$logdir,%chatwindow,.log,") %omsg
+          halt
+        }
+        halt
+      }
     }
-    var %line = $chr(91) $+ $1 $+ $chr(93) $+ $chr(32) $+ $chr(42) $+ $chr(32) $+ $2 $+ $chr(32) $+ $3-
-    if ((%DLF.filtered.limit == 1) && ($line(@DLF.Filtered,0) >= 5000)) dline @DLF.Filtered 1-100
-    if (%DLF.filtered.timestamp == 1) %line = $timestamp $+ $chr(32) $+ %line
-    if (%DLF.filtered.strip == 1) %line = $strip(%line)
-    if (%DLF.filtered.wrap == 1) aline -p $color(action) @DLF.Filtered %line
-    else aline $color(action) @DLF.Filtered %line
   }
-  halt
-}
-
-on *:input:@DLF.Filtered.Search: FilteredSearch $1-
-
-alias FilteredSearch {
-  window -ealbk0wz @DLF.filtered.search
-  var %sstring = $chr(42) $+ $1- $+ $chr(42)
-  titlebar @DLF.filtered.search -=- Searching for %sstring
-  filter -wwbpc @DLF.filtered @DLF.Filtered.search %sstring
-  if ($line(@DLF.Filtered.search,0) == 0) titlebar @DLF.filtered.search -=- Search finished. No matches for " $+ %sstring $+ " found.
-  else titlebar @DLF.filtered.search -=- Search finished. $line(@DLF.Filtered.search,0) matches found for " $+ %sstring $+ ".
+  if ($istok(%DLF.channels,$chan,$asc($comma))) {
+    if ((%DLF.custom.enabled == 1) && (%DLF.custom.channotice)) {
+      var %nr = $numtok(%DLF.custom.channotice,$asc($comma))
+      var %cnter = 1
+      while (%cnter <= %nr) {
+        if ($gettok(%DLF.custom.channotice,%cnter,$asc($comma)) iswm $strip($1-)) DLF_textfilter $chan $nick $1-
+        inc %cnter
+      }
+    }
+    if (%DLF.chspam == 1) {
+      if (*WWW.TURKSMSBOT.CJB.NET* iswm $1-) DLFSpamFilter $chan $nick $1-
+      if (*free-download* iswm $1-) DLFSpamFilter $chan $nick $1-
+    }
+  }
 }
 
 ; Handle channel user messages
@@ -877,6 +848,146 @@ on ^*:text:*:?: {
   CheckPrivText $nick $1-
 }
 
+on ^*:notice:*:?: {
+  var %DLF.pnotice = $strip($1-)
+  DoCheckComChan $nick %DLF.pnotice
+  if ((%DLF.noregmsg == 1) && ($CheckRegular($nick) == IsRegular)) {
+    DLF.Warning Regular user $nick $br($address) tried to send you a notice: $1-
+    halt
+  }
+  if ((%DLF.server == 1) && ($hfind(DLF.notice.server,%DLF.pnotice,1,W))) ServerFilter $nick $1-
+  if (*SLOTS My mom always told me not to talk to strangers* iswm %DLF.pnotice) DLF_textfilter Notice $nick $1-
+  if (*CTCP flood detected, protection enabled* iswm %DLF.pnotice) DLF_textfilter Notice $nick $1-
+  if ((%DLF.searchresults == 1) && (%DLF.searchactive == 1)) {
+    if (No match found for* iswm %DLF.ptext) ServerFilter $nick $1-
+    if (*I have*match* for*in listfile* iswm %DLF.ptext) ServerFilter $nick $1-
+    tokenize $asc($space) %DLF.ptext
+    if ($pos($1,$pling,1) == 1) FindResults $nick $1-
+  }
+  if ((%DLF.custom.enabled == 1) && (%DLF.custom.privnotice)) {
+    var %nr = $numtok(%DLF.custom.privnotice,$asc($comma))
+    var %cnter = 1
+    while (%cnter <= %nr) {
+      if ($gettok(%DLF.custom.privnotice,%cnter,$asc($comma)) iswm $strip($1-)) DLF_textfilter Private $nick $1-
+      inc %cnter
+    }
+  }
+}
+
+on ^*:action:*:?: {
+  if (%DLF.enabled == 0) got anotenabled
+  DoCheckComChan $nick $1-
+  if ((%DLF.noregmsg == 1) && ($CheckRegular($nick) == IsRegular)) {
+    echo -s 1,9[DLFilter] Regular user $nick ( $+ $address $+ ) tried to:4,15 $1-
+    echo -a 1,9[DLFilter] Regular user $nick ( $+ $address $+ ) tried to:4,15 $1-
+    .window -c $1
+    .close -m $1
+    haltdef
+    halt
+  }
+  if ((%DLF.custom.enabled == 1) && (%DLF.custom.privaction)) {
+    var %nr = $numtok(%DLF.custom.privaction,44)
+    var %cnter = 1
+    while (%cnter <= %nr) {
+      if ($gettok(%DLF.custom.privaction,%cnter,44) iswm $strip($1-)) DLF_actionfilter Private $nick $1-
+      inc %cnter
+    }
+  }
+  :anotenabled
+}
+
+ctcp *:*:?: {
+  if (%DLF.enabled == 0) goto DLFnoctcp
+  if ((%DLF.nocomchan.dcc == 1) && ($1-2 === DCC CHAT)) {
+    %DLF.accepthis = $nick
+    goto DLFnoctcp
+  }
+  if (%DLF.nocomchan == 1) DoCheckComChan $nick $1-
+  if ((%DLF.askregfile == 1) && (DCC SEND isin $1-)) {
+    if ($CheckRegular($nick) == IsRegular) {
+      if (%DLF.askregfile.type == 1) {
+        var %ext = $right($nopath($filename),4)
+        if ($pos(%ext,$chr(46),1) == 2) %ext = $right(%ext,3)
+        if ((.exe == %ext) || (.com == %ext) || (.bat == %ext) || (.scr == %ext) || (.mrc == %ext) || (.pif == %ext) || (.vbs == %ext) || (.js == %ext) || (.doc == %ext)) {
+        }
+        else {
+          goto DLFnoctcp
+        }
+      }
+      echo -s 1,9[DLFilter] Regular user $nick ( $+ $address $+ ) tried to send you file " $+ $gettok($1-,3-$numtok($1-,32), 32) $+ ".
+      haltdef
+      halt
+    }
+  }
+  if ((%DLF.noregmsg == 1) && (($CheckRegular($nick) == IsRegular)) && (DCC send !isin $1-)) {
+    echo -s 1,9[DLFilter] Regular user $nick ( $+ $address $+ ) tried to:4,15 $1-
+    echo -a 1,9[DLFilter] Regular user $nick ( $+ $address $+ ) tried to:4,15 $1-
+    haltdef
+    halt
+  }
+  if ((%DLF.custom.enabled == 1) && (%DLF.custom.privctcp)) {
+    var %nr = $numtok(%DLF.custom.privctcp,44)
+    var %cnter = 1
+    while (%cnter <= %nr) {
+      if ($gettok(%DLF.custom.privctcp,%cnter,44) iswm $1-) DLF_textfilter Private $nick $1-
+      inc %cnter
+    }
+  }
+  :DLFnoctcp
+}
+
+#dlf_enabled end
+; ========== End of DLF enabled group ==========
+
+alias TextSetNickColor {
+  if ((%DLF.colornicks == 1) && ($nick($1,$2).color == $color(nicklist))) cline 2 $1 $2
+  DLF_textfilter $1-
+}
+alias DLF_textfilter {
+  if (%DLF.filtered.log == 1) write $+(",$logdir,DLF.Filtered,.log,") $+($chr(91),$fulldate,$chr(93)) $+ $chr(32) $+ $chr(91) $+ $1 $+ $chr(93) $+ $chr(32) $+ $chr(60) $+ $2 $+ $chr(62) $+ $chr(32) $+ $strip($3-)
+  if (%DLF.showfiltered == 1) {
+    if (!$window(@DLF.Filtered)) {
+      window -k0nwz @DLF.filtered
+      titlebar @DLF.filtered -=- Right-click for options
+    }
+    var %line = $chr(91) $+ $1 $+ $chr(93) $+ $chr(32) $+ $chr(60) $+ $2 $+ $chr(62) $+ $chr(32) $+ $3-
+    if ((%DLF.filtered.limit == 1) && ($line(@DLF.filtered,0) >= 5000)) dline @DLF.Filtered 1-100
+    if (%DLF.filtered.timestamp == 1) %line = $timestamp $+ $chr(32) $+ %line
+    if (%DLF.filtered.strip == 1) %line = $strip(%line)
+    if (%DLF.filtered.wrap == 1) aline -p @DLF.filtered %line
+    else aline @DLF.filtered %line
+  }
+  halt
+}
+
+alias DLF_actionfilter {
+  if (%DLF.filtered.log == 1) write $+(",$logdir,DLF.Filtered,.log,") $+($chr(91),$fulldate,$chr(93)) $+ $chr(32) $+ $chr(91) $+ $1 $+ $chr(93) $+ $chr(32) $+ $chr(42) $+ $chr(32) $+ $2 $+ $chr(32) $+ $strip($3-)
+  if (%DLF.showfiltered == 1) {
+    if (!$window(@DLF.Filtered)) {
+      window -k0nwz @DLF.Filtered
+      titlebar @DLF.Filtered -=- Right-click for options
+    }
+    var %line = $chr(91) $+ $1 $+ $chr(93) $+ $chr(32) $+ $chr(42) $+ $chr(32) $+ $2 $+ $chr(32) $+ $3-
+    if ((%DLF.filtered.limit == 1) && ($line(@DLF.Filtered,0) >= 5000)) dline @DLF.Filtered 1-100
+    if (%DLF.filtered.timestamp == 1) %line = $timestamp $+ $chr(32) $+ %line
+    if (%DLF.filtered.strip == 1) %line = $strip(%line)
+    if (%DLF.filtered.wrap == 1) aline -p $color(action) @DLF.Filtered %line
+    else aline $color(action) @DLF.Filtered %line
+  }
+  halt
+}
+
+on *:input:@DLF.Filtered.Search: FilteredSearch $1-
+
+alias FilteredSearch {
+  window -ealbk0wz @DLF.filtered.search
+  var %sstring = $chr(42) $+ $1- $+ $chr(42)
+  titlebar @DLF.filtered.search -=- Searching for %sstring
+  filter -wwbpc @DLF.filtered @DLF.Filtered.search %sstring
+  if ($line(@DLF.Filtered.search,0) == 0) titlebar @DLF.filtered.search -=- Search finished. No matches for " $+ %sstring $+ " found.
+  else titlebar @DLF.filtered.search -=- Search finished. $line(@DLF.Filtered.search,0) matches found for " $+ %sstring $+ ".
+}
+
 alias CheckPrivText {
   %DLF.ptext = $strip($1-)
   if ($window(1)) DoCheckComChan $1 $2-
@@ -924,92 +1035,6 @@ alias PrivText {
   if ($window($1)) .window -c $1
   DLF_TextFilter Private $1-
   halt
-}
-
-on ^*:notice:*:#: {
-  if (%DLF.o.enabled == 1) {
-    var %DLF.o.chan = $chan
-    var %DLF.o.target = @ $+ $chan
-    if ($target == %DLF.o.target) {
-      if (($nick isop %DLF.o.chan) && ($me isop %DLF.o.chan)) {
-        if ($1 != @) var %omsg = $1-
-        if ($1 == @) var %omsg = $2-
-        if ($gettok(%omsg,1,$asc($space)) != /me) {
-          var %chatwindow = @ $+ %DLF.o.chan
-          if (!$window(%chatwindow)) {
-            window -eg1k1l12mnSw %chatwindow
-            if ((%DLF.o.log == 1) && ($exists($+(",$logdir,%chatwindow,.log,")))) {
-              var %log = $qt($+(logdir,%chatwindow,.log))
-              write %log $crlf
-              write %log $sqbr($fulldate) ----- Session started -----
-              write %log $crlf
-              .loadbuf -r %chatwindow $+(",$logdir,%chatwindow,.log,")
-            }
-          }
-          var %omsg = $tag($nick) %omsg
-          if (%DLF.o.timestamp == 1) var %omsg = $timestamp %omsg
-          aline -nl $color(nicklist) %chatwindow $nick
-          window -S %chatwindow
-          aline -ph $color(text) %chatwindow %omsg
-          if (%DLF.o.log == 1) write $+(",$logdir,%chatwindow,.log,") %omsg
-          halt
-        }
-        else {
-          %omsg = $gettok(%omsg,2-,$asc($space))
-          var %chatwindow = @ $+ %DLF.o.chan
-          if (!$window(%chatwindow)) window -eg1k1l12mnSw %chatwindow
-          var %omsg = $star $nick %omsg
-          if (%DLF.o.timestamp == 1) var %omsg = $timestamp %omsg
-          aline -nl $color(nicklist) %chatwindow $nick
-          window -S %chatwindow
-          aline -ph $color(action) %chatwindow %omsg
-          if (%DLF.o.log == 1) write $+(",$logdir,%chatwindow,.log,") %omsg
-          halt
-        }
-        halt
-      }
-    }
-  }
-  if ($istok(%DLF.channels,$chan,$asc($comma))) {
-    if ((%DLF.custom.enabled == 1) && (%DLF.custom.channotice)) {
-      var %nr = $numtok(%DLF.custom.channotice,$asc($comma))
-      var %cnter = 1
-      while (%cnter <= %nr) {
-        if ($gettok(%DLF.custom.channotice,%cnter,$asc($comma)) iswm $strip($1-)) DLF_textfilter $chan $nick $1-
-        inc %cnter
-      }
-    }
-    if (%DLF.chspam == 1) {
-      if (*WWW.TURKSMSBOT.CJB.NET* iswm $1-) DLFSpamFilter $chan $nick $1-
-      if (*free-download* iswm $1-) DLFSpamFilter $chan $nick $1-
-    }
-  }
-}
-
-on ^*:notice:*:?: {
-  var %DLF.pnotice = $strip($1-)
-  DoCheckComChan $nick %DLF.pnotice
-  if ((%DLF.noregmsg == 1) && ($CheckRegular($nick) == IsRegular)) {
-    DLF.Warning Regular user $nick $br($address) tried to send you a notice: $1-
-    halt
-  }
-  if ((%DLF.server == 1) && ($hfind(DLF.notice.server,%DLF.pnotice,1,W))) ServerFilter $nick $1-
-  if (*SLOTS My mom always told me not to talk to strangers* iswm %DLF.pnotice) DLF_textfilter Notice $nick $1-
-  if (*CTCP flood detected, protection enabled* iswm %DLF.pnotice) DLF_textfilter Notice $nick $1-
-  if ((%DLF.searchresults == 1) && (%DLF.searchactive == 1)) {
-    if (No match found for* iswm %DLF.ptext) ServerFilter $nick $1-
-    if (*I have*match* for*in listfile* iswm %DLF.ptext) ServerFilter $nick $1-
-    tokenize $asc($space) %DLF.ptext
-    if ($pos($1,$pling,1) == 1) FindResults $nick $1-
-  }
-  if ((%DLF.custom.enabled == 1) && (%DLF.custom.privnotice)) {
-    var %nr = $numtok(%DLF.custom.privnotice,$asc($comma))
-    var %cnter = 1
-    while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.privnotice,%cnter,$asc($comma)) iswm $strip($1-)) DLF_textfilter Private $nick $1-
-      inc %cnter
-    }
-  }
 }
 
 on *:input:@#* {
@@ -1125,28 +1150,6 @@ alias FindResults {
   window -b @DLF.@find.Results
   titlebar @DLF.@find.Results -=- $line(@DLF.@find.Results,0) results so far -=- Right-click for options
   halt
-}
-
-on ^*:action:*:?: {
-  if (%DLF.enabled == 0) got anotenabled
-  DoCheckComChan $nick $1-
-  if ((%DLF.noregmsg == 1) && ($CheckRegular($nick) == IsRegular)) {
-    echo -s 1,9[DLFilter] Regular user $nick ( $+ $address $+ ) tried to:4,15 $1-
-    echo -a 1,9[DLFilter] Regular user $nick ( $+ $address $+ ) tried to:4,15 $1-
-    .window -c $1
-    .close -m $1
-    haltdef
-    halt
-  }
-  if ((%DLF.custom.enabled == 1) && (%DLF.custom.privaction)) {
-    var %nr = $numtok(%DLF.custom.privaction,44)
-    var %cnter = 1
-    while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.privaction,%cnter,44) iswm $strip($1-)) DLF_actionfilter Private $nick $1-
-      inc %cnter
-    }
-  }
-  :anotenabled
 }
 
 alias DoCheckComChan {
