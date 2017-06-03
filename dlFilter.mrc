@@ -21,6 +21,9 @@ This avoids problems where other scripts halt events preventing this scripts eve
 
 /* CHANGE LOG
   1.17  Update opening comments and add change log
+        Use custom identifiers for creating bold, colour etc.
+        Use custom identifiers instead of $chr(xx)
+        Use alias for status messages
 */
 
 alias DLF.SetVersion {
@@ -1656,6 +1659,68 @@ on *:sockread:dlf: {
     }
   }
 }
+
+; ========== Status and error messages ==========
+alias -l DLF.logo return $rev([DLFilter])
+alias DLF.Status echo -s $c(1,9,$DLF.logo $1-)
+alias DLF.Warning echo -as $c(1,9,$DLF.logo $1-)
+alias DLF.Error DLF.Warning $c(4,$b(Error:)) $1-
+
+; ========== Identifiers instead of $chr(xx) - more readable ==========
+alias space return $chr(32)
+alias nbsp return $chr(160)
+alias amp return $chr(38)
+alias star return $chr(42)
+alias dollar return $chr(36)
+alias comma return $chr(44)
+alias hyphen return $chr(45)
+alias colon return $chr(58)
+alias semicolon return $chr(59)
+alias pling return $chr(33)
+alias period return $chr(46)
+alias lcurly return $chr(123)
+alias rcurly return $chr(125)
+alias lsquare return $chr(91)
+alias rsquare return $chr(93)
+alias sqbr return $+($lsquare,$1-,$rsquare)
+alias lbr return $chr(40)
+alias rbr return $chr(41)
+alias br return $+($lbr,$1-,$rbr)
+alias eq return $chr(61)
+alias lt return $chr(60)
+alias gt return $chr(62)
+alias tag return $+($lt,$1-,$gt)
+
+; ========== Control Codes using aliases ==========
+; Color, bold, underline, italic, reverse e.g.
+; echo 1 This line has $b(bold) $+ , $i(italic) $+ , $u(underscored) $+ , $c(4,red) $+ , and $rev(reversed) text.
+; Calls can be nested e.g. echo 1 $c(12,$u(http://www.dukelupus.com))
+alias b return $+($chr(2),$1-,$chr(2))
+alias u return $+($chr(31),$1-,$chr(31))
+alias i return $+($chr(29),$1-,$chr(29))
+alias rev return $+($chr(22),$1-,$chr(22))
+alias c {
+  var %code, %text
+  if ($0 < 2) {
+    DLF.Error Insufficient parameters to colour text
+    halt
+  }
+  elseif ($1 !isnum 0-15) {
+    DLF.Error Colour value invalid
+    halt
+  }
+  elseif (($0 >= 3) && ($2 isnum 0-15)) {
+    %code = $+($chr(3),$1,$comma,$2)
+    %text = $3-
+  }
+  else {
+    %code = $+($chr(3),$1)
+    %text = $2-
+  }
+  %text = $replace(%text,$chr(15),%code)
+  return $+(%code,%text,$chr(15))
+}
+
 alias DLF.debug {
   write -i DLFilter.debug.txt
   write -i DLFilter.debug.txt
