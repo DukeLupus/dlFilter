@@ -49,6 +49,8 @@ This avoids problems where other scripts halt events preventing this scripts eve
         Right click menu items for changing options base on line clicked
         Right click menu items for adding to custom filters
         More menu options equivalent to dialog options
+        Allow user to choose whether to delete configuration variables on unload
+        Limit update check to once per x days.
 */
 
 alias DLF.SetVersion {
