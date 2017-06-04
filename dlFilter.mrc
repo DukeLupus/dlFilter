@@ -1349,8 +1349,8 @@ alias DLF.Update.ProcessLine {
         }
       }
     }
-    elseif (%DLF.version.website == $DLF.SetVersion) DLF.Options.GUI.Status Running current version of DLFilter
-    else DLF.Options.GUI.Status Running a newer version $br($DLF.SetVersion) than website $br(%ver)
+    elseif (%DLF.version.web == $DLF.SetVersion) DLF.Options.GUI.Status Running current version of DLFilter
+    else DLF.Options.GUI.Status Running a newer version $br($DLF.SetVersion) than website $br(%DLF.version.web)
     set %DLF.LastUpdateCheck $ctime
     return $true
   }
