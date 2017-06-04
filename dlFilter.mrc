@@ -31,7 +31,9 @@ This avoids problems where other scripts halt events preventing this scripts eve
           Custom filter Add / Remove button enable / disable
           Custom filter list multi-select
         Menu code cleanup
+        Add generic sockets code
         Use GitHub for version check
+        Download button to update from GitHub
         Use script groups to enable / disable DLF event handling
         Allow msgs from Chanserv etc. and self
         Cleanup menu code
@@ -42,7 +44,6 @@ This avoids problems where other scripts halt events preventing this scripts eve
 
       TODO
         Fuller implementation of script groups to enable / disable events
-        Download button to update from GitHub
         About dialog (using comment at start of this file)
         Option for separate windows for fileserver ads
         Custom filters empty on initialisation
@@ -382,9 +383,9 @@ dialog DLF.Options.GUI {
   check "... but show them in Status window.", 18, 15 150 95 9, tab 1
   check "Away and thank-you messages", 19, 7 159 95 9, tab 1
   check "User mode changes", 20, 7 168 62 9, tab 1
-  text "Checking for DLFilter updates...", 56, 5 182 144 8, tab 1
+  text "Checking for dlFilter updates...", 56, 5 182 144 8, tab 1
   button "DLFilter website", 67, 4 191 70 12, tab 1 flat
-  button "Direct download", 66, 78 191 70 12, tab 1 flat
+  button "Update dlFilter", 66, 78 191 70 12, tab 1 flat disable
   ; Tab 2 Capturing / Spam / Security
   box " Capturing ", 22, 4 25 144 50, tab 2
   check "Capture server notices to separate window", 23, 7 35 120 8, tab 2
@@ -658,7 +659,15 @@ on *:dialog:DLF.Options.GUI:sclick:52: {
   DLF.Options.SetRemoveButton
 }
 on *:dialog:DLF.Options.GUI:sclick:67: url -an http://dukelupus.com/dlfilter
-on *:dialog:DLF.Options.GUI:sclick:66: url -an http://www.dukelupus.pri.ee/download.php?f=187932020
+on *:dialog:DLF.Options.GUI:sclick:66: {
+  did -b DLF.Options.GUI 66
+  DLF.Download.Run
+}
+
+alias DLF.Options.GUI.Status {
+  DLF.Status $1-
+  if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 $1-
+}
 
 ; ========== Start of DLF enabled group ==========
 #dlf_enabled on
@@ -1060,7 +1069,7 @@ alias CheckPrivText {
   if ((%DLF.searchresults == 1) && (%DLF.searchactive == 1)) {
     if ($hfind(DLF.search.headers,%DLF.ptext,1,W)) FindHeaders $1-
     var %nick = $1
-    tokenize 32 %DLF.ptext
+    tokenize $asc($space) %DLF.ptext
     if ((*Omen* iswm $1) && ($pling isin $2)) FindResults %nick $1-
     if ($pos($1,$pling,1) == 1) FindResults %nick $1-
     if (($1 == $colon) && ($pos($2,$pling,1) == 1)) FindResults %nick $1-
@@ -1241,7 +1250,7 @@ alias CheckRegular {
 alias DLF.GetFileName {
   var %file = $1-
   var %Filetypes = .mp3;.wma;.mpg;.mpeg;.zip;.bz2;.txt;.exe;.rar;.tar;.jpg;.gif;.wav;.aac;.asf;.vqf;.avi;.mov;.mp2;.m3u;.kar;.nfo;.sfv;.m2v;.iso;.vcd;.doc;.lit;.pdf;.r00;.r01;.r02;.r03;.r04;.r05;.r06;.r07;.r08;.r09;.r10;.shn;.md5;.html;.htm;.jpeg;.ace;.png;.c01;.c02;.c03;.c04;.rtf;.wri;.txt
-  tokenize 32 $replace($1-,$nbsp,$space)
+  tokenize $asc($space) $replace($1-,$nbsp,$space)
   var %Temp.Count = 1
   while (%Temp.Count <= $numtok($1-,$asc($period))) {
     var %Temp.Position = $pos($1-,.,%Temp.Count)
@@ -1298,52 +1307,109 @@ alias DLF.Update.Check {
 }
 
 alias DLF.Update.Run {
-  sockopen -e DLF.Update.Socket raw.githubusercontent.com 443
-  return
-  :error
-  DLF.Error During update: $qt($error)
+  did -b DLF.Options.GUI 66
+  DLF.Options.GUI.Status Checking for dlFilter updates...
+  DLF.Socket.Get Update https://raw.githubusercontent.com/SanderSade/dlFilter/master/dlFilter.version DLF.Options.GUI 56
 }
 
-on *:sockopen:DLF.Update.Socket: {
-  if ($sockerr > 0) DLF.Update.Error
-  sockwrite -n $sockname GET /SanderSade/dlFilter/master/dlFilter.version HTTP/1.1
-  sockwrite -n $sockname Host: raw.githubusercontent.com $+ $crlf $+ $crlf
-}
-
-on *:sockread:DLF.Update.Socket: {
-  if ($sockerr > 0) DLF.Update.Error
-  var %t, %br = -1
-  while (%br != 0) {
-    sockread %t
-    if ($sockerr > 0) DLF.Update.Error
-    %br = $sockbr
-    if ((%br > 0) && ($gettok(%t,1,$asc($eq)) == DLFilter)) {
-      var %ver = $gettok(%t,2,$asc($eq))
-      if (%ver > $DLF.SetVersion) DLF.Update.StatusMsg Please update DLFilter to version %ver
-      elseif (%ver == $DLF.SetVersion) DLF.Update.StatusMsg Running current version of DLFilter
-      else DLF.Update.StatusMsg Running a newer version $br($DLF.SetVersion) than website $br(%ver)
-      .sockclose DLF.Update.Socket
-      set %DLF.LastUpdateCheck $ctime
-      return
+on *:sockread:DLF.Socket.Update: {
+  DLF.Socket.Headers
+  var %line, %mark = $sock($sockname).mark
+  var %state = $gettok(%mark,1,$asc($space))
+  if (%state != Body) DLF.Socket.Error Cannot process response: Still processing %state
+  while ($true) {
+    sockread %line
+    if ($sockerr > 0) DLF.Socket.SockErr sockread:Body
+    if ($sockbr == 0) break
+    if ($DLF.Update.ProcessLine(%line)) {
+      .sockclose $sockname
+      break
     }
   }
-  DLF.Update.ErrorMsg Cannot find existing DLFilter version - please report this at http://www.dukelupus.com!
 }
 
-alias DLF.Update.Error {
-  DLF.Update.ErrorMsg Connection to DLFilter website failed!
+alias DLF.Update.ProcessLine {
+  if ($gettok($1-,1,$asc($eq)) == dlFilter) {
+    %DLF.Version.web = $gettok($1-,2,$asc($eq))
+    if (%DLF.version.web > $DLF.SetVersion) {
+      DLF.Options.GUI.Status Please update DLFilter to version %DLF.version.web
+      did -e DLF.Options.GUI 66
+      if (%DLF.channels == #) {
+        var %cnt = $chan(0)
+        while (%cnt) {
+          DLF.Update.Announce $chan(%cnt)
+          dec %cnt
+        }
+      }
+      else {
+        var %cnt = $numtok(%DLF.channels,$asc($comma))
+        while (%cnt) {
+          DLF.Update.Announce $gettok(%DLF.channels,%cnt,$asc($comma))
+          dec %cnt
+        }
+      }
+    }
+    elseif (%DLF.version.website == $DLF.SetVersion) DLF.Options.GUI.Status Running current version of DLFilter
+    else DLF.Options.GUI.Status Running a newer version $br($DLF.SetVersion) than website $br(%ver)
+    set %DLF.LastUpdateCheck $ctime
+    return $true
+  }
 }
 
-alias DLF.Update.StatusMsg {
-  else DLF.Warning $1-
-  if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 $1-
+on *:sockclose:DLF.Socket.Update: {
+  var %line
+  sockread -f %line
+  if ($sockerr > 0) DLF.Socket.SockErr sockclose
+  if ($sockbr > 0) {
+    if (!$DLF.Update.ProcessLine(%line)) DLF.Socket.Error dlFilter version missing!
+  }
 }
 
-alias DLF.Update.ErrorMsg {
-  DLF.Error $1-
-  if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 $1-
-  .sockclose DLF.Update.Socket
-  halt
+on *:join:# if ((%DLF.version.website) && (%DLF.version.website > $DLF.SetVersion) DLF.Update.Announce $chan
+
+alias DLF.Update.Announce {
+  echo 4 -t $1 $DLF.logo A new version of dlFilter is available.
+  echo 4 -t $1 $DLF.logo Use the Update button in dlFilter Options to download and install.
+}
+
+; ========== Download new version ==========
+alias DLF.Download.Run {
+  DLF.Options.GUI.Status Downloading new version of dlFilter...
+  var %newscript = $qt($script $+ .new)
+  if ($exists(%newscript)) .remove %newscript
+  if ($exists(%newscript)) DLF.Socket.Error Unable to delete old temporary download file.
+  ;DLF.Socket.Get Download https://raw.githubusercontent.com/SanderSade/dlFilter/master/dlFilter.mrc DLF.Options.GUI 56
+  DLF.Socket.Get Download https://raw.githubusercontent.com/SanderSade/dlFilter/dlFilter-v117/dlFilter.mrc DLF.Options.GUI 56
+}
+
+on *:sockread:DLF.Socket.Download: {
+  DLF.Socket.Headers
+  var %mark = $sock($sockname).mark
+  var %state = $gettok(%mark,1,$asc($space))
+  if (%state != Body) DLF.Socket.Error Cannot process response: Still processing %state
+  var %newscript = $qt($script $+ .new)
+  while ($true) {
+    sockread &block
+    if ($sockerr > 0) DLF.Socket.SockErr sockread:Body
+    if ($sockbr == 0) break
+    bwrite %newscript -1 -1 &block
+  }
+}
+
+on *:sockclose:DLF.Socket.Download: {
+  var %newscript = $qt($script $+ .new)
+  sockread -f &block
+  if ($sockerr > 0) DLF.Socket.SockErr sockclose
+  if ($sockbr > 0) bwrite %newscript -1 -1 &block
+  .remove $script
+  .rename %newscript $script
+  %DLF.version = %DLF.version.web
+  DLF.Status New version of dlFilter downloaded and installed
+  .reload -rs1 $script
+}
+
+alias DLF.Download.Error {
+  DLF.Update.ErrorMsg Unable to download new version of dlFilter!
 }
 
 ; ========== Define message matching hash tables ==========
@@ -1728,6 +1794,18 @@ alias DLF.CreateHashTables {
   DLF.Status Added %matches wildcard templates
 }
 
+; ========== Extend $regml to handle empty groups correctly
+alias DLF.regml {
+  var %reg = $iif($2,$1,), %n = $iif($2,$2,$1)
+  var %cnt = $iif(%reg,$regml(%reg,0),$regml(0))
+  while (%cnt) {
+    var %grp = $iif(%reg,$regml(%reg,%cnt).group,$regml(%cnt).group)
+    if (%n == 0) return %grp
+    if (%grp == %n) return $iif(%reg,$regml(%reg,%cnt),$regml(%cnt))
+    dec %cnt
+  }
+}
+
 ; ========== Status and error messages ==========
 alias -l DLF.logo return $rev([DLFilter])
 alias DLF.Status echo -ts $c(1,9,$DLF.logo $1-)
@@ -1735,7 +1813,7 @@ alias DLF.Warning echo -tas $c(1,9,$DLF.logo $1-)
 alias DLF.Error DLF.Warning $c(4,$b(Error:)) $1-
 
 ; ========== Identifiers instead of $chr(xx) - more readable ==========
-alias space return $chr(32)
+alias space returnex $chr(32)
 alias nbsp return $chr(160)
 alias amp return $chr(38)
 alias star return $chr(42)
@@ -1787,6 +1865,151 @@ alias c {
   }
   %text = $replace(%text,$chr(15),%code)
   return $+(%code,%text,$chr(15))
+}
+
+; ========== Socket utilities ==========
+; Modified version of https://www.rosettacode.org/wiki/HTTP/MIRC_Scripting_Language
+; Example:
+;     DLF.Socket.Get sockname http://www.example.com/somefile.txt [dialog id]
+;     on *:SOCKREAD:DLF.Socket.sockname: {
+;        DLF.Socket.Headers
+;        while ($true) {
+;          sockread %line
+;          sockread %line
+;          if ($sockerr > 0) DLF.Socket.SockErr sockread:Body
+;          if ($sockbr == 0) break
+;          your code to process body
+;        }
+;     }
+; "on SOCKOPEN" is not needed
+
+alias DLF.Socket.Get DLF.Socket.Open $+(DLF.Socket.,$1) $2-
+
+alias DLF.Socket.Open {
+  var %socket = $1
+  var %url = $2
+  var %dialog = $3
+  var %dialogid = $4
+
+  ; Regular expression to parse the url:
+  var %re = ^(?:(https?)(?:://)?)?([^\s/]+)(.*)
+  if ($regex(DLF.Socket.Get,$2,%re) !isnum 1-) DLF.Socket.Error Invalid url: %2
+
+  var %protocol = $DLF.regml(DLF.Socket.Get,1)
+  var %hostport = $DLF.regml(DLF.Socket.Get,2)
+  var %path = $DLF.regml(DLF.Socket.Get,3)
+  var %host = $gettok(%hostport,1,$asc($colon))
+  var %port = $gettok(%hostport,2,$asc($colon))
+
+  if (%protocol == $null) %protocol = http
+  if (%path == $null) %path = /
+  if (%port == $null) %port = $iif(%protocol == https,443,80)
+  if (%port == 443) %protocol = https
+  %hostport = $+(%host,$colon,$port)
+
+  if ($sock(%socket)) sockclose %socket
+  sockopen $iif(%protocol == https,-e) %socket %host %port
+  sockmark %socket Opening %host %path %dialog %dialogid
+}
+
+on *:sockopen:DLF.Socket.*:{
+  if ($sockerr) DLF.Socket.SockErr connecting
+
+  ; Mark: Opening %host %path %dialog %dialogid
+  var %line, %mark = $sock($sockname).mark
+  var %state = $gettok(%mark,1,$asc($space))
+  var %host = $gettok(%mark,2,$asc($space))
+  var %path = $gettok(%mark,3,$asc($space))
+  if (%state != Opening) DLF.Socket.Error Socket Open status invalid: %state
+  sockmark $sockname $puttok(%mark,Requested,1,$asc($space))
+
+  var %sw = sockwrite -tn $sockname
+  %sw GET %path HTTP/1.1
+  %sw Host: %host
+  %sw Connection: Close
+  %sw $crlf
+}
+
+alias DLF.Socket.Headers {
+  if ($sockerr) DLF.Socket.SockErr sockread
+
+  var %line, %mark = $sock($sockname).mark
+  var %state = $gettok(%mark,1,$asc($space))
+  ; if on SOCKREAD called for second time, then return immediately
+  if (%state == Body) return
+
+  while ($true) {
+    sockread %line
+    if ($sockerr) DLF.Socket.SockErr sockread
+    if ($sockbr == 0) DLF.Socket.Error Server response empty or truncated
+
+    if (%state == Requested) {
+      ; Requested: Process first header line which is Status code
+      ; HTTP/1.x status-code status-reason
+      var %version = $gettok(%line,1,$asc($space))
+      var %code = $gettok(%line,2,$asc($space))
+      var %reason = $gettok(%line,3-,$asc($space))
+      if (2?? iswm %code) {
+        ; 2xx codes indicate it went ok
+        %state = Headers
+        sockmark $sockname $puttok(%mark,%state,1,$asc($space))
+      }
+      elseif (3?? iswm %code) {
+        ; 3xx codes indicate redirection
+        %state = Redirect
+        sockmark $sockname $puttok(%mark,%state,1,$asc($space))
+      }
+      else DLF.Socket.Error $sockname get failed with status code %code $+ : %reason
+    }
+    elseif (%state == Redirect) {
+      ; No Location header ?
+      if ($len(%line) == 0) DLF.Socket.Error $sockname redirect failed: no redirect URL in headers
+      var %header = $gettok(%line,1,$asc($colon))
+      if (%header == Location) {
+        var %sockname = $sockname
+        sockclose $sockname
+        DLF.Socket.Open %sockname $gettok(%line,2-,$asc($colon)) $gettok(%mark,4-,$asc($space))
+        halt
+      }
+    }
+    elseif (%state == Headers) {
+      if ($len(%line) == 0) {
+        sockmark $sockname $puttok(%mark,Body,1,$asc($space))
+        return
+      }
+    }
+  }
+}
+
+alias DLF.Socket.SockErr {
+  DLF.Socket.Error $1: $sock($sockname).wserr $sock($sockname).wsmsg
+}
+
+alias DLF.Socket.Error {
+  if ($sockname) {
+    var %mark = $sock($sockname).mark
+    DLF.Error $+($sockname,: http,$iif($sock($sockname).ssl,s),://,$gettok(%mark,2,$asc($space)),$gettok(%mark,3,$asc($space)),:) $1-
+    if ($numtok(%mark,$asc($space)) >= 4) {
+      var %dialog = $gettok(%mark,4,$asc($space))
+      var %dialogid = $gettok(%mark,5,$asc($space))
+      if ($dialog(%dialog)) did -o %dialog %dialogid 1 $1-
+    }
+    sockclose $sockname
+  }
+  else DLF.Error $1-
+  halt
+}
+
+alias DLF.Socket.Status {
+  DLF.Status $1-
+  if ($sockname) {
+    var %mark = $sock($sockname).mark
+    if ($numtok(%mark,$asc($space)) >= 4) {
+      var %dialog = $gettok(%mark,4,$asc($space))
+      var %dialogid = $gettok(%mark,5,$asc($space))
+      if ($dialog(%dialog)) did -o %dialog %dialogid 1 $1-
+    }
+  }
 }
 
 ; ========== DLF.debug ==========
