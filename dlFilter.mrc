@@ -98,7 +98,7 @@ alias -l DLF.Initialise {
   if ($script(onotice.mrc)) .unload -rs onotice.mrc
   if ($script(onotice.txt)) .unload -rs onotice.txt
   DLF.Status $iif(%DLF.JustLoaded,Loading,Starting) $c(4,version $DLF.SetVersion) by DukeLupus
-  DLF.Status Please check DLFilter homepage $br($c(12,9,$u(https://github.com/SanderSade/dlFilter))) for help.
+  DLF.Status Please check DLFilter homepage $br($c(12,9,$u(https://github.com/SanderSade/dlFilter/issues))) for help.
   DLF.CreateHashTables
   DLF.Options.Initialise
 }
