@@ -61,7 +61,7 @@ preventing this scripts events from running.
 */
 
 alias -l DLF.SetVersion {
-  %DLF.version = 1.15
+  %DLF.version = 1.17
   return %DLF.version
 }
 
