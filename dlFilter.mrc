@@ -47,6 +47,7 @@ preventing this scripts events from running.
         All aliases and dialogs local (-l flag)
 
       TODO
+        Option to update to beta versions
         Breakout menu and events into aliases
         Fuller implementation of script groups to enable / disable events
         About dialog (using comment at start of this file)
@@ -65,7 +66,7 @@ alias -l DLF.SetVersion {
   return %DLF.version
 }
 
-; ========== Initialisation / Termination ==========
+; ==================== Initialisation / Termination ====================
 on *:start: {
   ; Reload script if needed to be first to execute
   if ($script != $script(1)) .reload -rs1 $qt($script)
@@ -126,6 +127,8 @@ on *:unload: {
   DLF.Status To reload run /load -rs1 $qt($script)
   DLF.Status $space
 }
+
+; ============================== Menus ==============================
 
 ; ========== Menus - Main DLF functionality ==========
 menu channel {
@@ -217,6 +220,7 @@ alias -l DLF.Option.Toggle {
   else DLF.status Option $1 cleared
 }
 
+; ========== Menus - @find functionality ==========
 menu @DLF.*.search {
   Copy line: {
     .clipboard
@@ -322,7 +326,7 @@ alias -l DLF.@find.SaveResults {
   savebuf $active %filename
 }
 
-; onotice windows
+; ========== Menus - oNotice functionality ==========
 menu @#* {
   Clear: /clear
   $iif(%DLF.o.timestamp == 1,$style(1)) Timestamp: DLF.Option.Toggle o.timestamp
@@ -357,7 +361,7 @@ alias -l DLF.onotice.Close {
   window -c $active
 }
 
-; ========== DLF Options Dialog ==========
+; ============================== DLF Options ==============================
 alias -l DLF.Options.Show dialog $iif($dialog(DLF.Options.GUI),-v,-md) DLF.Options.GUI DLF.Options.GUI
 
 dialog -l DLF.Options.GUI {
@@ -674,9 +678,12 @@ alias -l DLF.Options.GUI.Status {
   if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 $1-
 }
 
+; ============================== Event processing ==============================
+
 ; ========== Start of DLF enabled group ==========
 #dlf_enabled on
 
+; ========== Channel events ==========
 ctcp *:*ping*:%DLF.channels: haltdef
 
 ctcp *:*:%DLF.channels: {
@@ -689,7 +696,7 @@ ctcp *:*:%DLF.channels: {
     var %nr = $numtok(%DLF.custom.chanctcp,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.chanctcp,%cnter,$asc($comma)) iswm $1-) DLF_textfilter $target $nick $1-
+      if ($gettok(%DLF.custom.chanctcp,%cnter,$asc($comma)) iswm $1-) DLF.TextFilter $target $nick $1-
       inc %cnter
     }
   }
@@ -697,25 +704,40 @@ ctcp *:*:%DLF.channels: {
 
 on ^*:text:*:%DLF.channels: {
   var %DLF.txt = $strip($1-)
-  if ((%DLF.ads == 1) && ($hfind(DLF.text.ads,%DLF.txt,1,W))) TextSetNickColor $chan $nick $1-
-  if ((%DLF.requests == 1) && ($hfind(DLF.text.cmds,%DLF.txt,1,W))) DLF_textfilter $chan $nick $1-
-  if ((%DLF.away == 1) && ($hfind(DLF.text.away,%DLF.txt,1,W))) DLF_textfilter $chan $nick $1-
-  if ((%DLF.newreleases == 1) && ($hfind(DLF.text.newrels,%DLF.txt,1,W))) NewRFilter $nick $2-
-  if ((%DLF.newreleases == 1) && (Wiz* iswm $nick) && (--*!* iswm %DLF.txt)) NewRFilter $nick $2-
-  if ($hfind(DLF.text.always,%DLF.txt,1,W)) DLF_textfilter $chan $nick $1-
+  if ((%DLF.ads == 1) && ($hfind(DLF.text.ads,%DLF.txt,1,W))) DLF.TextSetNickColor $chan $nick $1-
+  if ((%DLF.requests == 1) && ($hfind(DLF.text.cmds,%DLF.txt,1,W))) DLF.TextFilter $chan $nick $1-
+  if ((%DLF.away == 1) && ($hfind(DLF.text.away,%DLF.txt,1,W))) DLF.TextFilter $chan $nick $1-
+  if ((%DLF.newreleases == 1) && ($hfind(DLF.text.newrels,%DLF.txt,1,W))) DLF.NewRelFilter $nick $2-
+  if ((%DLF.newreleases == 1) && (Wiz* iswm $nick) && (--*!* iswm %DLF.txt)) DLF.NewRelFilter $nick $2-
+  if ($hfind(DLF.text.always,%DLF.txt,1,W)) DLF.TextFilter $chan $nick $1-
 
   /*if (%DLF.chspam == 1) {
     ;no channel spam right now
   }
   */
+
   if ((%DLF.custom.enabled == 1) && (%DLF.custom.chantext)) {
     var %nr = $numtok(%DLF.custom.chantext,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.chantext,%cnter,$asc($comma)) iswm %DLF.txt) DLF_textfilter $chan $nick $1-
+      if ($gettok(%DLF.custom.chantext,%cnter,$asc($comma)) iswm %DLF.txt) DLF.TextFilter $chan $nick $1-
       inc %cnter
     }
   }
+}
+
+alias -l DLF.NewRelFilter {
+  var %line = $strip($2-)
+  %line = $remove(%line,+++ N e w release +++,to download this ebook.)
+  %line = $remove(%line,-=NEW=-)
+  %line = $mid(%line,$calc($pos(%line,!,1) - 1),$len(%line))
+  if (!$window(@DLF.NewReleases)) {
+    window -lbsk0nwz @DLF.NewReleases
+    titlebar @DLF.NewReleases -=- Right-click for options
+  }
+  aline -n @DLF.NewReleases %line
+  window -b @DLF.NewReleases
+  halt
 }
 
 on ^*:action:*:%DLF.channels: {
@@ -782,7 +804,7 @@ on ^*:notice:*:#: {
       var %nr = $numtok(%DLF.custom.channotice,$asc($comma))
       var %cnter = 1
       while (%cnter <= %nr) {
-        if ($gettok(%DLF.custom.channotice,%cnter,$asc($comma)) iswm $strip($1-)) DLF_textfilter $chan $nick $1-
+        if ($gettok(%DLF.custom.channotice,%cnter,$asc($comma)) iswm $strip($1-)) DLF.TextFilter $chan $nick $1-
         inc %cnter
       }
     }
@@ -884,8 +906,8 @@ on ^*:notice:*:?: {
     halt
   }
   if ((%DLF.server == 1) && ($hfind(DLF.notice.server,%DLF.pnotice,1,W))) ServerFilter $nick $1-
-  if (*SLOTS My mom always told me not to talk to strangers* iswm %DLF.pnotice) DLF_textfilter Notice $nick $1-
-  if (*CTCP flood detected, protection enabled* iswm %DLF.pnotice) DLF_textfilter Notice $nick $1-
+  if (*SLOTS My mom always told me not to talk to strangers* iswm %DLF.pnotice) DLF.TextFilter Notice $nick $1-
+  if (*CTCP flood detected, protection enabled* iswm %DLF.pnotice) DLF.TextFilter Notice $nick $1-
   if ((%DLF.searchresults == 1) && (%DLF.searchactive == 1)) {
     if (No match found for* iswm %DLF.ptext) ServerFilter $nick $1-
     if (*I have*match* for*in listfile* iswm %DLF.ptext) ServerFilter $nick $1-
@@ -896,7 +918,7 @@ on ^*:notice:*:?: {
     var %nr = $numtok(%DLF.custom.privnotice,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.privnotice,%cnter,$asc($comma)) iswm $strip($1-)) DLF_textfilter Private $nick $1-
+      if ($gettok(%DLF.custom.privnotice,%cnter,$asc($comma)) iswm $strip($1-)) DLF.TextFilter Private $nick $1-
       inc %cnter
     }
   }
@@ -964,7 +986,7 @@ ctcp *:*:?: {
     var %nr = $numtok(%DLF.custom.privctcp,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.privctcp,%cnter,$asc($comma)) iswm $1-) DLF_textfilter Private $nick $1-
+      if ($gettok(%DLF.custom.privctcp,%cnter,$asc($comma)) iswm $1-) DLF.TextFilter Private $nick $1-
       inc %cnter
     }
   }
@@ -974,12 +996,12 @@ ctcp *:*:?: {
 #dlf_enabled end
 ; ========== End of DLF enabled group ==========
 
-alias -l TextSetNickColor {
+alias -l DLF.TextSetNickColor {
   if ((%DLF.colornicks == 1) && ($nick($1,$2).color == $color(nicklist))) cline 2 $1 $2
-  DLF_textfilter $1-
+  DLF.TextFilter $1-
 }
 
-alias -l DLF_textfilter {
+alias -l DLF.TextFilter {
   if (%DLF.filtered.log == 1) write $qt($logdir $+ DLF.Filtered.log) $sqbr($fulldate) $sqbr($1) $tag($2) $strip($3-)
   if (%DLF.showfiltered == 1) {
     if (!$window(@DLF.Filtered)) {
@@ -1136,20 +1158,6 @@ alias -l ServerSearch {
   else titlebar @DLF.server.search -=- Search finished. $line(@DLF.server.search,0) matches found for " $+ %sstring $+ ".
 }
 
-alias -l newRfilter {
-  var %line = $strip($2-)
-  %line = $remove(%line,+++ N e w release +++,to download this ebook.)
-  %line = $remove(%line,-=NEW=-)
-  %line = $mid(%line,$calc($pos(%line,!,1) - 1),$len(%line))
-  if (!$window(@DLF.NewReleases)) {
-    window -lbsk0nwz @DLF.NewReleases
-    titlebar @DLF.NewReleases -=- Right-click for options
-  }
-  aline -n @DLF.NewReleases %line
-  window -b @DLF.NewReleases
-  halt
-}
-
 alias -l DLFSpamFilter {
   if ((%DLF.chspam.opnotify == 1) && ($me isop $1)) {
     DLF.Warning $c(4,Spam detected:) $sqbr($1) $tag($2) $br($address($2,1)) -->> $c(4,$3-)
@@ -1254,7 +1262,7 @@ on *:CTCPREPLY:*: {
     var %nr = $numtok(%DLF.custom.privctcp,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.privctcp,%cnter,$asc($comma)) iswm $1-) DLF_textfilter Private $nick $1-
+      if ($gettok(%DLF.custom.privctcp,%cnter,$asc($comma)) iswm $1-) DLF.TextFilter Private $nick $1-
       inc %cnter
     }
   }
@@ -1388,8 +1396,11 @@ on *:sockclose:DLF.Socket.Download: {
   .rename %newscript $script
   %DLF.version = %DLF.version.web
   DLF.Status New version of dlFilter downloaded and installed
+  signal DLF.Reload
   .reload -rs1 $script
 }
+
+on *:signal:DLF.ReLoad: DLF.Initialise
 
 alias -l DLF.Download.Error {
   DLF.Update.ErrorMsg Unable to download new version of dlFilter!
@@ -1774,7 +1785,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd priv.away *automated msg*
   inc %matches $hget(DLF.priv.away,0).item
 
-  if ($hget(DLF.priv.away)) hfree DLF.ctcp.spam
+  if ($hget(DLF.ctcp.spam)) hfree DLF.ctcp.spam
   DLF.hadd ctcp.spam *SLOTS*
   DLF.hadd ctcp.spam *OmeNServE*
   DLF.hadd ctcp.spam *RAR*
