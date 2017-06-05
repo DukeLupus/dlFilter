@@ -1,29 +1,32 @@
 /*
 DLFilter.mrc - Filter out messages on file sharing channels
-Authors: DukeLupus with recent updates by Sophist
+Authors: DukeLupus and Sophist
 
 Annoyed by advertising messages from the various file serving bots?
-Fed up with endless channel messages by other users searching for and requesting files?
+Fed up with endless channel messages by
+other users searching for and requesting files?
 Are the responses to your own requests getting lost in the crowd?
 
-This script filters out the crud, leaving only the useful messages displayed in the channel.
-By default, the filtered messages are thrown away, but you can direct them to custom windows if you wish.
+This script filters out the crud, leaving
+only the useful messages displayed in the channel.
+By default, the filtered messages are thrown away,
+but you can direct them to custom windows if you wish.
 
-Download from: http://dukelupus.com/dlfilter
-or https://raw.githubusercontent.com/SanderSade/dlFilter/master/dlFilter.mrc
+Download from https://github.com/SanderSade/dlFilter/releases
 Update regularly to handle new forms of message.
 
 To load: use /load -rs DLFilter.mrc
 
 Note that DLFilter loads itself automatically as a first script.
-This avoids problems where other scripts halt events preventing this scripts events from running.
+This avoids problems where other scripts halt events
+preventing this scripts events from running.
 */
 
 /* CHANGE LOG
   1.17  Update opening comments and add change log
         Use custom identifiers for creating bold, colour etc.
         Use custom identifiers instead of $chr(xx)
-        Use alias -l for status messages
+        Use alias for status messages
         Hash tables for message matching instead of lists of ifs
         Options dialog improvements
           Layout
@@ -58,7 +61,7 @@ This avoids problems where other scripts halt events preventing this scripts eve
 */
 
 alias -l DLF.SetVersion {
-  %DLF.version = 1.17
+  %DLF.version = 1.15
   return %DLF.version
 }
 
@@ -95,12 +98,12 @@ alias -l DLF.Initialise {
   if ($script(onotice.mrc)) .unload -rs onotice.mrc
   if ($script(onotice.txt)) .unload -rs onotice.txt
   DLF.Status $iif(%DLF.JustLoaded,Loading,Starting) $c(4,version $DLF.SetVersion) by DukeLupus
-  DLF.Status Please check DLFilter homepage $br($c(12,9,$u(http://dukelupus.com/dlfilter))) for help.
+  DLF.Status Please check DLFilter homepage $br($c(12,9,$u(https://github.com/SanderSade/dlFilter))) for help.
   DLF.CreateHashTables
   DLF.Options.Initialise
 }
 
-ctcp *:VERSION: .ctcpreply $nick VERSION $c(1,9,$logo version $DLF.SetVersion by DukeLupus.) $c(1,15,Get it from $c(12,15,$u(http://dukelupus.com/dlfilter)))
+ctcp *:VERSION: .ctcpreply $nick VERSION $c(1,9,$logo version $DLF.SetVersion by DukeLupus & Sophist.) $c(1,15,Get it from $c(12,15,$u(https://github.com/SanderSade/dlFilter/releases)))
 
 on *:unload: {
   var %keepvars = $?!="Do you want to keep your dlFilter configuration?"
@@ -144,7 +147,7 @@ menu menubar {
   DLFilter
   .Options: DLF.Options.Show
   .$iif(%DLF.showfiltered == 1,$style(1)) Show filtered lines: DLF.filter.showlines
-  .Visit filter website: .url -an http://dukelupus.com/dlfilter
+  .Visit filter website: .url -an https://github.com/SanderSade/dlFilter
   .-
   .Unload DLFilter: if ($?!="Do you want to unload DLFilter?" == $true) .unload -rs $qt($script)
 }
@@ -659,7 +662,7 @@ on *:dialog:DLF.Options.GUI:sclick:52: {
   DLF.Options.SetCustomType $did(37).seltext
   DLF.Options.SetRemoveButton
 }
-on *:dialog:DLF.Options.GUI:sclick:67: url -an http://dukelupus.com/dlfilter
+on *:dialog:DLF.Options.GUI:sclick:67: url -an https://github.com/SanderSade/dlFilter
 on *:dialog:DLF.Options.GUI:sclick:66: {
   did -b DLF.Options.GUI 66
   DLF.Download.Run
@@ -1844,7 +1847,7 @@ alias -l tag return $+($lt,$1-,$gt)
 ; ========== Control Codes using aliases ==========
 ; Color, bold, underline, italic, reverse e.g.
 ; echo 1 This line has $b(bold) $+ , $i(italic) $+ , $u(underscored) $+ , $c(4,red) $+ , and $rev(reversed) text.
-; Calls can be nested e.g. echo 1 $c(12,$u(http://www.dukelupus.com))
+; Calls can be nested e.g. echo 1 $c(12,$u(https://github.com/SanderSade/dlFilter))
 alias -l b return $+($chr(2),$1-,$chr(2))
 alias -l u return $+($chr(31),$1-,$chr(31))
 alias -l i return $+($chr(29),$1-,$chr(29))
