@@ -61,7 +61,7 @@ preventing this scripts events from running.
 */
 
 alias -l DLF.SetVersion {
-  %DLF.version = 1.17
+  %DLF.version = 1.18
   return %DLF.version
 }
 
@@ -91,7 +91,8 @@ alias -l DLF.Initialise {
   ; Delete obsolete variables
   .unset %DLF.custom.selected
 
-  if ($version < 6) {
+; We need returnex first implemented in 6.17
+  if ($version < 6.17) {
     DLF.Error DLFilter requires mIRC 6+. Loading stopped.
     .unload -rs $script
   }
@@ -676,39 +677,14 @@ alias -l DLF.Options.GUI.Status {
 ; ========== Start of DLF enabled group ==========
 #dlf_enabled on
 
-ctcp *:*SLOTS*:%DLF.channels: {
-  if (%DLF.colornicks == 1) DLF.SetNickColor $chan $nick
-  haltdef
-}
-ctcp *:*OmeNServE*:%DLF.channels: {
-  if (%DLF.colornicks == 1) DLF.SetNickColor $chan $nick
-  haltdef
-}
-ctcp *:*RAR*:%DLF.channels: {
-  if (%DLF.colornicks == 1) DLF.SetNickColor $chan $nick
-  haltdef
-}
-ctcp *:*WMA*:%DLF.channels: {
-  if (%DLF.colornicks == 1) DLF.SetNickColor $chan $nick
-  haltdef
-}
-ctcp *:*ASF*:%DLF.channels: {
-  if (%DLF.colornicks == 1) DLF.SetNickColor $chan $nick
-  haltdef
-}
-ctcp *:*SOUND*:%DLF.channels: {
-  if (%DLF.colornicks == 1) DLF.SetNickColor $chan $nick
-  haltdef
-}
-
-ctcp *:*MP*:%DLF.channels: {
-  if (%DLF.colornicks == 1) DLF.SetNickColor $chan $nick
-  haltdef
-}
-
-
 ctcp *:*ping*:%DLF.channels: haltdef
+
 ctcp *:*:%DLF.channels: {
+  if ((%DLF.colornicks == 1) && ($hfind(DLF.ctcp.spam,$1-,1,W))) {
+    DLF.SetNickColor $chan $nick
+    haltdef
+  }
+
   if ((%DLF.custom.enabled == 1) && (%DLF.custom.chanctcp)) {
     var %nr = $numtok(%DLF.custom.chanctcp,$asc($comma))
     var %cnter = 1
@@ -1797,6 +1773,16 @@ alias -l DLF.CreateHashTables {
   DLF.hadd priv.away *Away*SysReset*
   DLF.hadd priv.away *automated msg*
   inc %matches $hget(DLF.priv.away,0).item
+
+  if ($hget(DLF.priv.away)) hfree DLF.ctcp.spam
+  DLF.hadd ctcp.spam *SLOTS*
+  DLF.hadd ctcp.spam *OmeNServE*
+  DLF.hadd ctcp.spam *RAR*
+  DLF.hadd ctcp.spam *WMA*
+  DLF.hadd ctcp.spam *ASF*
+  DLF.hadd ctcp.spam *SOUND*
+  DLF.hadd ctcp.spam *MP*
+  inc %matches $hget(DLF.ctcp.spam,0).item
 
   DLF.Status Added %matches wildcard templates
 }
