@@ -23,7 +23,7 @@ This avoids problems where other scripts halt events preventing this scripts eve
   1.17  Update opening comments and add change log
         Use custom identifiers for creating bold, colour etc.
         Use custom identifiers instead of $chr(xx)
-        Use alias for status messages
+        Use alias -l for status messages
         Hash tables for message matching instead of lists of ifs
         Options dialog improvements
           Layout
@@ -41,8 +41,10 @@ This avoids problems where other scripts halt events preventing this scripts eve
         Allow user to choose whether to delete configuration variables on unload
         Limit load/start/connect update check to once per 7 days.
           (Options update check runs every time.)
+        All aliases and dialogs local (-l flag)
 
       TODO
+        Breakout menu and events into aliases
         Fuller implementation of script groups to enable / disable events
         About dialog (using comment at start of this file)
         Option for separate windows for fileserver ads
@@ -53,10 +55,9 @@ This avoids problems where other scripts halt events preventing this scripts eve
         Right click menu items for changing options base on line clicked
         Right click menu items for adding to custom filters
         More menu options equivalent to dialog options
-        Make all (or most) aliases and dialogues local (-l flag)
 */
 
-alias DLF.SetVersion {
+alias -l DLF.SetVersion {
   %DLF.version = 1.17
   return %DLF.version
 }
@@ -83,7 +84,7 @@ on *:load: {
   DLF.Error During load: $qt($error)
 }
 
-alias DLF.Initialise {
+alias -l DLF.Initialise {
   ; Delete obsolete variables
   .unset %DLF.custom.selected
 
@@ -187,7 +188,7 @@ menu @DLF.Server {
   -
 }
 
-alias DLF.AddRemoveChannel {
+alias -l DLF.AddRemoveChannel {
   var %chan = $chan
   if (%chan !isin %DLF.channels) {
     if (%DLF.channels != #) %DLF.channels = $addtok(%DLF.channels,%chan,$asc($comma))
@@ -199,12 +200,12 @@ alias DLF.AddRemoveChannel {
   DLF.Status $c(6,Channels set to $c(4,%DLF.channels))
 }
 
-alias DLF.filter.showlines {
+alias -l DLF.filter.showlines {
   if (%DLF.showfiltered == 1) window -c @DLF.filtered
   DLF.Option.Toggle showfiltered
 }
 
-alias DLF.Option.Toggle {
+alias -l DLF.Option.Toggle {
   var %newval = 1 - DLF. [ $+ $1 ]
   DLF. [ $+ $1 ] = %newval
   ;if ($2 != $null) did
@@ -230,13 +231,13 @@ menu @DLF.@find.Results,@DLF.NewReleases {
   $iif(!$script(vPowerGet.net.mrc), $style(2)) Send to vPowerGet.NET: DLF.@find.SendTovPowerGet
   Save results: DLF.@find.SaveResults
   Options: DLF.Options.Show
-  Clear: /clear
+  Clear: clear
   .-
-  Close: /window -c $active
+  Close: window -c $active
   .-
 }
 
-alias DLF.@find.CopyLines {
+alias -l DLF.@find.CopyLines {
   var %lines = $sline($active,0)
   if (!%lines) halt
   var %allines = $line($active,0)
@@ -265,7 +266,7 @@ alias DLF.@find.CopyLines {
   else titlebar $active -=- New Releases -=- $calc(%cnter - 1) line(s) copied into clipboard
 }
 
-alias DLF.@find.SendToAutoGet {
+alias -l DLF.@find.SendToAutoGet {
   var %lines = $sline($active,0)
   if (!%lines) halt
   if ($fopen(MTlisttowaiting)) .fclose MTlisttowaiting
@@ -289,7 +290,7 @@ alias DLF.@find.SendToAutoGet {
   else titlebar $active -=- New releases -=- %j line(s) sent to AutoGet
 }
 
-alias DLF.@find.SendTovPowerGet {
+alias -l DLF.@find.SendTovPowerGet {
   var %lines = $sline($active,0)
   if (!%lines) halt
   var %allines = $line($active,0)
@@ -310,7 +311,7 @@ alias DLF.@find.SendTovPowerGet {
   else titlebar $active -=- New releases -=- $calc(%cnter - 1) line(s) sent to vPowerGet.NET
 }
 
-alias DLF.@find.SaveResults {
+alias -l DLF.@find.SaveResults {
   var %filename = $sfile($mircdir,Save $active contents,Save)
   if (!%filename) haltdef
   %filename = $qt($remove(%filename,.txt) $+ .txt)
@@ -328,7 +329,7 @@ menu @#* {
   -
 }
 
-alias DLF.oNotice.Send {
+alias -l DLF.oNotice.Send {
   var %chatwindow = @ $+ $chan
   if (!$window(%chatwindow)) {
     window -eg1k1l12mSw %chatwindow
@@ -342,7 +343,7 @@ alias DLF.oNotice.Send {
   }
 }
 
-alias DLF.onotice.Close {
+alias -l DLF.onotice.Close {
   var %chatwindow = $active, %log = $qt($+($logdir,%chatwindow,.log))
   if ((%DLF.o.log == 1) && ($exists(%log))) {
     write %log $crlf
@@ -353,9 +354,9 @@ alias DLF.onotice.Close {
 }
 
 ; ========== DLF Options Dialog ==========
-alias DLF.Options.Show dialog $iif($dialog(DLF.Options.GUI),-v,-md) DLF.Options.GUI DLF.Options.GUI
+alias -l DLF.Options.Show dialog $iif($dialog(DLF.Options.GUI),-v,-md) DLF.Options.GUI DLF.Options.GUI
 
-dialog DLF.Options.GUI {
+dialog -l DLF.Options.GUI {
   ; Main dialogue
   title DLFilter v $+ $DLF.SetVersion
   size -1 -1 152 225
@@ -415,7 +416,7 @@ dialog DLF.Options.GUI {
 }
 
 ; Initialise variables
-alias DLF.Options.Initialise {
+alias -l DLF.Options.Initialise {
   if (%DLF.enabled == $null) %DLF.enabled = 1
   if (%DLF.ads == $null) %DLF.ads = 1
   if (%DLF.requests == $null) %DLF.requests = 1
@@ -520,7 +521,7 @@ on *:dialog:DLF.Options.GUI:init:0: {
 ; Change enabled state
 on *:dialog:DLF.Options.GUI:sclick:5: DLF.Options.setEnabledState
 
-alias DLF.Options.setEnabledState {
+alias -l DLF.Options.setEnabledState {
   %DLF.enabled = $did(5).state
   if (%DLF.enabled) .enable #dlf_enabled
   else .disable #dlf_enabled
@@ -586,7 +587,7 @@ on *:dialog:DLF.Options.GUI:sclick:37: {
   DLF.Options.SetCustomType $did(37).seltext
 }
 
-alias DLF.Options.SetCustomType {
+alias -l DLF.Options.SetCustomType {
   did -r DLF.Options.GUI 51
   if ($1- == Channel text) didtok DLF.Options.GUI 51 44 %DLF.custom.chantext
   if ($1- == Channel action) didtok DLF.Options.GUI 51 44 %DLF.custom.chanaction
@@ -600,7 +601,7 @@ alias DLF.Options.SetCustomType {
 
 ; Enable / disable Add custom message button
 on *:dialog:DLF.Options.GUI:edit:41: DLF.Options.SetAddButton
-alias DLF.Options.SetAddButton {
+alias -l DLF.Options.SetAddButton {
   if ($did(41)) did -te DLF.Options.GUI 46
   else {
     did -b DLF.Options.GUI 46
@@ -610,7 +611,7 @@ alias DLF.Options.SetAddButton {
 
 ; Enable / disable Remove custom message button
 on *:dialog:DLF.Options.GUI:sclick:51: DLF.Options.SetRemoveButton
-alias DLF.Options.SetRemoveButton {
+alias -l DLF.Options.SetRemoveButton {
   if ($did(51,0).sel > 0) did -te DLF.Options.GUI 52
   else {
     did -b DLF.Options.GUI 52
@@ -664,7 +665,7 @@ on *:dialog:DLF.Options.GUI:sclick:66: {
   DLF.Download.Run
 }
 
-alias DLF.Options.GUI.Status {
+alias -l DLF.Options.GUI.Status {
   DLF.Status $1-
   if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 $1-
 }
@@ -994,12 +995,12 @@ ctcp *:*:?: {
 #dlf_enabled end
 ; ========== End of DLF enabled group ==========
 
-alias TextSetNickColor {
+alias -l TextSetNickColor {
   if ((%DLF.colornicks == 1) && ($nick($1,$2).color == $color(nicklist))) cline 2 $1 $2
   DLF_textfilter $1-
 }
 
-alias DLF_textfilter {
+alias -l DLF_textfilter {
   if (%DLF.filtered.log == 1) write $qt($logdir $+ DLF.Filtered.log) $sqbr($fulldate) $sqbr($1) $tag($2) $strip($3-)
   if (%DLF.showfiltered == 1) {
     if (!$window(@DLF.Filtered)) {
@@ -1016,7 +1017,7 @@ alias DLF_textfilter {
   halt
 }
 
-alias DLF_actionfilter {
+alias -l DLF_actionfilter {
   if (%DLF.filtered.log == 1) write $qt($logdir $+ DLF.Filtered.log) $sqbr($fulldate) $sqbr($1) $star $2 $strip($3-)
   if (%DLF.showfiltered == 1) {
     if (!$window(@DLF.Filtered)) {
@@ -1035,7 +1036,7 @@ alias DLF_actionfilter {
 
 on *:input:@DLF.Filtered.Search: FilteredSearch $1-
 
-alias FilteredSearch {
+alias -l FilteredSearch {
   window -ealbk0wz @DLF.filtered.search
   var %sstring = $+($star,$1-,$star)
   titlebar @DLF.filtered.search -=- Searching for %sstring
@@ -1045,7 +1046,7 @@ alias FilteredSearch {
   titlebar @DLF.filtered.search -=- Search finished. %matches found for $qt(%sstring)
 }
 
-alias CheckPrivText {
+alias -l CheckPrivText {
   %DLF.ptext = $strip($1-)
   if ($window(1)) DoCheckComChan $1 $2-
   if ((%DLF.noregmsg == 1) && ($CheckRegular($1) == IsRegular)) {
@@ -1088,7 +1089,7 @@ alias CheckPrivText {
   }
 }
 
-alias PrivText {
+alias -l PrivText {
   if ($window($1)) .window -c $1
   DLF_TextFilter Private $1-
   halt
@@ -1129,7 +1130,7 @@ on *:close:@#*: {
   }
 }
 
-alias ServerFilter {
+alias -l ServerFilter {
   var %line = $tag($1) $2-
   if ($2 == $colon) %line = $remtok(%line,$colon,1,$asc($space))
   if (%DLF.server.log == 1) write $qt($+($logdir,DLF.Server.log) $sqbr($fulldate) $strip(%line)
@@ -1147,7 +1148,7 @@ alias ServerFilter {
 
 on *:input:@DLF.Server.Search: ServerSearch $1-
 
-alias ServerSearch {
+alias -l ServerSearch {
   window -ealbk0wz @DLF.Server.Search
   var %sstring = $star $+ $1- $+ $star
   titlebar @DLF.server.search -=- Searching for %sstring
@@ -1156,7 +1157,7 @@ alias ServerSearch {
   else titlebar @DLF.server.search -=- Search finished. $line(@DLF.server.search,0) matches found for " $+ %sstring $+ ".
 }
 
-alias newRfilter {
+alias -l newRfilter {
   var %line = $strip($2-)
   %line = $remove(%line,+++ N e w release +++,to download this ebook.)
   %line = $remove(%line,-=NEW=-)
@@ -1170,14 +1171,14 @@ alias newRfilter {
   halt
 }
 
-alias DLFSpamFilter {
+alias -l DLFSpamFilter {
   if ((%DLF.chspam.opnotify == 1) && ($me isop $1)) {
     DLF.Warning $c(4,Spam detected:) $sqbr($1) $tag($2) $br($address($2,1)) -->> $c(4,$3-)
   }
   halt
 }
 
-alias PSpamFilter {
+alias -l PSpamFilter {
   if ((%DLF.privspam.opnotify == 1) && ($comchan($1,1).op)) {
     DLF.Warning Spam detected: $c(4,15,$tag($1) $br($address($1,1)) -->> $b($2-))
     echo $comchan($1,1) Spam detected: $c(4,15,$tag($1) $br($address($1,1)) -->> $b($2-))
@@ -1193,13 +1194,13 @@ on *:input:%DLF.channels: {
   }
 }
 
-alias FindHeaders {
+alias -l FindHeaders {
   if (($window($1)) && (!$line($1,0))) .window -c $1
   ServerFilter $1-
   halt
 }
 
-alias FindResults {
+alias -l FindResults {
   if (($window($1)) && (!$line($1,0))) .window -c $1
   if (!$window(@DLF.@find.Results)) window -slk0wnz @DLF.@find.Results
   var %line = $right($2-,$calc($len($2-) - ($pos($2-,$pling,1) - 1)))
@@ -1209,7 +1210,7 @@ alias FindResults {
   halt
 }
 
-alias DoCheckComChan {
+alias -l DoCheckComChan {
   if ((%DLF.accepthis == $1) && (%DLF.nocomchan.dcc == 1)) {
     .unset %DLF.accepthis
     goto networkservs
@@ -1228,7 +1229,7 @@ alias DoCheckComChan {
   :networkservs
 }
 
-alias CheckRegular {
+alias -l CheckRegular {
   if ($1 == $me) return $1
   if ($1 == ChanServ) return $1
   if ($1 == NickServ) return $1
@@ -1247,7 +1248,7 @@ alias CheckRegular {
   return IsRegular
 }
 
-alias DLF.GetFileName {
+alias -l DLF.GetFileName {
   var %file = $1-
   var %Filetypes = .mp3;.wma;.mpg;.mpeg;.zip;.bz2;.txt;.exe;.rar;.tar;.jpg;.gif;.wav;.aac;.asf;.vqf;.avi;.mov;.mp2;.m3u;.kar;.nfo;.sfv;.m2v;.iso;.vcd;.doc;.lit;.pdf;.r00;.r01;.r02;.r03;.r04;.r05;.r06;.r07;.r08;.r09;.r10;.shn;.md5;.html;.htm;.jpeg;.ace;.png;.c01;.c02;.c03;.c04;.rtf;.wri;.txt
   tokenize $asc($space) $replace($1-,$nbsp,$space)
@@ -1280,12 +1281,12 @@ on *:CTCPREPLY:*: {
   }
 }
 
-alias DLF.SetNickColor {
+alias -l DLF.SetNickColor {
   if ($nick($1,$2).color == $color(nicklist)) cline 2 $1 $2
 }
 
 ; CheckOpStatus is not called from anywhere - obsolete?
-alias CheckOpStatus {
+alias -l CheckOpStatus {
   if ($me isop $1) && ($1 isin %DLF.channels) && (%DLF.o.enabled == 1) return 1
   else if ($me isop $1) && (%DLF.channels == #) && (%DLF.o.enabled == 1) return 1
   else return 0
@@ -1301,12 +1302,12 @@ on *:connect: {
   DLF.Update.Check
 }
 
-alias DLF.Update.Check {
+alias -l DLF.Update.Check {
   var %days = $calc($int(($ctime - %DLF.LastUpdateCheck) / 60 / 60 / 24))
   if (%days >= 7) DLF.Update.Run
 }
 
-alias DLF.Update.Run {
+alias -l DLF.Update.Run {
   did -b DLF.Options.GUI 66
   DLF.Options.GUI.Status Checking for dlFilter updates...
   DLF.Socket.Get Update https://raw.githubusercontent.com/SanderSade/dlFilter/master/dlFilter.version DLF.Options.GUI 56
@@ -1328,31 +1329,34 @@ on *:sockread:DLF.Socket.Update: {
   }
 }
 
-alias DLF.Update.ProcessLine {
+alias -l DLF.Update.ProcessLine {
   if ($gettok($1-,1,$asc($eq)) == dlFilter) {
     %DLF.Version.web = $gettok($1-,2,$asc($eq))
-    if (%DLF.version.web > $DLF.SetVersion) {
-      DLF.Options.GUI.Status Please update DLFilter to version %DLF.version.web
-      did -e DLF.Options.GUI 66
-      if (%DLF.channels == #) {
-        var %cnt = $chan(0)
-        while (%cnt) {
-          DLF.Update.Announce $chan(%cnt)
-          dec %cnt
-        }
-      }
-      else {
-        var %cnt = $numtok(%DLF.channels,$asc($comma))
-        while (%cnt) {
-          DLF.Update.Announce $gettok(%DLF.channels,%cnt,$asc($comma))
-          dec %cnt
-        }
-      }
-    }
+    if (%DLF.version.web > $DLF.SetVersion) DLF.Update.NewAvailable
     elseif (%DLF.version.web == $DLF.SetVersion) DLF.Options.GUI.Status Running current version of DLFilter
     else DLF.Options.GUI.Status Running a newer version $br($DLF.SetVersion) than website $br(%DLF.version.web)
     set %DLF.LastUpdateCheck $ctime
     return $true
+  }
+}
+
+alias -l DLF.Update.NewAvailable {
+  DLF.Options.GUI.Status Please update DLFilter to version %DLF.version.web
+  did -e DLF.Options.GUI 66
+  if (%DLF.channels == #) {
+    var %cnt = $chan(0)
+    while (%cnt) {
+      DLF.Update.Announce $chan(%cnt)
+      dec %cnt
+    }
+  }
+  else {
+    var %cnt = $numtok(%DLF.channels,$asc($comma))
+    while (%cnt) {
+      var %chan = $gettok(%DLF.channels,%cnt,$asc($comma))
+      if ($chan(%chan)) DLF.Update.Announce %chan
+      dec %cnt
+    }
   }
 }
 
@@ -1365,15 +1369,15 @@ on *:sockclose:DLF.Socket.Update: {
   }
 }
 
-on *:join:# if ((%DLF.version.website) && (%DLF.version.website > $DLF.SetVersion) DLF.Update.Announce $chan
+on me:join:%DLF.channels: if ((%DLF.version.web) && (%DLF.version.web > $DLF.SetVersion) DLF.Update.Announce $chan
 
-alias DLF.Update.Announce {
-  echo 4 -t $1 $DLF.logo A new version of dlFilter is available.
-  echo 4 -t $1 $DLF.logo Use the Update button in dlFilter Options to download and install.
+alias -l DLF.Update.Announce {
+  echo -t $1 $c(1,9,$DLF.logo A new version of dlFilter is available.)
+  echo -t $1 $c(1,9,$DLF.logo Use the Update button in dlFilter Options to download and install.)
 }
 
 ; ========== Download new version ==========
-alias DLF.Download.Run {
+alias -l DLF.Download.Run {
   DLF.Options.GUI.Status Downloading new version of dlFilter...
   var %newscript = $qt($script $+ .new)
   if ($exists(%newscript)) .remove %newscript
@@ -1408,19 +1412,19 @@ on *:sockclose:DLF.Socket.Download: {
   .reload -rs1 $script
 }
 
-alias DLF.Download.Error {
+alias -l DLF.Download.Error {
   DLF.Update.ErrorMsg Unable to download new version of dlFilter!
 }
 
 ; ========== Define message matching hash tables ==========
-alias DLF.hadd {
+alias -l DLF.hadd {
   var %h = DLF. $+ $1
   if (!$hget(%h)) hmake %h
   var %n = $hget($1, 0)
   hadd %h %n $2-
 }
 
-alias DLF.CreateHashTables {
+alias -l DLF.CreateHashTables {
   var %matches = 0
   if ($hget(DLF.text.ads)) hfree DLF.text.ads
   DLF.hadd text.ads *Type*@*
@@ -1795,7 +1799,7 @@ alias DLF.CreateHashTables {
 }
 
 ; ========== Extend $regml to handle empty groups correctly
-alias DLF.regml {
+alias -l DLF.regml {
   var %reg = $iif($2,$1,), %n = $iif($2,$2,$1)
   var %cnt = $iif(%reg,$regml(%reg,0),$regml(0))
   while (%cnt) {
@@ -1808,44 +1812,44 @@ alias DLF.regml {
 
 ; ========== Status and error messages ==========
 alias -l DLF.logo return $rev([DLFilter])
-alias DLF.Status echo -ts $c(1,9,$DLF.logo $1-)
-alias DLF.Warning echo -tas $c(1,9,$DLF.logo $1-)
-alias DLF.Error DLF.Warning $c(4,$b(Error:)) $1-
+alias -l DLF.Status echo -ts $c(1,9,$DLF.logo $1-)
+alias -l DLF.Warning echo -tas $c(1,9,$DLF.logo $1-)
+alias -l DLF.Error DLF.Warning $c(4,$b(Error:)) $1-
 
 ; ========== Identifiers instead of $chr(xx) - more readable ==========
-alias space returnex $chr(32)
-alias nbsp return $chr(160)
-alias amp return $chr(38)
-alias star return $chr(42)
-alias dollar return $chr(36)
-alias comma return $chr(44)
-alias hyphen return $chr(45)
-alias colon return $chr(58)
-alias semicolon return $chr(59)
-alias pling return $chr(33)
-alias period return $chr(46)
-alias lcurly return $chr(123)
-alias rcurly return $chr(125)
-alias lsquare return $chr(91)
-alias rsquare return $chr(93)
-alias sqbr return $+($lsquare,$1-,$rsquare)
-alias lbr return $chr(40)
-alias rbr return $chr(41)
-alias br return $+($lbr,$1-,$rbr)
-alias eq return $chr(61)
-alias lt return $chr(60)
-alias gt return $chr(62)
-alias tag return $+($lt,$1-,$gt)
+alias -l space returnex $chr(32)
+alias -l nbsp return $chr(160)
+alias -l amp return $chr(38)
+alias -l star return $chr(42)
+alias -l dollar return $chr(36)
+alias -l comma return $chr(44)
+alias -l hyphen return $chr(45)
+alias -l colon return $chr(58)
+alias -l semicolon return $chr(59)
+alias -l pling return $chr(33)
+alias -l period return $chr(46)
+alias -l lcurly return $chr(123)
+alias -l rcurly return $chr(125)
+alias -l lsquare return $chr(91)
+alias -l rsquare return $chr(93)
+alias -l sqbr return $+($lsquare,$1-,$rsquare)
+alias -l lbr return $chr(40)
+alias -l rbr return $chr(41)
+alias -l br return $+($lbr,$1-,$rbr)
+alias -l eq return $chr(61)
+alias -l lt return $chr(60)
+alias -l gt return $chr(62)
+alias -l tag return $+($lt,$1-,$gt)
 
 ; ========== Control Codes using aliases ==========
 ; Color, bold, underline, italic, reverse e.g.
 ; echo 1 This line has $b(bold) $+ , $i(italic) $+ , $u(underscored) $+ , $c(4,red) $+ , and $rev(reversed) text.
 ; Calls can be nested e.g. echo 1 $c(12,$u(http://www.dukelupus.com))
-alias b return $+($chr(2),$1-,$chr(2))
-alias u return $+($chr(31),$1-,$chr(31))
-alias i return $+($chr(29),$1-,$chr(29))
-alias rev return $+($chr(22),$1-,$chr(22))
-alias c {
+alias -l b return $+($chr(2),$1-,$chr(2))
+alias -l u return $+($chr(31),$1-,$chr(31))
+alias -l i return $+($chr(29),$1-,$chr(29))
+alias -l rev return $+($chr(22),$1-,$chr(22))
+alias -l c {
   var %code, %text
   if ($0 < 2) {
     DLF.Error Insufficient parameters to colour text
@@ -1883,9 +1887,9 @@ alias c {
 ;     }
 ; "on SOCKOPEN" is not needed
 
-alias DLF.Socket.Get DLF.Socket.Open $+(DLF.Socket.,$1) $2-
+alias -l DLF.Socket.Get DLF.Socket.Open $+(DLF.Socket.,$1) $2-
 
-alias DLF.Socket.Open {
+alias -l DLF.Socket.Open {
   var %socket = $1
   var %url = $2
   var %dialog = $3
@@ -1930,7 +1934,7 @@ on *:sockopen:DLF.Socket.*:{
   %sw $crlf
 }
 
-alias DLF.Socket.Headers {
+alias -l DLF.Socket.Headers {
   if ($sockerr) DLF.Socket.SockErr sockread
 
   var %line, %mark = $sock($sockname).mark
@@ -1981,11 +1985,11 @@ alias DLF.Socket.Headers {
   }
 }
 
-alias DLF.Socket.SockErr {
+alias -l DLF.Socket.SockErr {
   DLF.Socket.Error $1: $sock($sockname).wserr $sock($sockname).wsmsg
 }
 
-alias DLF.Socket.Error {
+alias -l DLF.Socket.Error {
   if ($sockname) {
     var %mark = $sock($sockname).mark
     DLF.Error $+($sockname,: http,$iif($sock($sockname).ssl,s),://,$gettok(%mark,2,$asc($space)),$gettok(%mark,3,$asc($space)),:) $1-
@@ -2000,7 +2004,7 @@ alias DLF.Socket.Error {
   halt
 }
 
-alias DLF.Socket.Status {
+alias -l DLF.Socket.Status {
   DLF.Status $1-
   if ($sockname) {
     var %mark = $sock($sockname).mark
@@ -2015,7 +2019,7 @@ alias DLF.Socket.Status {
 ; ========== DLF.debug ==========
 ; Run this with //DLF.debug only if you are asked to
 ; by someone providing dlFilter support.
-alias DLF.debug {
+alias -l DLF.debug {
   write -i DLFilter.debug.txt
   write -i DLFilter.debug.txt
   echo 14 -s [DLFilter] Debug started.
