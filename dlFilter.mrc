@@ -2057,7 +2057,7 @@ alias -l DLF.Socket.Status {
 ; ========== DLF.debug ==========
 ; Run this with //DLF.debug only if you are asked to
 ; by someone providing dlFilter support.
-alias -l DLF.debug {
+alias DLF.debug {
   write -i dlFilter.debug.txt
   write -i dlFilter.debug.txt
   echo 14 -s [dlFilter] Debug started.
