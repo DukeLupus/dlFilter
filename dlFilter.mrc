@@ -118,8 +118,8 @@ alias -l DLF.Initialise {
   .unset %DLF.custom.selected
 
 ; We need returnex first implemented in 6.17
-  if ($version < 6.17) {
-    DLF.Error dlFilter requires mIRC 6+. Loading stopped.
+  if ($version < 7.44) {
+    DLF.Error dlFilter requires mIRC 7.44+. Loading stopped.
     .unload -rs $script
   }
   if ($script(onotice.mrc)) .unload -rs onotice.mrc
