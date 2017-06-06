@@ -1,5 +1,5 @@
 /*
-DLFilter.mrc - Filter out messages on file sharing channels
+dlFilter.mrc - Filter out messages on file sharing channels
 Authors: DukeLupus and Sophist
 
 Annoyed by advertising messages from the various file serving bots?
@@ -15,14 +15,50 @@ but you can direct them to custom windows if you wish.
 Download from https://github.com/SanderSade/dlFilter/releases
 Update regularly to handle new forms of message.
 
-To load: use /load -rs DLFilter.mrc
+To load: use /load -rs dlFilter.mrc
 
-Note that DLFilter loads itself automatically as a first script.
+Note that dlFilter loads itself automatically as a first script.
 This avoids problems where other scripts halt events
 preventing this scripts events from running.
+
+Acknowledgements
+================
+dlFilter uses the following code from other people:
+
+o GetFileName from TipiTunes' OS-Quicksearch
+o automatic version check based on code developed for dlFilter by TipiTunes
+o Support for AG6 & 7 by TipiTunes
+o Some of the spam definitions are from HugHug's SoftSnow filter.
+o Vadi wrote special function to vPowerGet dll that allows
+  sending files from DLF.@find.Results window to vPowerGet.
 */
 
 /* CHANGE LOG
+  1.18  Fix reinitialisation of hash tables after update.
+        Add another hash table for ctcp.spam
+        Option to update to beta versions
+        Track minimum mIRC version for web update and
+          not offer update if mirc needs upgrade
+        Up download of new version rename old version to .vxxx so
+          user can recover if they have issues with the new version.
+
+      TODO
+        Breakout menu and events into aliases
+        Fuller implementation of script groups to enable / disable events
+        About dialog (using comment at start of this file)
+        Option for separate windows for fileserver ads
+        Custom filters empty on initialisation
+        Add support for mIRC multiple network connections:
+          Allow channels specified as network#channel
+          Option for common @windows or network-specific windows
+        Right click menu items for changing options base on line clicked
+        Right click menu items for adding to custom filters
+        More menu options equivalent to dialog options
+        More menu options for adding custom filters
+        Somehow send us details of user adding custom filters
+          for our own analysis (privacy issues?)
+        Add dlF icons to windows & options dialog
+
   1.17  Update opening comments and add change log
         Use custom identifiers for creating bold, colour etc.
         Use custom identifiers instead of $chr(xx)
@@ -43,22 +79,8 @@ preventing this scripts events from running.
         Files now always accepted from Regular users who are in DCC Trust List
         Allow user to choose whether to delete configuration variables on unload
         Limit load/start/connect update check to once per 7 days.
-          (Options update check runs every time.)
+          (Options update check still runs every time options dialog is loaded.)
         All aliases and dialogs local (-l flag)
-
-      TODO
-        Option to update to beta versions
-        Breakout menu and events into aliases
-        Fuller implementation of script groups to enable / disable events
-        About dialog (using comment at start of this file)
-        Option for separate windows for fileserver ads
-        Custom filters empty on initialisation
-        Add support for mIRC multiple network connections:
-          Allow channels specified as network#channel
-          Option for common @windows or network-specific windows
-        Right click menu items for changing options base on line clicked
-        Right click menu items for adding to custom filters
-        More menu options equivalent to dialog options
 */
 
 alias -l DLF.SetVersion {
@@ -94,13 +116,13 @@ alias -l DLF.Initialise {
 
 ; We need returnex first implemented in 6.17
   if ($version < 6.17) {
-    DLF.Error DLFilter requires mIRC 6+. Loading stopped.
+    DLF.Error dlFilter requires mIRC 6+. Loading stopped.
     .unload -rs $script
   }
   if ($script(onotice.mrc)) .unload -rs onotice.mrc
   if ($script(onotice.txt)) .unload -rs onotice.txt
   DLF.Status $iif(%DLF.JustLoaded,Loading,Starting) $c(4,version $DLF.SetVersion) by DukeLupus
-  DLF.Status Please check DLFilter homepage $br($c(12,9,$u(https://github.com/SanderSade/dlFilter/issues))) for help.
+  DLF.Status Please check dlFilter homepage $br($c(12,9,$u(https://github.com/SanderSade/dlFilter/issues))) for help.
   DLF.CreateHashTables
   DLF.Options.Initialise
 }
@@ -114,7 +136,7 @@ on *:unload: {
     DLF.Status Unsetting variables..
     .unset %DLF.*
   }
-  DLF.Status Closing open DLFilter windows
+  DLF.Status Closing open dlFilter windows
   if ($dialog(DLF.Options.GUI)) .dialog -x DLF.Options.GUI DLF.Options.GUI
   if ($window(@DLF.filtered)) window -c @DLF.filtered
   if ($window(@DLF.filtered.search)) window -c @DLF.filtered.search
@@ -136,7 +158,7 @@ menu channel {
   ;$iif($me !isop #, $style(2)) Send onotice: DLF.oNotice.Send
   Send onotice: DLF.oNotice.Send
   -
-  DLFilter
+  dlFilter
   ..Options: DLF.Options.Show
   ..$iif($chan isin %DLF.channels,Remove,Add) this channel: DLF.AddRemoveChannel
   ..$iif(%DLF.channels == #, $style(3)) Set to all channels: {
@@ -148,12 +170,12 @@ menu channel {
 }
 
 menu menubar {
-  DLFilter
+  dlFilter
   .Options: DLF.Options.Show
   .$iif(%DLF.showfiltered == 1,$style(1)) Show filtered lines: DLF.filter.showlines
   .Visit filter website: .url -an https://github.com/SanderSade/dlFilter
   .-
-  .Unload DLFilter: if ($?!="Do you want to unload DLFilter?" == $true) .unload -rs $qt($script)
+  .Unload dlFilter: if ($?!="Do you want to unload dlFilter?" == $true) .unload -rs $qt($script)
 }
 
 menu @DLF.Filtered {
@@ -293,7 +315,7 @@ alias -l DLF.@find.SendToAutoGet {
   unset %MTpath
   if (%MTautorequest == 1) MTkickstart $gettok(%temp,2,$asc($space))
   MTwhosinque
-  echo -s %MTlogo Added %j File(s) To Waiting List From DLFilter
+  echo -s %MTlogo Added %j File(s) To Waiting List From dlFilter
   if ($active == @DLF.@find.Results) titlebar $active -=- $line($active,0) results so far -=- %j line(s) sent to AutoGet
   else titlebar $active -=- New releases -=- %j line(s) sent to AutoGet
 }
@@ -362,39 +384,40 @@ alias -l DLF.onotice.Close {
 }
 
 ; ============================== DLF Options ==============================
-alias -l DLF.Options.Show dialog $iif($dialog(DLF.Options.GUI),-v,-md) DLF.Options.GUI DLF.Options.GUI
+alias DLF.Options.Show dialog $iif($dialog(DLF.Options.GUI),-v,-md) DLF.Options.GUI DLF.Options.GUI
 
 dialog -l DLF.Options.GUI {
   ; Main dialogue
-  title DLFilter v $+ $DLF.SetVersion
+  title dlFilter v $+ $DLF.SetVersion
   size -1 -1 152 225
   option dbu notheme
-  check "Enable/disable DLFilter", 5, 2 2 66 8
-  tab "Main", 1, 1 10 151 196, disable
-  tab "Capturing/Spam/Security", 2, disable
-  tab "Custom", 3, disable
-  button "Close", 4, 2 211 43 11, ok
-  check "Show/hide filtered lines", 21, 47 211 103 11, push
+  check "Enable/disable dlFilter", 5, 2 2 135 8
+  tab "Main", 1, 1 10 151 198
+  tab "Capturing/Spam/Security", 2
+  tab "Custom", 3
+  button "Close", 4, 2 211 45 11, ok flat
+  check "Show/hide filtered lines", 21, 51 211 100 11, push
   ; tab 1 Main
-  text "Channels (comma separated, use # for all):", 7, 6 27 125 8, tab 1
-  edit "", 6, 5 35 144 10, tab 1 autohs %DLF.channels
-  box " Filters ", 8, 4 46 144 47, tab 1
-  check "Ads and announcements", 9, 7 55 80 8, tab 1
-  check "Requests and searches", 10, 7 64 69 8, tab 1
-  check "Channel mode changes", 17, 7 73 75 8, tab 1
-  check "Requests sent to you in pm (@yournick, !yournick)", 33, 7 82 133 8, tab 1
-  box " User events ", 11, 4 96 144 84, tab 1
-  check "Joins", 12, 7 105 50 9, tab 1
-  check "Parts", 13, 7 114 50 9, tab 1
-  check "Quits", 14, 7 123 50 9, tab 1
-  check "Nick changes", 15, 7 132 50 9, tab 1
-  check "Kicks", 16, 7 141 50 9, tab 1
-  check "... but show them in Status window.", 18, 15 150 95 9, tab 1
-  check "Away and thank-you messages", 19, 7 159 95 9, tab 1
-  check "User mode changes", 20, 7 168 62 9, tab 1
-  text "Checking for dlFilter updates...", 56, 5 182 144 8, tab 1
-  button "DLFilter website", 67, 4 191 70 12, tab 1 flat
-  button "Update dlFilter", 66, 78 191 70 12, tab 1 flat disable
+  text "Channels (comma separated, just # for all):", 7, 4 26 132 8, tab 1
+  edit "", 6, 3 34 146 10, tab 1 autohs %DLF.channels
+  box " Filters ", 8, 4 45 144 47, tab 1
+  check "Ads and announcements", 9, 7 54 133 8, tab 1
+  check "Searches and file requests", 10, 7 63 133 8, tab 1
+  check "Channel mode changes", 17, 7 72 133 8, tab 1
+  check "Requests sent to you in pm (@yournick, !yournick)", 33, 7 81 133 8, tab 1
+  box " User events ", 11, 4 93 144 84, tab 1
+  check "Joins", 12, 7 102 133 8, tab 1
+  check "Parts", 13, 7 111 133 8, tab 1
+  check "Quits", 14, 7 120 133 8, tab 1
+  check "Nick changes", 15, 7 129 133 8, tab 1
+  check "Kicks", 16, 7 138 133 8, tab 1
+  check "... but show them in Status window.", 18, 15 147 125 8, tab 1
+  check "Away and thank-you messages", 19, 7 156 133 8, tab 1
+  check "User mode changes", 20, 7 165 133 8, tab 1
+  text "Checking for dlFilter updates...", 56, 5 178 144 8, tab 1
+  button "dlFilter website", 67, 4 186 70 10, tab 1 flat
+  button "Update dlFilter", 66, 78 186 70 10, tab 1 flat disable
+  check "Check for beta versions", 68, 4 198 136 8, tab 1
   ; Tab 2 Capturing / Spam / Security
   box " Capturing ", 22, 4 25 144 50, tab 2
   check "Capture server notices to separate window", 23, 7 35 120 8, tab 2
@@ -474,6 +497,8 @@ alias -l DLF.Options.Initialise {
     DLF.Status Setting channels to $c(4,all) $+ .
     %DLF.channels = #
   }
+  if (%DLF.betas == $null) %DLF.betas = 0
+
 }
 
 on *:dialog:DLF.Options.GUI:init:0: {
@@ -513,6 +538,7 @@ on *:dialog:DLF.Options.GUI:init:0: {
   if (%DLF.colornicks == 1) did -c DLF.Options.GUI 62
   if (%DLF.o.enabled == 1) did -c DLF.Options.GUI 61
   if (%DLF.custom.enabled == 1) did -c DLF.Options.GUI 36
+  if (%DLF.betas == 1) did -c DLF.Options.GUI 68
   did -a DLF.Options.GUI 37 Channel text
   did -a DLF.Options.GUI 37 Channel action
   did -a DLF.Options.GUI 37 Channel notice
@@ -568,6 +594,7 @@ on *:dialog:DLF.Options.GUI:sclick:4: {
   %DLF.colornicks = $did(62).state
   %DLF.o.enabled = $did(61).state
   %DLF.custom.enabled = $did(36).state
+  %DLF.betas = $did(68).state
 }
 
 ; Show / hide filtered messages check box
@@ -667,10 +694,20 @@ on *:dialog:DLF.Options.GUI:sclick:52: {
   DLF.Options.SetCustomType $did(37).seltext
   DLF.Options.SetRemoveButton
 }
+
+; Goto website button
 on *:dialog:DLF.Options.GUI:sclick:67: url -an https://github.com/SanderSade/dlFilter
+
+; Download update button
 on *:dialog:DLF.Options.GUI:sclick:66: {
   did -b DLF.Options.GUI 66
   DLF.Download.Run
+}
+
+; Check for Beta versions
+on *:dialog:DLF.Options.GUI:sclick:68: {
+  %DLF.betas = $did(68).state
+  DLF.Update.CheckVersions
 }
 
 alias -l DLF.Options.GUI.Status {
@@ -1297,7 +1334,7 @@ alias -l DLF.Update.Check {
 alias -l DLF.Update.Run {
   did -b DLF.Options.GUI 66
   DLF.Options.GUI.Status Checking for dlFilter updates...
-  DLF.Socket.Get Update https://raw.githubusercontent.com/SanderSade/dlFilter/master/dlFilter.version DLF.Options.GUI 56
+  DLF.Socket.Get Update https://raw.githubusercontent.com/SanderSade/dlFilter/dlFilter-v118/dlFilter.version DLF.Options.GUI 56
 }
 
 on *:sockread:DLF.Socket.Update: {
@@ -1305,45 +1342,15 @@ on *:sockread:DLF.Socket.Update: {
   var %line, %mark = $sock($sockname).mark
   var %state = $gettok(%mark,1,$asc($space))
   if (%state != Body) DLF.Socket.Error Cannot process response: Still processing %state
+  %DLF.version.web =
+  %DLF.version.web.mirc =
+  %DLF.version.beta =
+  %DLF.version.beta.mirc =
   while ($true) {
     sockread %line
     if ($sockerr > 0) DLF.Socket.SockErr sockread:Body
     if ($sockbr == 0) break
-    if ($DLF.Update.ProcessLine(%line)) {
-      .sockclose $sockname
-      break
-    }
-  }
-}
-
-alias -l DLF.Update.ProcessLine {
-  if ($gettok($1-,1,$asc($eq)) == dlFilter) {
-    %DLF.Version.web = $gettok($1-,2,$asc($eq))
-    if (%DLF.version.web > $DLF.SetVersion) DLF.Update.NewAvailable
-    elseif (%DLF.version.web == $DLF.SetVersion) DLF.Options.GUI.Status Running current version of DLFilter
-    else DLF.Options.GUI.Status Running a newer version $br($DLF.SetVersion) than website $br(%DLF.version.web)
-    set %DLF.LastUpdateCheck $ctime
-    return $true
-  }
-}
-
-alias -l DLF.Update.NewAvailable {
-  DLF.Options.GUI.Status Please update DLFilter to version %DLF.version.web
-  did -e DLF.Options.GUI 66
-  if (%DLF.channels == #) {
-    var %cnt = $chan(0)
-    while (%cnt) {
-      DLF.Update.Announce $chan(%cnt)
-      dec %cnt
-    }
-  }
-  else {
-    var %cnt = $numtok(%DLF.channels,$asc($comma))
-    while (%cnt) {
-      var %chan = $gettok(%DLF.channels,%cnt,$asc($comma))
-      if ($chan(%chan)) DLF.Update.Announce %chan
-      dec %cnt
-    }
+    DLF.Update.ProcessLine %line
   }
 }
 
@@ -1351,8 +1358,60 @@ on *:sockclose:DLF.Socket.Update: {
   var %line
   sockread -f %line
   if ($sockerr > 0) DLF.Socket.SockErr sockclose
-  if ($sockbr > 0) {
-    if (!$DLF.Update.ProcessLine(%line)) DLF.Socket.Error dlFilter version missing!
+  if ($sockbr > 0) DLF.Update.ProcessLine %line
+  DLF.Update.CheckVersions
+}
+
+alias -l DLF.Update.ProcessLine {
+  if ($gettok($1-,1,$asc($eq)) == dlFilter) {
+    %DLF.version.web = $gettok($1-,2,$asc($eq))
+    %DLF.version.web.mirc = $gettok($1-,3,$asc($eq))
+    set %DLF.LastUpdateCheck $ctime
+  }
+  elseif ($gettok($1-,1,$asc($eq)) == dlFilter.beta) {
+    %DLF.version.beta = $gettok($1-,2,$asc($eq))
+    %DLF.version.beta.mirc = $gettok($1-,3,$asc($eq))
+  }
+}
+
+alias -l DLF.Update.CheckVersions {
+  did -b DLF.Options.GUI 66
+  if (%DLF.version.web) {
+    if ((%DLF.betas) $&
+    && (%DLF.version.beta) $&
+    && (%DLF.version.beta > %DLF.version.web)) {
+      if (%DLF.version.beta > $DLF.SetVersion) DLF.Update.DownloadAvailable %DLF.version.beta %DLF.version.beta.mirc beta
+      elseif (%DLF.version.web == $DLF.SetVersion) DLF.Options.GUI.Status Running current version of dlFilter beta
+      else DLF.Options.GUI.Status Running a newer version $br($DLF.SetVersion) than web beta version $br(%DLF.version.beta)
+    }
+    elseif (%DLF.version.web > $DLF.SetVersion) DLF.Update.DownloadAvailable %DLF.version.web %DLF.version.web.mirc
+    elseif (%DLF.version.web == $DLF.SetVersion) DLF.Options.GUI.Status Running current version of dlFilter
+    else DLF.Options.GUI.Status Running a newer version $br($DLF.SetVersion) than website $br(%DLF.version.web)
+  }
+  else DLF.Socket.Error dlFilter version missing!
+}
+
+alias -l DLF.Update.DownloadAvailable {
+  var %ver = $iif($3,$3 version,version) $1
+  if ($version >= $2) {
+    DLF.Options.GUI.Status You can update dlFilter to %ver
+    did -e DLF.Options.GUI 66
+  }
+  else DLF.Options.GUI.Status Upgrade mIRC before you can update to %ver
+  if (%DLF.channels == #) {
+    var %cnt = $chan(0)
+    while (%cnt) {
+      DLF.Update.Announce $chan(%cnt) $3
+      dec %cnt
+    }
+  }
+  else {
+    var %cnt = $numtok(%DLF.channels,$asc($comma))
+    while (%cnt) {
+      var %chan = $gettok(%DLF.channels,%cnt,$asc($comma))
+      if ($chan(%chan)) DLF.Update.Announce %chan $3
+      dec %cnt
+    }
   }
 }
 
@@ -1360,17 +1419,17 @@ on me:join:%DLF.channels: if ((%DLF.version.web) && (%DLF.version.web > $DLF.Set
 
 alias -l DLF.Update.Announce {
   echo -t $1 $c(1,9,$DLF.logo A new version of dlFilter is available.)
-  echo -t $1 $c(1,9,$DLF.logo Use the Update button in dlFilter Options to download and install.)
+  if ($2 == beta) echo -t $1 $c(1,9,$DLF.logo However you need to $c(4,upgrade mIRC) before you can download it.)
+  else echo -t $1 $c(1,9,$DLF.logo Use the Update button in dlFilter Options to download and install.)
 }
 
 ; ========== Download new version ==========
 alias -l DLF.Download.Run {
   DLF.Options.GUI.Status Downloading new version of dlFilter...
   var %newscript = $qt($script $+ .new)
-  if ($exists(%newscript)) .remove %newscript
+  if ($isfile(%newscript)) .remove %newscript
   if ($exists(%newscript)) DLF.Socket.Error Unable to delete old temporary download file.
-  ;DLF.Socket.Get Download https://raw.githubusercontent.com/SanderSade/dlFilter/master/dlFilter.mrc DLF.Options.GUI 56
-  DLF.Socket.Get Download https://raw.githubusercontent.com/SanderSade/dlFilter/dlFilter-v117/dlFilter.mrc DLF.Options.GUI 56
+  DLF.Socket.Get Download https://raw.githubusercontent.com/SanderSade/dlFilter/dlFilter-v118/dlFilter.mrc DLF.Options.GUI 56
 }
 
 on *:sockread:DLF.Socket.Download: {
@@ -1389,18 +1448,26 @@ on *:sockread:DLF.Socket.Download: {
 
 on *:sockclose:DLF.Socket.Download: {
   var %newscript = $qt($script $+ .new)
+  var %oldscript = $qt($script $+ .v $+ $DLF.SetVersion)
+  var %oldsaved = $false
   sockread -f &block
   if ($sockerr > 0) DLF.Socket.SockErr sockclose
   if ($sockbr > 0) bwrite %newscript -1 -1 &block
-  .remove $script
+  if ($isfile(%oldscript)) .remove %oldscript
+  if ($exists(%oldscript)) .remove $script
+  else {
+    .rename $script %oldscript
+    %oldsaved = $true
+  }
   .rename %newscript $script
   %DLF.version = %DLF.version.web
-  DLF.Status New version of dlFilter downloaded and installed
-  signal DLF.Reload
+  DLF.Socket.Status New version of dlFilter downloaded and installed
+  if (%oldsaved) DLF.Status Old version of dlFilter.mrc saved as %oldscript in case you need to revert
+  signal DLF.Update.Reload
   .reload -rs1 $script
 }
 
-on *:signal:DLF.ReLoad: DLF.Initialise
+on *:signal:DLF.Update.ReLoad: DLF.Initialise
 
 alias -l DLF.Download.Error {
   DLF.Update.ErrorMsg Unable to download new version of dlFilter!
@@ -1811,7 +1878,7 @@ alias -l DLF.regml {
 }
 
 ; ========== Status and error messages ==========
-alias -l DLF.logo return $rev([DLFilter])
+alias -l DLF.logo return $rev([dlFilter])
 alias -l DLF.Status echo -ts $c(1,9,$DLF.logo $1-)
 alias -l DLF.Warning echo -tas $c(1,9,$DLF.logo $1-)
 alias -l DLF.Error DLF.Warning $c(4,$b(Error:)) $1-
@@ -2020,39 +2087,39 @@ alias -l DLF.Socket.Status {
 ; Run this with //DLF.debug only if you are asked to
 ; by someone providing dlFilter support.
 alias -l DLF.debug {
-  write -i DLFilter.debug.txt
-  write -i DLFilter.debug.txt
-  echo 14 -s [DLFilter] Debug started.
-  echo 14 -s [DLFilter] Creating DLFilter.debug.txt
-  write DLFilter.debug.txt --- $fulldate ---
-  write -i DLFilter.debug.txt
-  write DLFilter.debug.txt Executing $script from $scriptdir
-  write DLFilter.debug.txt DLFilter version %DLF.version
-  write DLFilter.debug.txt mIRC version $version
-  write DLFilter.debug.txt Running Windows $os
-  write DLFilter.debug.txt Nick: $me
-  write DLFilter.debug.txt Host: $host
-  write DLFilter.debug.txt IP: $ip
-  write DLFilter.debug.txt Connected to $server $+ , port $port
-  write -i DLFilter.debug.txt
-  write -i DLFilter.debug.txt
-  write DLFilter.debug.txt --- Scripts ---
-  write -i DLFilter.debug.txt
+  write -i dlFilter.debug.txt
+  write -i dlFilter.debug.txt
+  echo 14 -s [dlFilter] Debug started.
+  echo 14 -s [dlFilter] Creating dlFilter.debug.txt
+  write dlFilter.debug.txt --- $fulldate ---
+  write -i dlFilter.debug.txt
+  write dlFilter.debug.txt Executing $script from $scriptdir
+  write dlFilter.debug.txt dlFilter version %DLF.version
+  write dlFilter.debug.txt mIRC version $version
+  write dlFilter.debug.txt Running Windows $os
+  write dlFilter.debug.txt Nick: $me
+  write dlFilter.debug.txt Host: $host
+  write dlFilter.debug.txt IP: $ip
+  write dlFilter.debug.txt Connected to $server $+ , port $port
+  write -i dlFilter.debug.txt
+  write -i dlFilter.debug.txt
+  write dlFilter.debug.txt --- Scripts ---
+  write -i dlFilter.debug.txt
   var %scripts = $script(0)
-  echo 14 -s [DLFilter] %scripts scripts loaded
-  write DLFilter.debug.txt %scripts scripts loaded
+  echo 14 -s [dlFilter] %scripts scripts loaded
+  write dlFilter.debug.txt %scripts scripts loaded
   var %cnter = 1
   while (%cnter <= %scripts) {
-    write DLFilter.debug.txt Script %cnter is $script(%cnter)
-    echo 14 -s [DLFilter] Script %cnter is $script(%cnter)
-    write DLFilter.debug.txt $script(%cnter) is $lines($script(%cnter)) lines and $file($script(%cnter)).size bytes
+    write dlFilter.debug.txt Script %cnter is $script(%cnter)
+    echo 14 -s [dlFilter] Script %cnter is $script(%cnter)
+    write dlFilter.debug.txt $script(%cnter) is $lines($script(%cnter)) lines and $file($script(%cnter)).size bytes
     inc %cnter
   }
-  echo 14 -s [DLFilter] Checking variables
-  write -i DLFilter.debug.txt
-  write -i DLFilter.debug.txt
-  write DLFilter.debug.txt --- DLFilter Variables ---
-  write -i DLFilter.debug.txt
+  echo 14 -s [dlFilter] Checking variables
+  write -i dlFilter.debug.txt
+  write -i dlFilter.debug.txt
+  write dlFilter.debug.txt --- dlFilter Variables ---
+  write -i dlFilter.debug.txt
   saveini
   var %lines = $ini(remote.ini,variables,0) - 1
   var %Dlfvariables = 0
@@ -2060,40 +2127,40 @@ alias -l DLF.debug {
   while (%cnter <= %lines) {
     var %line = $readini(remote.ini,n,variables,n $+ %cnter)
     if (DLF isin %line) {
-      write DLFilter.debug.txt %line
+      write dlFilter.debug.txt %line
       inc %Dlfvariables
     }
     inc %cnter
   }
-  write -i DLFilter.debug.txt
-  echo 14 -s [DLFilter] Found %lines variables, $calc(%Dlfvariables - 1) of them are DLFilter variables.
-  write DLFilter.debug.txt Found %lines variables, $calc(%Dlfvariables - 1) of them are DLFilter variables.
-  write -i DLFilter.debug.txt
-  write -i DLFilter.debug.txt
-  write DLFilter.debug.txt --- Groups ---
-  write -i DLFilter.debug.txt
-  echo 14 -s [DLFilter] $group(0) group(s) found
-  write DLFilter.debug.txt $group(0) group(s) found
+  write -i dlFilter.debug.txt
+  echo 14 -s [dlFilter] Found %lines variables, $calc(%Dlfvariables - 1) of them are dlFilter variables.
+  write dlFilter.debug.txt Found %lines variables, $calc(%Dlfvariables - 1) of them are dlFilter variables.
+  write -i dlFilter.debug.txt
+  write -i dlFilter.debug.txt
+  write dlFilter.debug.txt --- Groups ---
+  write -i dlFilter.debug.txt
+  echo 14 -s [dlFilter] $group(0) group(s) found
+  write dlFilter.debug.txt $group(0) group(s) found
   var %grps = $group(0)
   var %cnter = 1
   while (%cnter <= %grps) {
-    echo 14 -s [DLFilter] Group %cnter $+ : $group(%cnter) is from $group(%cnter).fname $+ . Status: $group(%cnter).status
-    write DLFilter.debug.txt Group %cnter $+ : $group(%cnter) is from $group(%cnter).fname $+ . Status: $group(%cnter).status
+    echo 14 -s [dlFilter] Group %cnter $+ : $group(%cnter) is from $group(%cnter).fname $+ . Status: $group(%cnter).status
+    write dlFilter.debug.txt Group %cnter $+ : $group(%cnter) is from $group(%cnter).fname $+ . Status: $group(%cnter).status
     inc %cnter
   }
-  write -i DLFilter.debug.txt
-  write -i DLFilter.debug.txt
-  write DLFilter.debug.txt --- Hash tables ---
-  write -i DLFilter.debug.txt
-  echo 14 -s [DLFilter] $hget(0) hash table(s) found
-  write DLFilter.debug.txt $hget(0) hash table(s) found
+  write -i dlFilter.debug.txt
+  write -i dlFilter.debug.txt
+  write dlFilter.debug.txt --- Hash tables ---
+  write -i dlFilter.debug.txt
+  echo 14 -s [dlFilter] $hget(0) hash table(s) found
+  write dlFilter.debug.txt $hget(0) hash table(s) found
   var %hs = $hget(0)
   var %cnter = 1
   while (%cnter <= %hs) {
-    echo 14 -s [DLFilter] Table %cnter $+ : $hget(%cnter) $+ , size $hget(%cnter).size
-    write DLFilter.debug.txt Table %cnter $+ : $hget(%cnter) $+ , size $hget(%cnter).size
+    echo 14 -s [dlFilter] Table %cnter $+ : $hget(%cnter) $+ , size $hget(%cnter).size
+    write dlFilter.debug.txt Table %cnter $+ : $hget(%cnter) $+ , size $hget(%cnter).size
     inc %cnter
   }
-  write -i DLFilter.debug.txt
-  write DLFilter.debug.txt --- End of debug info ---
+  write -i dlFilter.debug.txt
+  write dlFilter.debug.txt --- End of debug info ---
 }
