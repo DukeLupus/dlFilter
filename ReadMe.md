@@ -41,4 +41,4 @@ Note 2: Some other scripts may interfere with filtering, causing various problem
 For additional help and details, see [dlFilter website](http://dukelupus.com/dlfilter).
 
 ## Change log
-The change log can be viewed [here](http://dukelupus.com/dlfilter/blob/master/ChangeLog.md).
+The change log can be viewed [here](https://github.com/SanderSade/dlFilter/blob/master/ChangeLog.md).
