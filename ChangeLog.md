@@ -109,8 +109,7 @@ Note: While I didn't add *#*#*#*#*, you might want to add it to custom filters y
 * Changed "Send to AutoGet" into "Send to AutoGet 7"
 * Added support for latest beta of AG7.
 
-# 1.000
-* Formal release of Version 1
+# 1.0 Formal release
 * Few minor changes
 
 ### 0.986
