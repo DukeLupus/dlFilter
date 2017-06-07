@@ -44,9 +44,9 @@ o Vadi wrote special function to vPowerGet dll that allows
         Code remediation
         All dialog option changes now immediate
         Subsidiary check-boxes now enable / disable with parent
+        Menu and events broken out into aliases
 
       TODO
-        Breakout menu and events into aliases
         Fuller implementation of script groups to enable / disable events
         About dialog (using comment at start of this file)
         Option for separate windows for fileserver ads
@@ -61,6 +61,7 @@ o Vadi wrote special function to vPowerGet dll that allows
         Somehow send us details of user adding custom filters
           for our own analysis (privacy issues?)
         Add dlF icons to windows & options dialog
+        Use native logging for custom windows instead of script logging
 
   1.17  Update opening comments and add change log
         Use custom identifiers for creating bold, colour etc.
@@ -128,6 +129,7 @@ alias -l DLF.Initialise {
   DLF.Status Please check dlFilter homepage $br($c(12,9,$u(https://github.com/SanderSade/dlFilter/issues))) for help.
   DLF.CreateHashTables
   DLF.Options.Initialise
+  DLF.Groups.Events
 }
 
 ctcp *:VERSION: .ctcpreply $nick VERSION $c(1,9,$logo version $DLF.SetVersion by DukeLupus & Sophist.) $c(1,15,Get it from $c(12,15,$u(https://github.com/SanderSade/dlFilter/releases)))
@@ -579,8 +581,7 @@ alias -l DLF.Options.LinkedFields {
 alias -l DLF.Options.Save {
   %DLF.showfiltered = $did(21).state
   %DLF.enabled = $did(5).state
-  if (%DLF.enabled) .enable #dlf_enabled
-  else .disable #dlf_enabled
+  DLF.Groups.Events
   %DLF.Channels = $did(6).text
   %DLF.ads = $did(9).state
   %DLF.requests = $did(10).state
@@ -612,6 +613,11 @@ alias -l DLF.Options.Save {
   %DLF.o.enabled = $did(61).state
   %DLF.custom.enabled = $did(36).state
   %DLF.betas = $did(68).state
+}
+
+alias -l DLF.Groups.Events {
+  if (%DLF.enabled) .enable #dlf_events
+  else .disable #dlf_events
 }
 
 ; Select custom message type
@@ -706,9 +712,18 @@ alias -l DLF.Options.GUI.Status {
   if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 $1-
 }
 
-; ============================== Event processing ==============================
+; ============================== Event catching ==============================
 
-#dlf_enabled on
+; Following is just in case groups get reset to default...
+#dlf_bootstrap on
+on *:text:*:*: DLF.Groups.Bootstrap
+alias -l DLF.Groups.Bootstrap {
+  if (%DLF.enabled != $null) DLF.Groups.Events
+  .disable #dlf_bootstrap
+}
+#dlf_bootstrap end
+
+#dlf_events off
 
 ; Channel user activity
 ; join, art, quit, nick changes, kick
@@ -748,9 +763,9 @@ on ^*:text:*:?: DLF.Private.Text $1-
 on ^*:notice:*:?: DLF.Private.Notice $1-
 on ^*:action:*:?: DLF.Private.Action $1-
 
-#dlf_enabled end
-; ========== End of DLF enabled group ==========
+#dlf_events end
 
+; ========== Event processing code ==========
 ; Channel user activity
 ; join, art, quit, nick changes, kick
 alias -l DLF.User.Channel {
@@ -763,7 +778,7 @@ alias -l DLF.User.NoChannel {
     var %i = $comchan($newnick,0)
     while (%i) {
       var %chan = $comchan($newnick,%i)
-      if (!$findtok(%DLF.channels,%chan,0,$asc($comma)) echo -ct $1 %chan $2-
+      if (!$findtok(%DLF.channels,%chan,0,$asc($comma))) echo -ct $1 %chan $2-
       dec %i
     }
   }
@@ -776,8 +791,6 @@ alias -l DLF.Channels.Text {
   if ((%DLF.ads == 1) && ($hfind(DLF.text.ads,%DLF.txt,1,W))) DLF.TextSetNickColor $chan $nick $1-
   if ((%DLF.requests == 1) && ($hfind(DLF.text.cmds,%DLF.txt,1,W))) DLF.TextFilter $chan $nick $1-
   if ((%DLF.away == 1) && ($hfind(DLF.text.away,%DLF.txt,1,W))) DLF.TextFilter $chan $nick $1-
-  if ((%DLF.newreleases == 1) && ($hfind(DLF.text.newrels,%DLF.txt,1,W))) DLF.NewRelFilter $nick $2-
-  if ((%DLF.newreleases == 1) && (Wiz* iswm $nick) && (--*!* iswm %DLF.txt)) DLF.NewRelFilter $nick $2-
   if ($hfind(DLF.text.always,%DLF.txt,1,W)) DLF.TextFilter $chan $nick $1-
 
   /*if (%DLF.chspam == 1) {
@@ -793,20 +806,6 @@ alias -l DLF.Channels.Text {
       inc %cnter
     }
   }
-}
-
-alias -l DLF.NewRelFilter {
-  var %line = $strip($2-)
-  %line = $remove(%line,+++ N e w release +++,to download this ebook.)
-  %line = $remove(%line,-=NEW=-)
-  %line = $mid(%line,$calc($pos(%line,!,1) - 1),$len(%line))
-  if (!$window(@DLF.NewReleases)) {
-    window -lbsk0nwz @DLF.NewReleases
-    titlebar @DLF.NewReleases -=- Right-click for options
-  }
-  aline -n @DLF.NewReleases %line
-  window -b @DLF.NewReleases
-  halt
 }
 
 alias -l DLF.Channels.Action {
@@ -905,7 +904,7 @@ on ^*:open:*: {
 
 alias -l DLF.Private.Text {
   if ((%DLF.nocomchan.dcc == 1) && (%DLF.accepthis == $target)) return
-  if ($+(*,$dollar,decode* iswm $1-) DLF.Warning Do not paste any messages containg $b($dollar $+ decode) to your mIRC. They are mIRC worms, people sending them are infected. Instead, please report such messages to the channel ops.
+  if ($+(*,$dollar,decode*) iswm $1-) DLF.Warning Do not paste any messages containing $b($dollar $+ decode) to your mIRC. They are mIRC worms, people sending them are infected. Instead, please report such messages to the channel ops.
   CheckPrivText $nick $1-
 }
 
@@ -1608,14 +1607,6 @@ alias -l DLF.CreateHashTables {
   DLF.hadd text.away *Back*Duration*
   DLF.hadd text.away *MisheBORG*SendStat*v.*
   inc %matches $hget(DLF.text.away,0).item
-
-  if ($hget(DLF.text.newrels)) hfree DLF.text.newrels
-  DLF.hadd text.newrels *NEW from the excellent proofers of*
-  DLF.hadd text.newrels *N e w release*
-  DLF.hadd text.newrels N E W *
-  DLF.hadd text.newrels *-=NEW=-*
-  DLF.hadd text.newrels *-=NEW RELEASE=-*
-  inc %matches $hget(DLF.text.newrels,0).item
 
   if ($hget(DLF.text.always)) hfree DLF.text.always
   DLF.hadd text.always 2find *
