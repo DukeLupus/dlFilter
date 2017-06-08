@@ -45,22 +45,25 @@ o Vadi wrote special function to vPowerGet dll that allows
         All dialog option changes now immediate
         Subsidiary check-boxes now enable / disable with parent
         Menu and events broken out into aliases
+        Disable rather than unload script if mIRC version is too low
+        Add extra options for windows for Server Ads and per connection
+        Remove New Release filters
+        Improve DLF.debug code
+        Channel names can now be network#channel as well as #channel (any network)
 
       TODO
+        Implement extra windows for fileserver ads and multi-server
+        Popups to support network#channel
         Fuller implementation of script groups to enable / disable events
         About dialog (using comment at start of this file)
-        Option for separate windows for fileserver ads
         Custom filters empty on initialisation
-        Add support for mIRC multiple network connections:
-          Allow channels specified as network#channel
-          Option for common @windows or network-specific windows
         Right click menu items for changing options base on line clicked
         Right click menu items for adding to custom filters
         More menu options equivalent to dialog options
         More menu options for adding custom filters
         Somehow send us details of user adding custom filters
           for our own analysis (privacy issues?)
-        Add dlF icons to windows & options dialog
+        Add dlF icons to toolbar & options dialog
         Use native logging for custom windows instead of script logging
 
   1.17  Update opening comments and add change log
@@ -117,19 +120,27 @@ on *:load: {
 alias -l DLF.Initialise {
   ; Delete obsolete variables
   .unset %DLF.custom.selected
+  .unset %DLF.newreleases
 
-; We need returnex first implemented in 6.17
-  if ($version < 7.44) {
-    DLF.Error dlFilter requires mIRC 7.44+. Loading stopped.
-    .unload -rs $script
-  }
   if ($script(onotice.mrc)) .unload -rs onotice.mrc
   if ($script(onotice.txt)) .unload -rs onotice.txt
   DLF.Status $iif(%DLF.JustLoaded,Loading,Starting) $c(4,version $DLF.SetVersion) by DukeLupus
   DLF.Status Please check dlFilter homepage $br($c(12,9,$u(https://github.com/SanderSade/dlFilter/issues))) for help.
   DLF.CreateHashTables
   DLF.Options.Initialise
+  var %ver = $DLF.mIRCversion
+  if (%ver != 0) DLF.Error dlFilter requires mIRC %ver $+ +. dlFilter disabled until mIRC is updated.
   DLF.Groups.Events
+}
+
+alias -l DLF.mIRCversion {
+  ; We need returnex first implemented in 6.17
+  ; We need regml.group first implemented in 7.44
+  if ($version < 7.44) {
+    %DLF.enabled = 0
+    return 7.44
+  }
+  return 0
 }
 
 ctcp *:VERSION: .ctcpreply $nick VERSION $c(1,9,$logo version $DLF.SetVersion by DukeLupus & Sophist.) $c(1,15,Get it from $c(12,15,$u(https://github.com/SanderSade/dlFilter/releases)))
@@ -396,15 +407,16 @@ dialog -l DLF.Options.GUI {
   title dlFilter v $+ $DLF.SetVersion
   size -1 -1 152 225
   option dbu notheme
-  check "Enable/disable dlFilter", 5, 2 2 135 8
+  text "", 99, 67 2 82 8, right hide
+  check "Enable/disable dlFilter", 5, 2 2 62 8
   tab "Main", 1, 1 10 151 198
-  tab "Capturing/Spam/Security", 2
+  tab "Filtering/Spam/Security", 2
   tab "Custom", 3
   button "Close", 4, 2 211 45 11, ok flat
   check "Show/hide filtered lines", 21, 51 211 100 11, push
   ; tab 1 Main
   text "Channels (comma separated, just # for all):", 7, 4 26 132 8, tab 1
-  edit "", 6, 3 34 146 10, tab 1 autohs %DLF.channels
+  edit "", 6, 3 34 146 10, tab 1 autohs
   box " Filters ", 8, 4 45 144 47, tab 1
   check "Ads and announcements", 9, 7 54 133 8, tab 1
   check "Searches and file requests", 10, 7 63 133 8, tab 1
@@ -423,24 +435,25 @@ dialog -l DLF.Options.GUI {
   button "dlFilter website", 67, 4 186 70 10, tab 1 flat
   button "Update dlFilter", 66, 78 186 70 10, tab 1 flat disable
   check "Check for beta versions", 68, 4 198 136 8, tab 1
-  ; Tab 2 Capturing / Spam / Security
-  box " Capturing ", 22, 4 25 144 50, tab 2
-  check "Capture server notices to separate window", 23, 7 35 120 8, tab 2
-  check "Group @find/@locator results", 24, 7 44 118 8, tab 2
-  check "Capture 'New Release' to separate window", 25, 7 53 123 8, tab 2
-  check "Capture onotices to separate @#window (OpsTalk)", 61, 7 62 132 8, tab 2
-  box " Spam and security ", 26, 4 79 145 115, tab 2
-  check "Filter spam on channel", 27, 7 88 138 8, tab 2
-  check "... and Notify if you are an op", 28, 15 97 130 8, tab 2
-  check "Filter private spam", 29, 7 106 138 8, tab 2
-  check "... and Notify if you are op in common channel", 30, 15 115 130 8, tab 2
-  check "... and /ignore spammer for 1h (asks confirmation)", 31, 15 124 130 8, tab 2
-  check "Don't accept any messages or files from users with whom you do not have a common channel", 32, 7 132 138 16, tab 2 multi
-  check "... but accept DCC / query chats", 72, 15 148 130 8, tab 2
-  check "Do not accept files from regular users (except mIRC trusted users)", 34, 7 157 138 16, tab 2 multi
-  check "... block only potentially dangerous filetypes", 75, 15 173 130 8, tab 2
-  check "Do not accept private messages from regulars", 35, 7 182 138 8, tab 2
-  check "Color uncolored fileservers", 62, 4 196 144 8, tab 2
+  ; Tab 2 Filtering / Spam / Security
+  box " Filtering ", 22, 4 25 144 56, tab 2
+  check "Filter server notices to separate window", 23, 7 34 120 8, tab 2
+  check "Filter server adverts to separate window", 38, 7 43 138 8, tab 2
+  check "Separate filter windows per connection", 39, 7 52 138 8, tab 2
+  check "Group @find/@locator results", 24, 7 61 138 8, tab 2
+  check "Filter oNotices to separate @#window (OpsTalk)", 61, 7 70 138 8, tab 2
+  box " Spam and security ", 26, 4 82 145 114, tab 2
+  check "Filter spam on channel", 27, 7 91 138 8, tab 2
+  check "... and Notify if you are an op", 28, 15 100 130 8, tab 2
+  check "Filter private spam", 29, 7 109 138 8, tab 2
+  check "... and Notify if you are op in common channel", 30, 15 118 130 8, tab 2
+  check "... and /ignore spammer for 1h (asks confirmation)", 31, 15 127 130 8, tab 2
+  check "Don't accept any messages or files from users with whom you do not have a common channel", 32, 7 135 138 16, tab 2 multi
+  check "... but accept DCC / query chats", 72, 15 151 130 8, tab 2
+  check "Do not accept files from regular users (except mIRC trusted users)", 34, 7 160 138 16, tab 2 multi
+  check "... block only potentially dangerous filetypes", 75, 15 176 130 8, tab 2
+  check "Do not accept private messages from regulars", 35, 7 185 138 8, tab 2
+  check "Color uncolored fileservers in nickname list", 62, 4 198 144 8, tab 2
   ; tab 3 Custom
   check "Enable custom strings", 36, 5 27 100 8, tab 3
   text "Message type:", 42, 5 36 50 8, tab 3
@@ -503,13 +516,20 @@ alias -l DLF.Options.Initialise {
     %DLF.channels = #
   }
   if (%DLF.betas == $null) %DLF.betas = 0
-
+  if (%DLF.serverads == $null) %DLF.serverads = 0
+  if (%DLF.perconnect == $null) %DLF.perconnect = 1
 }
 
 on *:dialog:DLF.Options.GUI:init:0: {
   DLF.SetVersion
-  did -o DLF.Options.GUI 6 1 %DLF.Channels
+  var %ver = $DLF.mIRCversion
+  if (%ver != 0) {
+    did -b DLF.Options.GUI 5
+    did -vo DLF.Options.GUI 99 1 Upgrade to mIRC %ver $+ +
+  }
   if (%DLF.enabled == 1) did -c DLF.Options.GUI 5
+  if (%DLF.networkchannels == $null) %DLF.networkchannels = %DLF.channels
+  did -o DLF.Options.GUI 6 1 %DLF.networkchannels
   if (%DLF.ads == 1) did -c DLF.Options.GUI 9
   if (%DLF.requests == 1) did -c DLF.Options.GUI 10
   if (%DLF.joins == 1) did -c DLF.Options.GUI 12
@@ -524,8 +544,9 @@ on *:dialog:DLF.Options.GUI:init:0: {
   if (%DLF.privrequests == 1) did -c DLF.Options.GUI 33
   if (%DLF.showfiltered == 1) did -c DLF.Options.GUI 21
   if (%DLF.server == 1) did -c DLF.Options.GUI 23
+  if (%DLF.serverads == 1) did -c DLF.Options.GUI 38
+  if (%DLF.perconnect == 1) did -c DLF.Options.GUI 39
   if (%DLF.searchresults == 1) did -c DLF.Options.GUI 24
-  if (%DLF.newreleases == 1) did -c DLF.Options.GUI 25
   if (%DLF.chspam == 1) did -c DLF.Options.GUI 27
   if (%DLF.chspam.opnotify == 1) did -c DLF.Options.GUI 28
   if (%DLF.privspam == 1) did -c DLF.Options.GUI 29
@@ -557,7 +578,7 @@ on *:dialog:DLF.Options.GUI:init:0: {
   DLF.Update.Run
 }
 
-; Save values for all checkbox clicks
+; Handle all checkbox clicks and save
 on *:dialog:DLF.Options.GUI:sclick:4-36,38-45,47-51,53-65,68-999: {
   DLF.Options.LinkedFields 27 28
   DLF.Options.LinkedFields 29 30 31
@@ -579,10 +600,10 @@ alias -l DLF.Options.LinkedFields {
 }
 
 alias -l DLF.Options.Save {
+  DLF.Options.SaveChannels
   %DLF.showfiltered = $did(21).state
   %DLF.enabled = $did(5).state
   DLF.Groups.Events
-  %DLF.Channels = $did(6).text
   %DLF.ads = $did(9).state
   %DLF.requests = $did(10).state
   %DLF.joins = $did(12).state
@@ -596,8 +617,9 @@ alias -l DLF.Options.Save {
   %DLF.usrmode = $did(20).state
   %DLF.privrequests = $did(33).state
   %DLF.server = $did(23).state
+  %DLF.serverads = $did(38).state
+  %DLF.perconnect = $did(39).state
   %DLF.searchresults = $did(24).state
-  %DLF.newreleases = $did(25).state
   %DLF.chspam = $did(27).state
   %DLF.chspam.opnotify = $did(28).state
   %DLF.privspam = $did(29).state
@@ -613,6 +635,13 @@ alias -l DLF.Options.Save {
   %DLF.o.enabled = $did(61).state
   %DLF.custom.enabled = $did(36).state
   %DLF.betas = $did(68).state
+}
+
+; Enable / disable Add custom message button
+on *:dialog:DLF.Options.GUI:edit:6: DLF.Options.SaveChannels
+alias -l DLF.Options.SaveChannels {
+  %DLF.networkchannels = $did(6).text
+  %DLF.channels = $DLF.SetChannels(%DLF.networkchannels)
 }
 
 alias -l DLF.Groups.Events {
@@ -707,6 +736,20 @@ on *:dialog:DLF.Options.GUI:sclick:66: {
   DLF.Download.Run
 }
 
+alias -l DLF.SetChannels {
+  var %c = $1
+  var %r = $+(/,[^,$comma,#]+,$lbr,?=#[^,$comma,#]*,$rbr,/g)
+  return $regsubex(%c,%r,$null)
+}
+
+alias -l DLF.IsChannel {
+  if ($1 == 0) return $false
+  var %netchan = $+($network,$chan)
+  if ($findtok(%DLF.networkchannels,$chan,$asc($comma))) return $true
+  if ($findtok(%DLF.networkchannels,%netchan,$asc($comma))) return $true
+  return $false
+}
+
 alias -l DLF.Options.GUI.Status {
   DLF.Status $1-
   if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 56 1 $1-
@@ -715,6 +758,7 @@ alias -l DLF.Options.GUI.Status {
 ; ============================== Event catching ==============================
 
 ; Following is just in case groups get reset to default...
+; Primarily for developers when e.g. script is reloaded on change by authors autoreload script
 #dlf_bootstrap on
 on *:text:*:*: DLF.Groups.Bootstrap
 alias -l DLF.Groups.Bootstrap {
@@ -727,9 +771,9 @@ alias -l DLF.Groups.Bootstrap {
 
 ; Channel user activity
 ; join, art, quit, nick changes, kick
-on ^*:join:%DLF.channels: if (%DLF.joins == 1) DLF.User.Channel Join $sqbr($chan) $star $nick $br($address) has joined $chan
-on ^*:part:%DLF.channels: if (%DLF.parts == 1) DLF.User.Channel Part $sqbr($chan) $star $nick $br($address) has left $chan
-on ^*:kick:%DLF.channels: if (%DLF.kicks == 1) DLF.User.Channel Kick $sqbr($chan) $star $knick $br($address($knick,5)) was kicked from $chan by $nick $br($1-)
+on ^*:join:%DLF.channels: if ($DLF.IsChannel(%DLF.joins)) DLF.User.Channel Join $sqbr($chan) $star $nick $br($address) has joined $chan
+on ^*:part:%DLF.channels: if ($DLF.IsChannel(%DLF.parts)) DLF.User.Channel Part $sqbr($chan) $star $nick $br($address) has left $chan
+on ^*:kick:%DLF.channels: if ($DLF.IsChannel(%DLF.kicks)) DLF.User.Channel Kick $sqbr($chan) $star $knick $br($address($knick,5)) was kicked from $chan by $nick $br($1-)
 on ^*:nick: if (%DLF.nicks == 1) DLF.User.NoChannel Nick $star $nick $br($address) is now known as $newnick
 on ^*:quit: if (%DLF.quits == 1) DLF.User.NoChannel Quit $star $nick $br($address) Quit $br($1-).
 
@@ -749,14 +793,14 @@ on ^*:mode:%DLF.channels: if (%DLF.chmode == 1) halt
 on ^*:servermode:%DLF.channels: if (%DLF.chmode == 1) halt
 
 ; Channel messages
-on ^*:text:*:%DLF.channels: DLF.Channels.Text $1-
-on ^*:action:*:%DLF.channels: DLF.Channels.Action $1-
-on ^*:notice:*:%DLF.channels: DLF.Channels.Notice $1-
+on ^*:text:*:%DLF.channels: if ($DLF.IsChannel) DLF.Channels.Text $1-
+on ^*:action:*:%DLF.channels: if ($DLF.IsChannel) DLF.Channels.Action $1-
+on ^*:notice:*:%DLF.channels: if ($DLF.IsChannel) DLF.Channels.Notice $1-
 on ^*:notice:*:#: if (%DLF.o.enabled == 1) DLF.Channels.oNotice $1-
 
 ; Channel ctcp
-ctcp *:*ping*:%DLF.channels: haltdef
-ctcp *:*:%DLF.channels: DLF.Channels.ctcp $1-
+ctcp *:*ping*:%DLF.channels: if ($DLF.IsChannel) haltdef
+ctcp *:*:%DLF.channels: if ($DLF.IsChannel) DLF.Channels.ctcp $1-
 
 ; Private messages
 on ^*:text:*:?: DLF.Private.Text $1-
@@ -788,10 +832,10 @@ alias -l DLF.User.NoChannel {
 ; Channel messages
 alias -l DLF.Channels.Text {
   var %DLF.txt = $strip($1-)
-  if ((%DLF.ads == 1) && ($hfind(DLF.text.ads,%DLF.txt,1,W))) DLF.TextSetNickColor $chan $nick $1-
-  if ((%DLF.requests == 1) && ($hfind(DLF.text.cmds,%DLF.txt,1,W))) DLF.TextFilter $chan $nick $1-
-  if ((%DLF.away == 1) && ($hfind(DLF.text.away,%DLF.txt,1,W))) DLF.TextFilter $chan $nick $1-
-  if ($hfind(DLF.text.always,%DLF.txt,1,W)) DLF.TextFilter $chan $nick $1-
+  if ((%DLF.ads == 1) && ($hfind(DLF.text.ads,%DLF.txt,1,W))) DLF.Filter.SetNickColour $chan $nick $1-
+  if ((%DLF.requests == 1) && ($hfind(DLF.text.cmds,%DLF.txt,1,W))) DLF.Filter.Text $chan $nick $1-
+  if ((%DLF.away == 1) && ($hfind(DLF.text.away,%DLF.txt,1,W))) DLF.Filter.Text $chan $nick $1-
+  if ($hfind(DLF.text.always,%DLF.txt,1,W)) DLF.Filter.Text $chan $nick $1-
 
   /*if (%DLF.chspam == 1) {
     ;no channel spam right now
@@ -802,7 +846,7 @@ alias -l DLF.Channels.Text {
     var %nr = $numtok(%DLF.custom.chantext,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.chantext,%cnter,$asc($comma)) iswm %DLF.txt) DLF.TextFilter $chan $nick $1-
+      if ($gettok(%DLF.custom.chantext,%cnter,$asc($comma)) iswm %DLF.txt) DLF.Filter.Text $chan $nick $1-
       inc %cnter
     }
   }
@@ -810,14 +854,14 @@ alias -l DLF.Channels.Text {
 
 alias -l DLF.Channels.Action {
   var %DLF.action = $strip($1-)
-  if ((%DLF.ads == 1) && ($hfind(DLF.action.ads,%DLF.action,1,W))) DLF_actionfilter $chan $nick $1-
-  if ((%DLF.away == 1) && ($hfind(DLF.action.away,%DLF.action,1,W))) DLF_actionfilter $chan $nick $1-
+  if ((%DLF.ads == 1) && ($hfind(DLF.action.ads,%DLF.action,1,W))) DLF.Filter.Action $chan $nick $1-
+  if ((%DLF.away == 1) && ($hfind(DLF.action.away,%DLF.action,1,W))) DLF.Filter.Action $chan $nick $1-
 
   if ((%DLF.custom.enabled == 1) && (%DLF.custom.chanaction)) {
     var %nr = $numtok(%DLF.custom.chanaction,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.chanaction,%cnter,$asc($comma)) iswm %DLF.act) DLF_actionfilter $chan $nick %DLF.action
+      if ($gettok(%DLF.custom.chanaction,%cnter,$asc($comma)) iswm %DLF.act) DLF.Filter.Action $chan $nick %DLF.action
       inc %cnter
     }
   }
@@ -828,7 +872,7 @@ alias -l DLF.Channels.Notice {
     var %nr = $numtok(%DLF.custom.channotice,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.channotice,%cnter,$asc($comma)) iswm $strip($1-)) DLF.TextFilter $chan $nick $1-
+      if ($gettok(%DLF.custom.channotice,%cnter,$asc($comma)) iswm $strip($1-)) DLF.Filter.Text $chan $nick $1-
       inc %cnter
     }
   }
@@ -884,14 +928,14 @@ alias -l DLF.Channels.oNotice {
 
 alias -l DLF.Channels.ctcp {
   if ($hfind(DLF.ctcp.spam,$1-,1,W)) {
-    DLF.SetNickColor $chan $nick
+    DLF.SetNickColour $chan $nick
     haltdef
   }
 
   if ((%DLF.custom.enabled == 1) && (%DLF.custom.chanctcp)) {
     var %i = $numtok(%DLF.custom.chanctcp,$asc($comma))
     while (%i) {
-      if ($gettok(%DLF.custom.chanctcp,%i,$asc($comma)) iswm $1-) DLF.TextFilter $target $nick $1-
+      if ($gettok(%DLF.custom.chanctcp,%i,$asc($comma)) iswm $1-) DLF.Filter.Text $target $nick $1-
       dec %i
     }
   }
@@ -899,13 +943,13 @@ alias -l DLF.Channels.ctcp {
 
 on ^*:open:*: {
   if ((%DLF.nocomchan.dcc == 1) && (%DLF.accepthis == $target)) return
-  CheckPrivText $nick $1-
+  DLF.CheckPrivText $nick $1-
 }
 
 alias -l DLF.Private.Text {
   if ((%DLF.nocomchan.dcc == 1) && (%DLF.accepthis == $target)) return
   if ($+(*,$dollar,decode*) iswm $1-) DLF.Warning Do not paste any messages containing $b($dollar $+ decode) to your mIRC. They are mIRC worms, people sending them are infected. Instead, please report such messages to the channel ops.
-  CheckPrivText $nick $1-
+  DLF.CheckPrivText $nick $1-
 }
 
 alias -l DLF.Private.Notice {
@@ -916,8 +960,8 @@ alias -l DLF.Private.Notice {
     halt
   }
   if ((%DLF.server == 1) && ($hfind(DLF.notice.server,%DLF.pnotice,1,W))) ServerFilter $nick $1-
-  if (*SLOTS My mom always told me not to talk to strangers* iswm %DLF.pnotice) DLF.TextFilter Notice $nick $1-
-  if (*CTCP flood detected, protection enabled* iswm %DLF.pnotice) DLF.TextFilter Notice $nick $1-
+  if (*SLOTS My mom always told me not to talk to strangers* iswm %DLF.pnotice) DLF.Filter.Text Notice $nick $1-
+  if (*CTCP flood detected, protection enabled* iswm %DLF.pnotice) DLF.Filter.Text Notice $nick $1-
   if ((%DLF.searchresults == 1) && (%DLF.searchactive == 1)) {
     if (No match found for* iswm %DLF.ptext) ServerFilter $nick $1-
     if (*I have*match* for*in listfile* iswm %DLF.ptext) ServerFilter $nick $1-
@@ -928,7 +972,7 @@ alias -l DLF.Private.Notice {
     var %nr = $numtok(%DLF.custom.privnotice,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.privnotice,%cnter,$asc($comma)) iswm $strip($1-)) DLF.TextFilter Private $nick $1-
+      if ($gettok(%DLF.custom.privnotice,%cnter,$asc($comma)) iswm $strip($1-)) DLF.Filter.Text Private $nick $1-
       inc %cnter
     }
   }
@@ -946,7 +990,7 @@ alias -l DLF.Private.Action {
     var %nr = $numtok(%DLF.custom.privaction,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.privaction,%cnter,$asc($comma)) iswm $strip($1-)) DLF_actionfilter Private $nick $1-
+      if ($gettok(%DLF.custom.privaction,%cnter,$asc($comma)) iswm $strip($1-)) DLF.Filter.Action Private $nick $1-
       inc %cnter
     }
   }
@@ -996,26 +1040,27 @@ ctcp *:*:?: {
     var %nr = $numtok(%DLF.custom.privctcp,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.privctcp,%cnter,$asc($comma)) iswm $1-) DLF.TextFilter Private $nick $1-
+      if ($gettok(%DLF.custom.privctcp,%cnter,$asc($comma)) iswm $1-) DLF.Filter.Text Private $nick $1-
       inc %cnter
     }
   }
   :return
 }
 
-alias -l DLF.TextSetNickColor {
-  DLF.SetNickColor $1 $2
-  DLF.TextFilter $1-
+alias -l DLF.Filter.SetNickColour {
+  DLF.SetNickColour $1 $2
+  DLF.Filter.Text $1-
 }
 
-alias -l DLF.TextFilter {
-  if (%DLF.filtered.log == 1) write $qt($logdir $+ DLF.Filtered.log) $sqbr($fulldate) $sqbr($1) $tag($2) $strip($3-)
+alias -l DLF.Filter.Text {
+  var %nc = $+($network,$1)
+  if (%DLF.filtered.log == 1) write $qt($logdir $+ DLF.Filtered.log) $sqbr($fulldate) $sqbr(%nc) $tag($2) $strip($3-)
   if (%DLF.showfiltered == 1) {
     if (!$window(@DLF.Filtered)) {
       window -k0nwz @DLF.filtered
       titlebar @DLF.filtered -=- Right-click for options
     }
-    var %line = $sqbr($1) $tag($2) $3-
+    var %line = $sqbr(%nc) $tag($2) $3-
     if ((%DLF.filtered.limit == 1) && ($line(@DLF.filtered,0) >= 5000)) dline @DLF.Filtered 1-100
     if (%DLF.filtered.timestamp == 1) %line = $timestamp %line
     if (%DLF.filtered.strip == 1) %line = $strip(%line)
@@ -1025,7 +1070,7 @@ alias -l DLF.TextFilter {
   halt
 }
 
-alias -l DLF_actionfilter {
+alias -l DLF.Filter.Action {
   if (%DLF.filtered.log == 1) write $qt($logdir $+ DLF.Filtered.log) $sqbr($fulldate) $sqbr($1) $star $2 $strip($3-)
   if (%DLF.showfiltered == 1) {
     if (!$window(@DLF.Filtered)) {
@@ -1054,7 +1099,7 @@ alias -l FilteredSearch {
   titlebar @DLF.filtered.search -=- Search finished. %matches found for $qt(%sstring)
 }
 
-alias -l CheckPrivText {
+alias -l DLF.CheckPrivText {
   %DLF.ptext = $strip($1-)
   if ($window(1)) DoCheckComChan $1 $2-
   if ((%DLF.noregmsg == 1) && ($CheckRegular($1) == IsRegular)) {
@@ -1226,7 +1271,7 @@ alias -l DoCheckComChan {
 alias -l CheckRegular {
   if ($1 == $me) return $1
   if ($1 == ChanServ) return $1
-  if ($1 == NickServ) return $1.
+  if ($1 == NickServ) return $1
   if ($1 == MemoServ) return $1
   if ($1 == OperServ) return $1
   if ($1 == BotServ) return $1
@@ -1266,16 +1311,15 @@ on *:CTCPREPLY:*: {
     halt
   }
   if ((%DLF.custom.enabled == 1) && (%DLF.custom.privctcp)) {
-    var %nr = $numtok(%DLF.custom.privctcp,$asc($comma))
-    var %cnter = 1
-    while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.privctcp,%cnter,$asc($comma)) iswm $1-) DLF.TextFilter Private $nick $1-
-      inc %cnter
+    var %i = $numtok(%DLF.custom.privctcp,$asc($comma))
+    while (%i) {
+      if ($gettok(%DLF.custom.privctcp,%i,$asc($comma)) iswm $1-) DLF.Filter.Text Private $nick $1-
+      dec %i
     }
   }
 }
 
-alias -l DLF.SetNickColor {
+alias -l DLF.SetNickColour {
   if ((%DLF.colornicks == 1) && ($nick($1,$2).color == $color(nicklist))) cline 2 $1 $2
 }
 
@@ -1345,7 +1389,7 @@ alias -l DLF.Update.ProcessLine {
 }
 
 alias -l DLF.Update.CheckVersions {
-  did -b DLF.Options.GUI 66
+  if ($dialog(DLF.Options.GUI)) did -b DLF.Options.GUI 66
   if (%DLF.version.web) {
     if ((%DLF.betas) $&
     && (%DLF.version.beta) $&
@@ -2014,9 +2058,7 @@ alias -l DLF.Socket.Headers {
   }
 }
 
-alias -l DLF.Socket.SockErr {
-  DLF.Socket.Error $1: $sock($sockname).wserr $sock($sockname).wsmsg
-}
+alias -l DLF.Socket.SockErr DLF.Socket.Error $1: $sock($sockname).wserr $sock($sockname).wsmsg
 
 alias -l DLF.Socket.Error {
   if ($sockname) {
