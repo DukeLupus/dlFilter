@@ -65,6 +65,11 @@ o Vadi wrote special function to vPowerGet dll that allows
           for our own analysis (privacy issues?)
         Add dlF icons to toolbar & options dialog
         Use native logging for custom windows instead of script logging
+        Development debug functionality - if mIRC debug is on, add DLF debug
+          messages to the debug log.
+        Use CTCP halt to stop DCC CHAT and SEND rather than convoluted ctcp/open processing
+        Separate CTCP processing for these.
+        Switch channels text box to a list box in a separate tab.
 
   1.17  Update opening comments and add change log
         Use custom identifiers for creating bold, colour etc.
