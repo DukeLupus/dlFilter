@@ -1226,7 +1226,7 @@ alias -l DoCheckComChan {
 alias -l CheckRegular {
   if ($1 == $me) return $1
   if ($1 == ChanServ) return $1
-  if ($1 == NickServ) return $1
+  if ($1 == NickServ) return $1.
   if ($1 == MemoServ) return $1
   if ($1 == OperServ) return $1
   if ($1 == BotServ) return $1
@@ -1446,7 +1446,7 @@ alias -l DLF.Download.Error {
 ; ========== Define message matching hash tables ==========
 alias -l DLF.hadd {
   var %h = DLF. $+ $1
-  if (!$hget(%h)) hmake %h
+  if (!$hget(%h)) hmake %h 10
   var %n = $hget($1, 0)
   hadd %h %n $2-
 }
@@ -2049,80 +2049,98 @@ alias -l DLF.Socket.Status {
 ; Run this with //DLF.debug only if you are asked to
 ; by someone providing dlFilter support.
 alias DLF.debug {
-  write -i dlFilter.debug.txt
-  write -i dlFilter.debug.txt
   echo 14 -s [dlFilter] Debug started.
-  echo 14 -s [dlFilter] Creating dlFilter.debug.txt
-  write dlFilter.debug.txt --- $fulldate ---
+  if ($show) echo 14 -s [dlFilter] Creating dlFilter.debug.txt
+  write -c dlFilter.debug.txt --- Start of debug info --- $fulldate ---
   write -i dlFilter.debug.txt
   write dlFilter.debug.txt Executing $script from $scriptdir
   write dlFilter.debug.txt dlFilter version %DLF.version
-  write dlFilter.debug.txt mIRC version $version
+  write dlFilter.debug.txt mIRC version $version $iif($portable,portable)
   write dlFilter.debug.txt Running Windows $os
-  write dlFilter.debug.txt Nick: $me
   write dlFilter.debug.txt Host: $host
   write dlFilter.debug.txt IP: $ip
-  write dlFilter.debug.txt Connected to $server $+ , port $port
   write -i dlFilter.debug.txt
   write -i dlFilter.debug.txt
-  write dlFilter.debug.txt --- Scripts ---
+  var %cs = $scon(0)
+  if ($show) echo 14 -s [dlFilter] %cs servers
+  write dlFilter.debug.txt --- Servers --- %cs servers
+  write -i dlFilter.debug.txt
+  var %i = 1
+  while (%i <= %cs) {
+    var %st = $scon(%i).status
+    if (%st == connected) %st = $iif($scon(%i).ssl,securely) %st to $+($scon(%i).server,$chr(40),$scon(%i).serverip,:,$scon(%i).port,$chr(41)) as $scon(%i).me
+    if ($show) echo 14 -s [dlFilter] Server %i is $scon(%i).servertarget $+ : %st
+    write dlFilter.debug.txt Server %i is $scon(%i).servertarget $+ : %st
+    if (%st != disconnected) {
+      write dlFilter.debug.txt $chr(9) ChanTypes= $+ $scon(%i).chantypes $+ , ChanModes= $+ [ $+ $scon(%i).chanmodes $+ ], Modespl= $+ $scon(%i).modespl $+ , Nickmode= $+ $scon(%i).nickmode $+ , Usermode= $+ $scon(%i).usermode
+      var %cid = $cid
+      /scid $scon(%i)
+      var %nochans = $chan(0)
+      var %chans = $null
+      while (%nochans) {
+        if ($chan(%nochans).cid == $cid) %chans = $addtok(%chans,$chan(%nochans) $+([,$chan(%nochans).mode,]),44)
+        dec %nochans
+      }
+      /scid %cid
+      %chans = $sorttok(%chans,44)
+      write dlFilter.debug.txt $chr(9) Channels: $replace(%chans,$chr(44),$chr(44) $+ $chr(32))
+    }
+    inc %i
+  }
+  write -i dlFilter.debug.txt
   write -i dlFilter.debug.txt
   var %scripts = $script(0)
-  echo 14 -s [dlFilter] %scripts scripts loaded
-  write dlFilter.debug.txt %scripts scripts loaded
-  var %cnter = 1
-  while (%cnter <= %scripts) {
-    write dlFilter.debug.txt Script %cnter is $script(%cnter)
-    echo 14 -s [dlFilter] Script %cnter is $script(%cnter)
-    write dlFilter.debug.txt $script(%cnter) is $lines($script(%cnter)) lines and $file($script(%cnter)).size bytes
-    inc %cnter
-  }
-  echo 14 -s [dlFilter] Checking variables
+  if ($show) echo 14 -s [dlFilter] %scripts scripts loaded
+  write dlFilter.debug.txt --- Scripts --- %scripts scripts loaded
   write -i dlFilter.debug.txt
-  write -i dlFilter.debug.txt
-  write dlFilter.debug.txt --- dlFilter Variables ---
-  write -i dlFilter.debug.txt
-  saveini
-  var %lines = $ini(remote.ini,variables,0) - 1
-  var %Dlfvariables = 0
-  var %cnter = 0
-  while (%cnter <= %lines) {
-    var %line = $readini(remote.ini,n,variables,n $+ %cnter)
-    if (DLF isin %line) {
-      write dlFilter.debug.txt %line
-      inc %Dlfvariables
-    }
-    inc %cnter
+  var %i = 1
+  while (%i <= %scripts) {
+    if ($show) echo 14 -s [dlFilter] Script %i is $script(%i)
+    write dlFilter.debug.txt Script %i is $script(%i) and is $lines($script(%i)) lines and $file($script(%i)).size bytes
+    inc %i
   }
   write -i dlFilter.debug.txt
-  echo 14 -s [dlFilter] Found %lines variables, $calc(%Dlfvariables - 1) of them are dlFilter variables.
-  write dlFilter.debug.txt Found %lines variables, $calc(%Dlfvariables - 1) of them are dlFilter variables.
+  write -i dlFilter.debug.txt
+  var %vars = $var(*,0)
+  var %DLFvars = $var(DLF.*,0)
+  if ($show) echo 14 -s [dlFilter] Found %vars variables, of which %DLFvars are dlFilter variables.
+  write dlFilter.debug.txt --- dlFilter Variables --- %vars variables, of which %DLFvars are dlFilter variables.
+  write -i dlFilter.debug.txt
+  var %vars = $null
+  while (%DLFvars) {
+    %vars = $addtok(%vars,$var(DLF.*,%DLFvars),44)
+    dec %DLFvars
+  }
+  var %vars = $sorttok(%vars,44,r)
+  var %DLFvars = $numtok(%vars,44)
+  while (%DLFvars) {
+    var %v = $gettok(%vars,%DLFvars,44)
+    write dlFilter.debug.txt %v = $var($right(%v,-1),1).value
+    dec %DLFvars
+  }
   write -i dlFilter.debug.txt
   write -i dlFilter.debug.txt
-  write dlFilter.debug.txt --- Groups ---
-  write -i dlFilter.debug.txt
-  echo 14 -s [dlFilter] $group(0) group(s) found
-  write dlFilter.debug.txt $group(0) group(s) found
   var %grps = $group(0)
-  var %cnter = 1
-  while (%cnter <= %grps) {
-    echo 14 -s [dlFilter] Group %cnter $+ : $group(%cnter) is from $group(%cnter).fname $+ . Status: $group(%cnter).status
-    write dlFilter.debug.txt Group %cnter $+ : $group(%cnter) is from $group(%cnter).fname $+ . Status: $group(%cnter).status
-    inc %cnter
+  if ($show) echo 14 -s [dlFilter] %grps group(s) found
+  write dlFilter.debug.txt --- Groups --- %grps group(s) found
+  write -i dlFilter.debug.txt
+  var %i = 1
+  while (%i <= %grps) {
+    write dlFilter.debug.txt Group %i $iif($group(%i).status == on,on: $+ $chr(160),off:) $group(%i) from $group(%i).fname
+    inc %i
   }
   write -i dlFilter.debug.txt
   write -i dlFilter.debug.txt
-  write dlFilter.debug.txt --- Hash tables ---
-  write -i dlFilter.debug.txt
-  echo 14 -s [dlFilter] $hget(0) hash table(s) found
-  write dlFilter.debug.txt $hget(0) hash table(s) found
   var %hs = $hget(0)
-  var %cnter = 1
-  while (%cnter <= %hs) {
-    echo 14 -s [dlFilter] Table %cnter $+ : $hget(%cnter) $+ , size $hget(%cnter).size
-    write dlFilter.debug.txt Table %cnter $+ : $hget(%cnter) $+ , size $hget(%cnter).size
-    inc %cnter
+  if ($show) echo 14 -s [dlFilter] %hs hash table(s) found
+  write dlFilter.debug.txt --- Hash tables --- %hs hash table(s) found
+  write -i dlFilter.debug.txt
+  var %i = 1
+  while (%i <= %hs) {
+    write dlFilter.debug.txt Table %i $+ : $hget(%i) $+ , items $hget(%i, 0).item $+ , slots $hget(%i).size
+    inc %i
   }
   write -i dlFilter.debug.txt
-  write dlFilter.debug.txt --- End of debug info ---
+  write dlFilter.debug.txt --- End of debug info --- $fulldate ---
+  echo 14 -s [dlFilter] Debug ended.
 }
