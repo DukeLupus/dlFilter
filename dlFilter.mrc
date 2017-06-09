@@ -64,12 +64,14 @@ o Vadi wrote special function to vPowerGet dll that allows
         Somehow send us details of user adding custom filters
           for our own analysis (privacy issues?)
         Add dlF icons to toolbar & options dialog
+        Add menu to toolbar item
         Use native logging for custom windows instead of script logging
         Development debug functionality - if mIRC debug is on, add DLF debug
           messages to the debug log.
         Use CTCP halt to stop DCC CHAT and SEND rather than convoluted ctcp/open processing
         Separate CTCP processing for these.
         Switch channels text box to a list box in a separate tab.
+        Include code to create binvar and export to icon gif file
 
   1.17  Update opening comments and add change log
         Use custom identifiers for creating bold, colour etc.
@@ -131,6 +133,7 @@ alias -l DLF.Initialise {
   if ($script(onotice.txt)) .unload -rs onotice.txt
   DLF.Status $iif(%DLF.JustLoaded,Loading,Starting) $c(4,version $DLF.SetVersion) by DukeLupus
   DLF.Status Please check dlFilter homepage $br($c(12,9,$u(https://github.com/SanderSade/dlFilter/issues))) for help.
+  DLF.CreateGif
   DLF.CreateHashTables
   DLF.Options.Initialise
   var %ver = $DLF.mIRCversion
@@ -589,9 +592,9 @@ on *:dialog:DLF.Options.GUI:sclick:4-36,38-45,47-51,53-65,68-999: {
   DLF.Options.LinkedFields 29 30 31
   DLF.Options.LinkedFields 32 72
   DLF.Options.LinkedFields 34 75
+  DLF.Options.Save
   if (%DLF.showfiltered == 0) window -c @DLF.filtered
   if (($did == 68) && (!$sock(DLF.Socket.Update))) DLF.Update.CheckVersions
-  DLF.Options.Save
 }
 
 alias -l DLF.Options.LinkedFields {
@@ -1420,7 +1423,7 @@ alias -l DLF.Update.DownloadAvailable {
   if (%DLF.channels == #) {
     var %cnt = $chan(0)
     while (%cnt) {
-      DLF.Update.Announce $chan(%cnt) $3
+      DLF.Update.ChanAnnounce $chan(%cnt) $1 $2 $3
       dec %cnt
     }
   }
@@ -1428,17 +1431,28 @@ alias -l DLF.Update.DownloadAvailable {
     var %cnt = $numtok(%DLF.channels,$asc($comma))
     while (%cnt) {
       var %chan = $gettok(%DLF.channels,%cnt,$asc($comma))
-      if ($chan(%chan)) DLF.Update.Announce %chan $3
+      if ($chan(%chan)) DLF.Update.ChanAnnounce %chan $1 $2 $3
       dec %cnt
     }
   }
 }
 
-on me:join:%DLF.channels: if ((%DLF.version.web) && (%DLF.version.web > $DLF.SetVersion) DLF.Update.Announce $chan
+; Announce new version whenever user joins an enabled channel.
+on me:*:join:%DLF.channels: {
+  echo -s Joined $chan
+  if (%DLF.version.web) {
+    if ((%DLF.betas) $&
+    && (%DLF.version.beta) $&
+    && (%DLF.version.beta > %DLF.version.web) $&
+    && (%DLF.version.beta > $DLF.SetVersion)) DLF.Update.ChanAnnounce $chan %DLF.version.beta %DLF.version.beta.mirc beta
+    elseif (%DLF.version.web > $DLF.SetVersion) DLF.Update.ChanAnnounce $chan %DLF.version.web %DLF.version.web.mirc
+  }
+}
 
-alias -l DLF.Update.Announce {
-  echo -t $1 $c(1,9,$DLF.logo A new version of dlFilter is available.)
-  if ($2 == beta) echo -t $1 $c(1,9,$DLF.logo However you need to $c(4,upgrade mIRC) before you can download it.)
+alias -l DLF.Update.ChanAnnounce {
+  var %ver = $iif($4,$4 version,version) $br($2)
+  echo -t $1 $c(1,9,$DLF.logo A new %ver of dlFilter is available.)
+  if ($3 > $version) echo -t $1 $c(1,9,$DLF.logo However you need to $c(4,upgrade mIRC) before you can download it.)
   else echo -t $1 $c(1,9,$DLF.logo Use the Update button in dlFilter Options to download and install.)
 }
 
@@ -1490,6 +1504,14 @@ on *:signal:DLF.Update.ReLoad: DLF.Initialise
 
 alias -l DLF.Download.Error {
   DLF.Update.ErrorMsg Unable to download new version of dlFilter!
+}
+
+; ========== Create dlFilter.gif if needed ==========
+alias -l DLF.CreateGif {
+  /bset -ta &gif 1 eJxz93SzsEwUYBBg+M4AArpO837sZhgFo2AEAsWfLIwMDP8ZdEAcUJ5g4PBn
+  /bset -ta &gif 61 +M8p47Eh4SAD4z9FkwqDh05tzOJ2LSsCGo52S7ByuHQYJLu1yghX7fkR8MiD
+  /bset -ta &gif 121 UVWWTWKm0JP9/brycT0SQinu3Syqt2I6Jz86MNOOlYmXy0SBwRoAZQAkYg==
+  DLF.CreateBinaryFile &gif $+($nofile($script),dlFilter.gif)
 }
 
 ; ========== Define message matching hash tables ==========
@@ -2090,6 +2112,55 @@ alias -l DLF.Socket.Status {
       if ($dialog(%dialog)) did -o %dialog %dialogid 1 $1-
     }
   }
+}
+
+; ========== Binary file encode/decode ==========
+alias -l DLF.CreateBinaryFile {
+  if (($0 < 2) || (!$regex($1,/^&[^ ]+$/))) DLF.Error DLF.CreateBinaryFile: Invalid parameters: $1-
+  var %len = $decode($1,mb)
+  if ($decompress($1,b) == 0) DLF.error Error decompressing $2-
+  ; Check if file exists and is identical to avoid rewriting it every time
+  if ($isfile($2-)) {
+    if ($sha256($1,1) == $sha256($2-,2)) {
+      DLF.Status dlFilter.gif OK.
+      ;return
+    }
+  }
+  if ($isfile($2-)) {
+    .remove $qt($2-)
+    DLF.Status Updating: $2-
+  }
+  else DLF.Status Creating: $2-
+  if ($exists($2-)) DLF.Error Cannot remove existing $2-
+  bwrite -a $qt($2-) -1 -1 $1
+  DLF.Status Created: $2-
+}
+
+alias DLF.GenerateBinaryFile {
+  if (($0 < 1) || (!$regex($1,/^&[^ ]+$/))) DLF.Error DLF.CreateBinaryFile: Invalid parameters: $1-
+  var %fn = $qt($1-)
+  ;var %ofn = $+(%ifn,.mrc)
+  ;if ($isfile(%ofn)) .remove $qt(%ofn)
+
+  bread $qt(%fn) 0 $file(%fn).size &file
+  noop $compress(&file,b)
+  var %enclen = $encode(&file,mb)
+
+  echo 1 $crlf
+  echo 1 $rev(To recreate the file, copy and paste the following lines into the mrc script:)
+  var %i = 1
+  while (%i <= %enclen) {
+    echo bset -ta &create %i $bvar(&file,%i,60).text
+    /bset -ta &create %i $bvar(&file,%i,60).text
+    if ($bvar(&file,%i,60).text != $bvar(&create,%i,60).text) {
+      echo 1 Old: $bvar(&file,1,$bvar(&file,0))
+      echo 1 New: $bvar(&create,1,$bvar($create,0))
+      DLF.Error Mismatch @ %i !!
+    }
+    inc %i 60
+  }
+  echo 1 DLF.CreateBinaryFile & $+ create $1-
+  echo 1 $rev(That's all folks!)
 }
 
 ; ========== DLF.debug ==========
