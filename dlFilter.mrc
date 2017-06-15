@@ -71,9 +71,15 @@ o Vadi wrote special function to vPowerGet dll that allows
         Development debug functionality - if mIRC debug is on, add DLF debug
           messages to the debug log.
         Use CTCP halt to stop DCC CHAT and SEND rather than convoluted ctcp/open processing
+        Rewrite anti-chat code
         Separate CTCP processing for these.
         Switch channels text box to a list box in a separate tab.
         Include code to create binvar and export to icon gif file
+        Track requests in channels and allow dcc sends and responses regardless of matching
+        Rewrite / fix @find code
+        Own find results not captured
+        Other @find command not sent to filters window
+        Send to... menus - do they work?
 
   1.17  Update opening comments and add change log
         Use custom identifiers for creating bold, colour etc.
@@ -110,6 +116,10 @@ on *:start: {
   if ($script != $script(1)) .reload -rs1 $qt($script)
   if (%DLF.JustLoaded) return
   DLF.Initialise
+  return
+
+  :error
+  DLF.Error During start: $qt($error)
 }
 
 on *:load: {
@@ -133,7 +143,7 @@ alias -l DLF.Initialise {
 
   if ($script(onotice.mrc)) .unload -rs onotice.mrc
   if ($script(onotice.txt)) .unload -rs onotice.txt
-  DLF.Status $iif(%DLF.JustLoaded,Loading,Starting) $c(4,version $DLF.SetVersion) by DukeLupus
+  DLF.Status $iif(%DLF.JustLoaded,Loading,Starting) $c(4,version $DLF.SetVersion) by DukeLupus & Sophist.
   DLF.Status Please check dlFilter homepage $br($c(12,9,$u(https://github.com/SanderSade/dlFilter/issues))) for help.
   DLF.CreateGif
   DLF.CreateHashTables
@@ -153,11 +163,11 @@ alias -l DLF.mIRCversion {
   return 0
 }
 
-ctcp *:VERSION: .ctcpreply $nick VERSION $c(1,9,$logo version $DLF.SetVersion by DukeLupus & Sophist.) $c(1,15,Get it from $c(12,15,$u(https://github.com/SanderSade/dlFilter/releases)))
+ctcp *:VERSION:*: .ctcpreply $nick VERSION $c(1,9,$DLF.logo version $DLF.SetVersion by DukeLupus & Sophist.) $+ $c(1,15,$space $+ Get it from $c(12,15,$u(https://github.com/SanderSade/dlFilter/releases)))
 
 on *:unload: {
   var %keepvars = $?!="Do you want to keep your dlFilter configuration?"
-  DLF.Status Unloading $c(4,9,version $DLF.SetVersion) by DukeLupus.
+  DLF.Status Unloading $c(4,9,version $DLF.SetVersion) by DukeLupus & Sophist.
   if (%keepvars == $false) {
     DLF.Status Unsetting variables..
     .unset %DLF.*
@@ -246,6 +256,7 @@ menu @DLF.Server {
 alias -l DLF.Channels.AddRemove {
   if ($DLF.IsChannel($network,$chan)) DLF.Channels.Add $chan $network
   else DLF.Channels.Remove $chan $network
+  if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 6 1 %DLF.netchans
   DLF.Status $c(6,Channels set to $c(4,%DLF.netchans))
 }
 
@@ -822,14 +833,27 @@ on ^*:mode:%DLF.channels: if (%DLF.chmode == 1) halt
 on ^*:servermode:%DLF.channels: if (%DLF.chmode == 1) halt
 
 ; Channel messages
+on *:input:#: {
+  if ($DLF.IsChannelEvent) {
+    if (($1 == @find) || ($1 == @locator)) DLF.Channel.FindRequest $1-
+    if (($left($1,1) isin !@) && ($right($1,-1) ison $chan)) DLF.Channel.ServerRequest $1-
+  }
+}
+alias -l DLF.Channel.ServerRequest echo -at DLF.Channel.ServerRequest called: $1-
+alias -l DLF.Channel.FindRequest echo -at DLF.Channel.FindRequest called: $1-
+
 on ^*:text:*:%DLF.channels: if ($DLF.IsChannelEvent) DLF.Channels.Text $1-
 on ^*:action:*:%DLF.channels: if ($DLF.IsChannelEvent) DLF.Channels.Action $1-
 on ^*:notice:*:%DLF.channels: if ($DLF.IsChannelEvent) DLF.Channels.Notice $1-
-on ^*:notice:*:#: if (%DLF.o.enabled == 1) DLF.Channels.oNotice $1-
+on ^*:notice:*:#: if ($DLF.Channels.IsoNotice) DLF.Channels.oNotice $1-
 
 ; Channel ctcp
 ctcp *:*ping*:%DLF.channels: if ($DLF.IsChannelEvent) haltdef
 ctcp *:*:%DLF.channels: if ($DLF.IsChannelEvent) DLF.Channels.ctcp $1-
+ctcp ^*:DCC CHAT:?: DLF.dcc.ChatRequest $1-
+ctcp ^*:DCC SEND:?: DLF.dcc.SendRequest $1-
+alias -l DLF.dcc.ChatRequest echo -st DLF.dcc.ChatRequest called: $1-
+alias -l DLF.dcc.SendRequest echo -st DLF.dcc.SendRequest called: $1-
 
 ; Private messages
 on ^*:text:*:?: DLF.Private.Text $1-
@@ -916,48 +940,41 @@ alias -l DLF.Channels.Notice {
   }
 }
 
+alias DLF.Channels.IsoNotice {
+  if (%DLF.o.enabled != 1) return 0
+  if ($target != $+(@,$chan)) return 0
+  if ($me !isop $chan) return 0
+  if ($nick !isop $chan) return 0
+  return 1
+}
+
 alias -l DLF.Channels.oNotice {
-  var %DLF.o.chan = $chan
-  var %DLF.o.target = @ $+ $chan
-  if ($target == %DLF.o.target) {
-    if (($nick isop %DLF.o.chan) && ($me isop %DLF.o.chan)) {
-      if ($1 != @) var %omsg = $1-
-      if ($1 == @) var %omsg = $2-
-      if ($gettok(%omsg,1,$asc($space)) != /me) {
-        var %chatwindow = @ $+ %DLF.o.chan
-        if (!$window(%chatwindow)) {
-          window -eg1k1l12mnSw %chatwindow
-          if ((%DLF.o.log == 1) && ($exists($+(",$logdir,%chatwindow,.log,")))) {
-            var %log = $qt($+(logdir,%chatwindow,.log))
-            write %log $crlf
-            write %log $sqbr($fulldate) ----- Session started -----
-            write %log $crlf
-            .loadbuf -r %chatwindow $+(",$logdir,%chatwindow,.log,")
-          }
-        }
-        var %omsg = $tag($nick) %omsg
-        if (%DLF.o.timestamp == 1) var %omsg = $timestamp %omsg
-        aline -nl $color(nicklist) %chatwindow $nick
-        window -S %chatwindow
-        aline -ph $color(text) %chatwindow %omsg
-        if (%DLF.o.log == 1) write $+(",$logdir,%chatwindow,.log,") %omsg
-        halt
-      }
-      else {
-        %omsg = $gettok(%omsg,2-,$asc($space))
-        var %chatwindow = @ $+ %DLF.o.chan
-        if (!$window(%chatwindow)) window -eg1k1l12mnSw %chatwindow
-        var %omsg = $star $nick %omsg
-        if (%DLF.o.timestamp == 1) var %omsg = $timestamp %omsg
-        aline -nl $color(nicklist) %chatwindow $nick
-        window -S %chatwindow
-        aline -ph $color(action) %chatwindow %omsg
-        if (%DLF.o.log == 1) write $+(",$logdir,%chatwindow,.log,") %omsg
-        halt
-      }
-      halt
+  var %chatwindow = @ $+ $chan
+  if (!$window(%chatwindow)) {
+    window -eg1k1l12mnSw %chatwindow
+    if (%DLF.o.log == 1) {
+      var %log = $qt($+(logdir,%chatwindow,.log))
+      write %log $crlf
+      write %log $sqbr($fulldate) ----- Session started -----
+      write %log $crlf
+      .loadbuf -r %chatwindow %log
     }
   }
+  if ($1 == @) var %omsg = $2-
+  else var %omsg = $1-
+  window -S %chatwindow
+  aline -nl $color(nicklist) %chatwindow $nick
+  if ($gettok(%omsg,1,$asc($space)) == /me) {
+    %omsg = $star $nick $gettok(%omsg,2-,$asc($space))
+    if (%DLF.o.timestamp == 1) var %omsg = $timestamp %omsg
+    aline -ph $color(action) %chatwindow %omsg
+    } else {
+    %omsg = $tag($nick) %omsg
+    if (%DLF.o.timestamp == 1) var %omsg = $timestamp %omsg
+    aline -ph $color(text) %chatwindow %omsg
+  }
+  if (%DLF.o.log == 1) write $+(",$logdir,%chatwindow,.log,") %omsg
+  halt
 }
 
 alias -l DLF.Channels.ctcp {
@@ -1053,14 +1070,14 @@ ctcp *:*:?: {
         var %ext = $right($nopath($filename),4)
         if ($pos(%ext,$period,1) == 2) %ext = $right(%ext,3)
         if ((%ext != .exe) $&
-         && (%ext != .com) $&
-         && (%ext != .bat) $&
-         && (%ext != .scr) $&
-         && (%ext != .mrc) $&
-         && (%ext != .pif) $&
-         && (%ext != .vbs) $&
-         && (%ext != .doc) $&
-         && (%ext != .js)) goto :return
+          && (%ext != .com) $&
+          && (%ext != .bat) $&
+          && (%ext != .scr) $&
+          && (%ext != .mrc) $&
+          && (%ext != .pif) $&
+          && (%ext != .vbs) $&
+          && (%ext != .doc) $&
+          && (%ext != .js)) goto :return
       }
       DLF.Status $c(3,Regular user $nick $br($address) tried to send you a file $qt($gettok($1-,3-$numtok($1-,$asc($space)), $asc($space))))
       halt
@@ -1261,10 +1278,8 @@ alias -l DLF.Private.SpamFilter {
   halt
 }
 
-on *:input:%DLF.channels: {
-  if (($1 == @find) || ($1 == @locator)) {
-    .set -u600 %DLF.searchactive 1
-  }
+alias -l DLF.Channel.FindRequest {
+  .set -u600 %DLF.searchactive 1
 }
 
 alias -l DLF.Find.Headers {
@@ -1362,13 +1377,6 @@ alias -l DLF.Away.Filter {
   haltdef
 }
 
-; CheckOpStatus is not called from anywhere - obsolete?
-alias -l CheckOpStatus {
-  if ($me isop $1) && ($1 isin %DLF.channels) && (%DLF.o.enabled == 1) return 1
-  else if ($me isop $1) && (%DLF.channels == #) && (%DLF.o.enabled == 1) return 1
-  else return 0
-}
-
 ; ========== Check version for updates ==========
 on *:connect: DLF.Update.Check
 
@@ -1425,8 +1433,8 @@ alias -l DLF.Update.CheckVersions {
   if ($dialog(DLF.Options.GUI)) did -b DLF.Options.GUI 66
   if (%DLF.version.web) {
     if ((%DLF.betas) $&
-    && (%DLF.version.beta) $&
-    && (%DLF.version.beta > %DLF.version.web)) {
+      && (%DLF.version.beta) $&
+      && (%DLF.version.beta > %DLF.version.web)) {
       if (%DLF.version.beta > $DLF.SetVersion) DLF.Update.DownloadAvailable %DLF.version.beta %DLF.version.beta.mirc beta
       elseif (%DLF.version.web == $DLF.SetVersion) DLF.Options.GUI.Status Running current version of dlFilter beta
       else DLF.Options.GUI.Status Running a newer version $br($DLF.SetVersion) than web beta version $br(%DLF.version.beta)
@@ -1473,12 +1481,11 @@ alias -l DLF.Update.DownloadAvailable {
 
 ; Announce new version whenever user joins an enabled channel.
 on me:*:join:%DLF.channels: {
-  echo -s Joined $chan
   if (%DLF.version.web) {
     if ((%DLF.betas) $&
-    && (%DLF.version.beta) $&
-    && (%DLF.version.beta > %DLF.version.web) $&
-    && (%DLF.version.beta > $DLF.SetVersion)) DLF.Update.ChanAnnounce $chan %DLF.version.beta %DLF.version.beta.mirc beta
+      && (%DLF.version.beta) $&
+      && (%DLF.version.beta > %DLF.version.web) $&
+      && (%DLF.version.beta > $DLF.SetVersion)) DLF.Update.ChanAnnounce $chan %DLF.version.beta %DLF.version.beta.mirc beta
     elseif (%DLF.version.web > $DLF.SetVersion) DLF.Update.ChanAnnounce $chan %DLF.version.web %DLF.version.web.mirc
   }
 }
@@ -2156,8 +2163,8 @@ alias -l DLF.CreateBinaryFile {
   ; Check if file exists and is identical to avoid rewriting it every time
   if ($isfile($2-)) {
     if ($sha256($1,1) == $sha256($2-,2)) {
-      DLF.Status dlFilter.gif OK.
-      ;return
+      DLF.Status Checked: $2-
+      return
     }
   }
   if ($isfile($2-)) {
@@ -2171,7 +2178,7 @@ alias -l DLF.CreateBinaryFile {
 }
 
 alias DLF.GenerateBinaryFile {
-  if (($0 < 1) || (!$regex($1,/^&[^ ]+$/))) DLF.Error DLF.CreateBinaryFile: Invalid parameters: $1-
+  if (($0 < 1) || (!$regex($1,/^&[^ ]+$/))) DLF.Error DLF.GenerateBinaryFile: Invalid parameters: $1-
   var %fn = $qt($1-)
   ;var %ofn = $+(%ifn,.mrc)
   ;if ($isfile(%ofn)) .remove $qt(%ofn)
