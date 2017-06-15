@@ -606,12 +606,12 @@ on *:dialog:DLF.Options.GUI:init:0: {
   did -a DLF.Options.GUI 37 Private notice
   did -a DLF.Options.GUI 37 Private ctcp
   did -c DLF.Options.GUI 37 1
-  DLF.Options.SetCustomType
+  DLF.Options.SetCustomType $did(37).seltext
   DLF.Update.Run
 }
 
 ; Handle all checkbox clicks and save
-on *:dialog:DLF.Options.GUI:sclick:4-36,38-45,47-51,53-65,68-999: {
+on *:dialog:DLF.Options.GUI:sclick:4-36,38-45,47-50,53-65,68-999: {
   DLF.Options.LinkedFields 27 28
   DLF.Options.LinkedFields 29 30 31
   DLF.Options.LinkedFields 32 72
@@ -725,14 +725,16 @@ on *:dialog:DLF.Options.GUI:sclick:46: {
   %new = $regsubex(%new,$+(/[][!#$%&()/:;<=>.|,$comma,$lcurly,$rcurly,]+/g),$star)
   %new = $regsubex(%new,/[*] *[*]+/g,$star)
   if (%new == *) return
-  if (%DLF.custom.selected == Channel text) %DLF.custom.chantext = $addtok(%DLF.custom.chantext,%new,$asc($comma))
-  if (%DLF.custom.selected == Channel action) %DLF.custom.chanaction = $addtok(%DLF.custom.chanaction,%new,$asc($comma))
-  if (%DLF.custom.selected == Channel notice) %DLF.custom.channotice = $addtok(%DLF.custom.channotice,%new,$asc($comma))
-  if (%DLF.custom.selected == Channel ctcp) %DLF.custom.chanctcp = $addtok(%DLF.custom.chanctcp,%new,$asc($comma))
-  if (%DLF.custom.selected == Private text) %DLF.custom.privtext = $addtok(%DLF.custom.privtext,%new,$asc($comma))
-  if (%DLF.custom.selected == Private action) %DLF.custom.privaction = $addtok(%DLF.custom.privaction,%new,$asc($comma))
-  if (%DLF.custom.selected == Private notice) %DLF.custom.privnotice = $addtok(%DLF.custom.privnotice,%new,$asc($comma))
-  if (%DLF.custom.selected == Private ctcp) %DLF.custom.privctcp = $addtok(%DLF.custom.privctcp,%new,$asc($comma))
+  var %selected = $did(37).seltext
+  if (%selected == Channel text) %DLF.custom.chantext = $addtok(%DLF.custom.chantext,%new,$asc($comma))
+  elseif (%selected == Channel action) %DLF.custom.chanaction = $addtok(%DLF.custom.chanaction,%new,$asc($comma))
+  elseif (%selected == Channel notice) %DLF.custom.channotice = $addtok(%DLF.custom.channotice,%new,$asc($comma))
+  elseif (%selected == Channel ctcp) %DLF.custom.chanctcp = $addtok(%DLF.custom.chanctcp,%new,$asc($comma))
+  elseif (%selected == Private text) %DLF.custom.privtext = $addtok(%DLF.custom.privtext,%new,$asc($comma))
+  elseif (%selected == Private action) %DLF.custom.privaction = $addtok(%DLF.custom.privaction,%new,$asc($comma))
+  elseif (%selected == Private notice) %DLF.custom.privnotice = $addtok(%DLF.custom.privnotice,%new,$asc($comma))
+  elseif (%selected == Private ctcp) %DLF.custom.privctcp = $addtok(%DLF.custom.privctcp,%new,$asc($comma))
+  else DLF.Error Invalid message type: %selected
   ; Clear edit field, list selection and disable add button
   did -r DLF.Options.GUI 41
   DLF.Options.SetAddButton
@@ -742,16 +744,18 @@ on *:dialog:DLF.Options.GUI:sclick:46: {
 ; Customer filter Remove button clicked
 on *:dialog:DLF.Options.GUI:sclick:52: {
   var %selcnt = $did(51,0).sel
+  var %selected = $did(37).seltext
   while (%selcnt) {
     var %seltext = $did(51,$did(51,%selcnt).sel).text
-    if (%DLF.custom.selected == Channel text) %DLF.custom.chantext = $remtok(%DLF.custom.chantext,%seltext,1,$asc($comma))
-    if (%DLF.custom.selected == Channel action) %DLF.custom.chanaction = $remtok(%DLF.custom.chanaction,%seltext,1,$asc($comma))
-    if (%DLF.custom.selected == Channel notice) %DLF.custom.channotice = $remtok(%DLF.custom.channotice,%seltext,1,$asc($comma))
-    if (%DLF.custom.selected == Channel ctcp) %DLF.custom.chanctcp = $remtok(%DLF.custom.chanctcp,%seltext,1,$asc($comma))
-    if (%DLF.custom.selected == Private text) %DLF.custom.privtext = $remtok(%DLF.custom.privtext,%seltext,1,$asc($comma))
-    if (%DLF.custom.selected == Private action) %DLF.custom.privaction = $remtok(%DLF.custom.privaction,%seltext,1,$asc($comma))
-    if (%DLF.custom.selected == Private notice) %DLF.custom.privnotice = $remtok(%DLF.custom.privnotice,%seltext,1,$asc($comma))
-    if (%DLF.custom.selected == Private ctcp) %DLF.custom.privctcp = $remtok(%DLF.custom.privctcp,%seltext,1,$asc($comma))
+    if (%selected == Channel text) %DLF.custom.chantext = $remtok(%DLF.custom.chantext,%seltext,1,$asc($comma))
+    elseif (%selected == Channel action) %DLF.custom.chanaction = $remtok(%DLF.custom.chanaction,%seltext,1,$asc($comma))
+    elseif (%selected == Channel notice) %DLF.custom.channotice = $remtok(%DLF.custom.channotice,%seltext,1,$asc($comma))
+    elseif (%selected == Channel ctcp) %DLF.custom.chanctcp = $remtok(%DLF.custom.chanctcp,%seltext,1,$asc($comma))
+    elseif (%selected == Private text) %DLF.custom.privtext = $remtok(%DLF.custom.privtext,%seltext,1,$asc($comma))
+    elseif (%selected == Private action) %DLF.custom.privaction = $remtok(%DLF.custom.privaction,%seltext,1,$asc($comma))
+    elseif (%selected == Private notice) %DLF.custom.privnotice = $remtok(%DLF.custom.privnotice,%seltext,1,$asc($comma))
+    elseif (%selected == Private ctcp) %DLF.custom.privctcp = $remtok(%DLF.custom.privctcp,%seltext,1,$asc($comma))
+    else DLF.Error Invalid message type: %selected
     dec %selcnt
   }
   did -b DLF.Options.GUI 52
