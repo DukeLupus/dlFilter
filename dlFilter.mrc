@@ -741,8 +741,10 @@ on *:dialog:DLF.Options.GUI:sclick:46: {
   DLF.Options.SetCustomType $did(37).seltext
 }
 
-; Customer filter Remove button clicked
-on *:dialog:DLF.Options.GUI:sclick:52: {
+; Customer filter Remove button clicked or double click in list
+on *:dialog:DLF.Options.GUI:sclick:52: DLF.Options.Remove
+on *:dialog:DLF.Options.GUI:dclick:51: DLF.Options.Remove
+alias -l DLF.Options.Remove {
   var %selcnt = $did(51,0).sel
   var %selected = $did(37).seltext
   while (%selcnt) {
