@@ -51,10 +51,16 @@ o Vadi wrote special function to vPowerGet dll that allows
         Improve DLF.debug code
         Channel names can now be network#channel as well as #channel (any network)
         Create toolbar gif file from embedded data without needing to download it.
+          (And code to turn gif into compressed encoded embedded data.)
 
       TODO
+        Use native logging for custom windows instead of script logging
+        Use native timestamps for custom windows instead of script timestamps
+        Centralise custom window management to a single routine
         Implement extra windows for fileserver ads and multi-server
-        Popups to support network#channel
+        Development debug functionality - if mIRC debug is on, add DLF debug
+          messages to the debug log.
+        Menus to support network#channel
         Fuller implementation of script groups to enable / disable events
         About dialog (using comment at start of this file)
         Custom filters empty on initialisation
@@ -66,15 +72,11 @@ o Vadi wrote special function to vPowerGet dll that allows
           for our own analysis (privacy issues?)
         Add dlF icons to toolbar & options dialog
         Add menu to toolbar item
-        Use native logging for custom windows instead of script logging
-        Use native timestamps for custom windows instead of script timestamps
-        Development debug functionality - if mIRC debug is on, add DLF debug
-          messages to the debug log.
         Use CTCP halt to stop DCC CHAT and SEND rather than convoluted ctcp/open processing
         Rewrite anti-chat code
         Separate CTCP processing for these.
-        Switch channels text box to a list box in a separate tab.
-        Include code to create binvar and export to icon gif file
+        Switch options channels text box to a list box in a separate tab.
+          (And add functionality to add from list of opened channels.)
         Track requests in channels and allow dcc sends and responses regardless of matching
         Rewrite / fix @find code
         Own find results not captured
@@ -140,6 +142,7 @@ alias -l DLF.Initialise {
   ; Delete obsolete variables
   .unset %DLF.custom.selected
   .unset %DLF.newreleases
+  .unset %DLF.ptext
 
   if ($script(onotice.mrc)) .unload -rs onotice.mrc
   if ($script(onotice.txt)) .unload -rs onotice.txt
@@ -282,8 +285,8 @@ alias -l DLF.Menu.ShowFilter {
 }
 
 alias -l DLF.Option.Toggle {
-  var %newval = 1 - DLF. [ $+ $1 ]
-  DLF. [ $+ $1 ] = %newval
+  var %newval = 1 - % [ $+ DLF. [ $+ [ $1 ] ] ]
+  % [ $+ [ DLF. [ $+ [ $1 ] ] ] ] = %newval
   ;if ($2 != $null) did
   if (%newval) DLF.Status Option $1 set
   else DLF.status Option $1 cleared
@@ -301,7 +304,7 @@ menu @DLF.*.search {
   Options: DLF.Options.Show
 }
 
-menu @DLF.@find.Results,@DLF.NewReleases {
+menu @DLF.@find.Results {
   .-
   .Copy line(s): DLF.@find.CopyLines
   $iif(!$script(AutoGet.mrc), $style(2)) Send to AutoGet: DLF.@find.SendToAutoGet
@@ -505,7 +508,6 @@ alias -l DLF.Options.Initialise {
   if (%DLF.privrequests == $null) %DLF.privrequests = 1
   if (%DLF.server == $null) %DLF.server = 1
   if (%DLF.searchresults == $null) %DLF.searchresults = 1
-  if (%DLF.newreleases == $null) %DLF.newreleases = 1
   if (%DLF.chspam == $null) %DLF.chspam = 1
   if (%DLF.chspam.opnotify == $null) %DLF.chspam.opnotify = 1
   if (%DLF.privspam == $null) %DLF.privspam = 1
@@ -901,7 +903,6 @@ alias -l DLF.User.NoChannel {
       dec %i
     }
   }
-  echo -s DLF.User.Channel $2 $hashtag $3-
   DLF.User.Channel $2 $hashtag $3-
 }
 
@@ -1108,7 +1109,7 @@ alias -l DLF.Filter.SetNickColour {
 }
 
 alias -l DLF.Filter.Text {
-  if (($1 == Normal) && ($2 == Private) && ($window($3)) .window -c $3
+  if (($1 == Normal) && ($2 == Private) && ($window($3))) .window -c $3
   var %nc = $+($network,$2)
   if (%DLF.filtered.log == 1) write $qt($logdir $+ DLF.Filtered.log) $sqbr($fulldate) $sqbr(%nc) $tag($3) $strip($4-)
   if (%DLF.showfiltered == 1) {
@@ -1203,7 +1204,7 @@ alias -l ServerSearch {
 
 alias -l DLF.Channel.SpamFilter {
   if ((%DLF.chspam.opnotify == 1) && ($me isop $1)) {
-    DLF.Warning $c(4,Spam detected:) $sqbr($1) $tag($2) $br($address($2,1)) -->> $c(4,$3-)
+    DLF.Warning $c(4,Channel spam detected:) $sqbr($1) $tag($2) $br($address($2,1)) -->> $c(4,$3-)
   }
   halt
 }
@@ -1211,7 +1212,7 @@ alias -l DLF.Channel.SpamFilter {
 alias -l DLF.Private.SpamFilter {
   if ((%DLF.privspam.opnotify == 1) && ($comchan($1,1).op)) {
     DLF.Warning Spam detected: $c(4,15,$tag($1) $br($address($1,1)) -->> $b($2-))
-    echo $comchan($1,1) Spam detected: $c(4,15,$tag($1) $br($address($1,1)) -->> $b($2-))
+    echo $comchan($1,1) Private spam detected: $c(4,15,$tag($1) $br($address($1,1)) -->> $b($2-))
   }
   if ((%DLF.spam.addignore == 1) && ($input(Spam received from $1 ( $+ $address($1,1) $+ ). Spam was: " $+ $2- $+ ". Add this user to ignore for one hour?,yq,Add spammer to /ignore?) == $true)) /ignore -wu3600 $1 4
   if ($window($1)) .window -c $1
