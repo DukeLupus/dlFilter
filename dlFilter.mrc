@@ -460,7 +460,7 @@ dialog -l DLF.Options.GUI {
   check "Quits", 14, 7 120 133 8, tab 1
   check "Nick changes", 15, 7 129 133 8, tab 1
   check "Kicks", 16, 7 138 133 8, tab 1
-  check "... but show them in Status window.", 18, 15 147 125 8, tab 1
+  check "... but show the above in Status window", 18, 15 147 125 8, tab 1
   check "Away and thank-you messages", 19, 7 156 133 8, tab 1
   check "User mode changes", 20, 7 165 133 8, tab 1
   text "Checking for dlFilter updates...", 56, 5 178 144 8, tab 1
@@ -606,7 +606,7 @@ on *:dialog:DLF.Options.GUI:init:0: {
   did -a DLF.Options.GUI 37 Private notice
   did -a DLF.Options.GUI 37 Private ctcp
   did -c DLF.Options.GUI 37 1
-  DLF.Options.SetCustomType $did(37).seltext
+  DLF.Options.SetCustomType
   DLF.Update.Run
 }
 
@@ -682,20 +682,19 @@ alias -l DLF.Groups.Events {
 }
 
 ; Select custom message type
-on *:dialog:DLF.Options.GUI:sclick:37: {
-  DLF.Options.SetCustomType $did(37).seltext
-}
+on *:dialog:DLF.Options.GUI:sclick:37: DLF.Options.SetCustomType
 
 alias -l DLF.Options.SetCustomType {
+  var %selected = $did(37).seltext
   did -r DLF.Options.GUI 51
-  if ($1- == Channel text) didtok DLF.Options.GUI 51 44 %DLF.custom.chantext
-  if ($1- == Channel action) didtok DLF.Options.GUI 51 44 %DLF.custom.chanaction
-  if ($1- == Channel notice) didtok DLF.Options.GUI 51 44 %DLF.custom.channotice
-  if ($1- == Channel ctcp) didtok DLF.Options.GUI 51 44 %DLF.custom.chanctcp
-  if ($1- == Private text) didtok DLF.Options.GUI 51 44 %DLF.custom.privtext
-  if ($1- == Private action) didtok DLF.Options.GUI 51 44 %DLF.custom.privaction
-  if ($1- == Private notice) didtok DLF.Options.GUI 51 44 %DLF.custom.privnotice
-  if ($1- == Private ctcp) didtok DLF.Options.GUI 51 44 %DLF.custom.privctcp
+  if (%selected == Channel text) didtok DLF.Options.GUI 51 44 %DLF.custom.chantext
+  if (%selected == Channel action) didtok DLF.Options.GUI 51 44 %DLF.custom.chanaction
+  if (%selected == Channel notice) didtok DLF.Options.GUI 51 44 %DLF.custom.channotice
+  if (%selected == Channel ctcp) didtok DLF.Options.GUI 51 44 %DLF.custom.chanctcp
+  if (%selected == Private text) didtok DLF.Options.GUI 51 44 %DLF.custom.privtext
+  if (%selected == Private action) didtok DLF.Options.GUI 51 44 %DLF.custom.privaction
+  if (%selected == Private notice) didtok DLF.Options.GUI 51 44 %DLF.custom.privnotice
+  if (%selected == Private ctcp) didtok DLF.Options.GUI 51 44 %DLF.custom.privctcp
 }
 
 ; Enable / disable Add custom message button
@@ -738,12 +737,11 @@ on *:dialog:DLF.Options.GUI:sclick:46: {
   ; Clear edit field, list selection and disable add button
   did -r DLF.Options.GUI 41
   DLF.Options.SetAddButton
-  DLF.Options.SetCustomType $did(37).seltext
+  DLF.Options.SetCustomType
 }
 
 ; Customer filter Remove button clicked or double click in list
 on *:dialog:DLF.Options.GUI:sclick:52: DLF.Options.Remove
-on *:dialog:DLF.Options.GUI:dclick:51: DLF.Options.Remove
 alias -l DLF.Options.Remove {
   var %selcnt = $did(51,0).sel
   var %selected = $did(37).seltext
@@ -761,8 +759,18 @@ alias -l DLF.Options.Remove {
     dec %selcnt
   }
   did -b DLF.Options.GUI 52
-  DLF.Options.SetCustomType $did(37).seltext
+  DLF.Options.SetCustomType
   DLF.Options.SetRemoveButton
+}
+
+; Double click on custom text line removes line but puts it into Add box for editing and re-adding.
+; Do not put if statement on ON DIALOG line - for some reason it fails without an error message
+on *:dialog:DLF.Options.GUI:dclick:51: {
+  if ($did(51,0).sel == 1 ) {
+    did -o DLF.Options.GUI 41 1 $did(51,$did(51,1).sel).text
+    DLF.Options.Remove
+    DLF.Options.SetAddButton
+  }
 }
 
 ; Goto website button
