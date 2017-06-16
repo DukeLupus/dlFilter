@@ -825,11 +825,11 @@ alias -l DLF.Groups.Bootstrap {
 
 ; Channel user activity
 ; join, art, quit, nick changes, kick
-on ^*:join:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.joins)) DLF.User.Channel Join $sqbr($chan) $star $nick $br($address) has joined $chan
-on ^*:part:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.parts)) DLF.User.Channel Part $sqbr($chan) $star $nick $br($address) has left $chan
-on ^*:kick:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.kicks)) DLF.User.Channel Kick $sqbr($chan) $star $knick $br($address($knick,5)) was kicked from $chan by $nick $br($1-)
-on ^*:nick: if (%DLF.nicks == 1) DLF.User.NoChannel $newnick Nick $star $nick $br($address) is now known as $newnick
-on ^*:quit: if (%DLF.quits == 1) DLF.User.NoChannel $nick Quit $star $nick $br($address) Quit $br($1-).
+on ^*:join:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.joins)) DLF.User.Channel Join $chan $nick $br($address) has joined $chan
+on ^*:part:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.parts)) DLF.User.Channel Part $chan $nick $br($address) has left $chan
+on ^*:kick:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.kicks)) DLF.User.Channel Kick $chan $knick $br($address($knick,5)) was kicked from $chan by $nick $br($1-)
+on ^*:nick: if (%DLF.nicks == 1) DLF.User.NoChannel $newnick Nick $nick $br($address) is now known as $newnick
+on ^*:quit: if (%DLF.quits == 1) DLF.User.NoChannel $nick Quit $nick $br($address) Quit $br($1-).
 
 ; Channel mode changes
 ; ban, unban, op, deop, voice, devoice etc.
@@ -885,8 +885,8 @@ raw 301:*: DLF.Away.Filter
 ; Channel user activity
 ; join, art, quit, nick changes, kick
 alias -l DLF.User.Channel {
-  if (%DLF.showstatus == 1) echo -stnc $1-
-  haltdef
+  if (%DLF.showstatus == 1) echo -stnc $1 $sqbr($2) $star $3-
+  DLF.Filter.Text $1-
 }
 
 alias -l DLF.User.NoChannel {
@@ -894,20 +894,21 @@ alias -l DLF.User.NoChannel {
     var %i = $comchan($1,0)
     while (%i) {
       var %chan = $comchan($1,%i)
-      if ($DLF.IsChannel($network,%chan) == $false) echo -ct $2 %chan $3-
+      if ($DLF.IsChannel($network,%chan) == $false) echo -ct $2 %chan $star $3-
       dec %i
     }
   }
-  DLF.User.Channel $2-
+  echo -s DLF.User.Channel $2 $hashtag $3-
+  DLF.User.Channel $2 $hashtag $3-
 }
 
 ; Channel messages
 alias -l DLF.Channels.Text {
   var %DLF.txt = $strip($1-)
-  if ((%DLF.ads == 1) && ($hfind(DLF.text.ads,%DLF.txt,1,W))) DLF.Filter.SetNickColour $chan $nick $1-
-  if ((%DLF.requests == 1) && ($hfind(DLF.text.cmds,%DLF.txt,1,W))) DLF.Filter.Text $chan $nick $1-
-  if ((%DLF.away == 1) && ($hfind(DLF.text.away,%DLF.txt,1,W))) DLF.Filter.Text $chan $nick $1-
-  if ($hfind(DLF.text.always,%DLF.txt,1,W)) DLF.Filter.Text $chan $nick $1-
+  if ((%DLF.ads == 1) && ($hfind(DLF.text.ads,%DLF.txt,1,W))) DLF.Filter.SetNickColour Normal $chan $nick $1-
+  if ((%DLF.requests == 1) && ($hfind(DLF.text.cmds,%DLF.txt,1,W))) DLF.Filter.Text Normal $chan $nick $1-
+  if ((%DLF.away == 1) && ($hfind(DLF.text.away,%DLF.txt,1,W))) DLF.Filter.Text Normal $chan $nick $1-
+  if ($hfind(DLF.text.always,%DLF.txt,1,W)) DLF.Filter.Text Normal $chan $nick $1-
 
   /*if (%DLF.chspam == 1) {
     ;no channel spam right now
@@ -918,7 +919,7 @@ alias -l DLF.Channels.Text {
     var %nr = $numtok(%DLF.custom.chantext,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.chantext,%cnter,$asc($comma)) iswm %DLF.txt) DLF.Filter.Text $chan $nick $1-
+      if ($gettok(%DLF.custom.chantext,%cnter,$asc($comma)) iswm %DLF.txt) DLF.Filter.Text Normal $chan $nick $1-
       inc %cnter
     }
   }
@@ -926,14 +927,14 @@ alias -l DLF.Channels.Text {
 
 alias -l DLF.Channels.Action {
   var %DLF.action = $strip($1-)
-  if ((%DLF.ads == 1) && ($hfind(DLF.action.ads,%DLF.action,1,W))) DLF.Filter.Action $chan $nick $1-
-  if ((%DLF.away == 1) && ($hfind(DLF.action.away,%DLF.action,1,W))) DLF.Filter.Action $chan $nick $1-
+  if ((%DLF.ads == 1) && ($hfind(DLF.action.ads,%DLF.action,1,W))) DLF.Filter.Text Action $chan $nick $1-
+  if ((%DLF.away == 1) && ($hfind(DLF.action.away,%DLF.action,1,W))) DLF.Filter.Text Action $chan $nick $1-
 
   if ((%DLF.custom.enabled == 1) && (%DLF.custom.chanaction)) {
     var %nr = $numtok(%DLF.custom.chanaction,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.chanaction,%cnter,$asc($comma)) iswm %DLF.act) DLF.Filter.Action $chan $nick %DLF.action
+      if ($gettok(%DLF.custom.chanaction,%cnter,$asc($comma)) iswm %DLF.act) DLF.Filter.Text Action $chan $nick %DLF.action
       inc %cnter
     }
   }
@@ -944,7 +945,7 @@ alias -l DLF.Channels.Notice {
     var %nr = $numtok(%DLF.custom.channotice,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.channotice,%cnter,$asc($comma)) iswm $strip($1-)) DLF.Filter.Text $chan $nick $1-
+      if ($gettok(%DLF.custom.channotice,%cnter,$asc($comma)) iswm $strip($1-)) DLF.Filter.Text Notice $chan $nick $1-
       inc %cnter
     }
   }
@@ -1000,7 +1001,7 @@ alias -l DLF.Channels.ctcp {
   if ((%DLF.custom.enabled == 1) && (%DLF.custom.chanctcp)) {
     var %i = $numtok(%DLF.custom.chanctcp,$asc($comma))
     while (%i) {
-      if ($gettok(%DLF.custom.chanctcp,%i,$asc($comma)) iswm $1-) DLF.Filter.Text $target $nick $1-
+      if ($gettok(%DLF.custom.chanctcp,%i,$asc($comma)) iswm $1-) DLF.Filter.Text Notice $target $nick $1-
       dec %i
     }
   }
@@ -1025,8 +1026,8 @@ alias -l DLF.Private.Notice {
     halt
   }
   if ((%DLF.server == 1) && ($hfind(DLF.notice.server,%DLF.pnotice,1,W))) DLF.Filter.Server $nick $1-
-  if (*SLOTS My mom always told me not to talk to strangers* iswm %DLF.pnotice) DLF.Filter.Text Notice $nick $1-
-  if (*CTCP flood detected, protection enabled* iswm %DLF.pnotice) DLF.Filter.Text Notice $nick $1-
+  if (*SLOTS My mom always told me not to talk to strangers* iswm %DLF.pnotice) DLF.Filter.Text Notice Notice $nick $1-
+  if (*CTCP flood detected, protection enabled* iswm %DLF.pnotice) DLF.Filter.Text Notice Notice $nick $1-
   if ((%DLF.searchresults == 1) && (%DLF.searchactive == 1)) {
     if (No match found for* iswm %DLF.ptext) DLF.Filter.Server $nick $1-
     if (*I have*match* for*in listfile* iswm %DLF.ptext) DLF.Filter.Server $nick $1-
@@ -1037,7 +1038,7 @@ alias -l DLF.Private.Notice {
     var %nr = $numtok(%DLF.custom.privnotice,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.privnotice,%cnter,$asc($comma)) iswm $strip($1-)) DLF.Filter.Text Private $nick $1-
+      if ($gettok(%DLF.custom.privnotice,%cnter,$asc($comma)) iswm $strip($1-)) DLF.Filter.Text Notice Private $nick $1-
       inc %cnter
     }
   }
@@ -1055,7 +1056,7 @@ alias -l DLF.Private.Action {
     var %nr = $numtok(%DLF.custom.privaction,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.privaction,%cnter,$asc($comma)) iswm $strip($1-)) DLF.Filter.Action Private $nick $1-
+      if ($gettok(%DLF.custom.privaction,%cnter,$asc($comma)) iswm $strip($1-)) DLF.Filter.Text Action Private $nick $1-
       inc %cnter
     }
   }
@@ -1105,7 +1106,7 @@ ctcp *:*:?: {
     var %nr = $numtok(%DLF.custom.privctcp,$asc($comma))
     var %cnter = 1
     while (%cnter <= %nr) {
-      if ($gettok(%DLF.custom.privctcp,%cnter,$asc($comma)) iswm $1-) DLF.Filter.Text Private $nick $1-
+      if ($gettok(%DLF.custom.privctcp,%cnter,$asc($comma)) iswm $1-) DLF.Filter.Text Normal Private $nick $1-
       inc %cnter
     }
   }
@@ -1118,36 +1119,20 @@ alias -l DLF.Filter.SetNickColour {
 }
 
 alias -l DLF.Filter.Text {
-  var %nc = $+($network,$1)
-  if (%DLF.filtered.log == 1) write $qt($logdir $+ DLF.Filtered.log) $sqbr($fulldate) $sqbr(%nc) $tag($2) $strip($3-)
+  var %nc = $+($network,$2)
+  if (%DLF.filtered.log == 1) write $qt($logdir $+ DLF.Filtered.log) $sqbr($fulldate) $sqbr(%nc) $tag($3) $strip($4-)
   if (%DLF.showfiltered == 1) {
     if (!$window(@DLF.Filtered)) {
       window -k0nwz @DLF.filtered
       titlebar @DLF.filtered -=- Right-click for options
     }
-    var %line = $sqbr(%nc) $tag($2) $3-
+    if ($1 == Normal) var %line = $sqbr(%nc) $tag($3) $4-
+    else var %line = $sqbr(%nc) $3-
     if ((%DLF.filtered.limit == 1) && ($line(@DLF.filtered,0) >= 5000)) dline @DLF.Filtered 1-100
     if (%DLF.filtered.timestamp == 1) %line = $timestamp %line
     if (%DLF.filtered.strip == 1) %line = $strip(%line)
-    if (%DLF.filtered.wrap == 1) aline -p @DLF.filtered %line
-    else aline @DLF.filtered %line
-  }
-  halt
-}
-
-alias -l DLF.Filter.Action {
-  if (%DLF.filtered.log == 1) write $qt($logdir $+ DLF.Filtered.log) $sqbr($fulldate) $sqbr($1) $star $2 $strip($3-)
-  if (%DLF.showfiltered == 1) {
-    if (!$window(@DLF.Filtered)) {
-      window -k0nwz @DLF.Filtered
-      titlebar @DLF.Filtered -=- Right-click for options
-    }
-    var %line = $sqbr($1) $star $2-
-    if ((%DLF.filtered.limit == 1) && ($line(@DLF.Filtered,0) >= 5000)) dline @DLF.Filtered 1-100
-    if (%DLF.filtered.timestamp == 1) %line = $timestamp %line
-    if (%DLF.filtered.strip == 1) %line = $strip(%line)
-    if (%DLF.filtered.wrap == 1) aline -p $color(action) @DLF.Filtered %line
-    else aline $color(action) @DLF.Filtered %line
+    if (%DLF.filtered.wrap == 1) aline -p $color($1) @DLF.filtered %line
+    else aline $color($1) @DLF.filtered %line
   }
   halt
 }
@@ -1209,7 +1194,7 @@ alias -l DLF.Private.CheckText {
 
 alias -l DLF.Filter.PrivateText {
   if ($window($1)) .window -c $1
-  DLF.Filter.Text Private $1-
+  DLF.Filter.Text Normal Private $1 $2-
   halt
 }
 
@@ -1376,7 +1361,7 @@ alias -l DLF.ctcp.Reply {
   if ((%DLF.custom.enabled == 1) && (%DLF.custom.privctcp)) {
     var %i = $numtok(%DLF.custom.privctcp,$asc($comma))
     while (%i) {
-      if ($gettok(%DLF.custom.privctcp,%i,$asc($comma)) iswm $1-) DLF.Filter.Text Private $nick $1-
+      if ($gettok(%DLF.custom.privctcp,%i,$asc($comma)) iswm $1-) DLF.Filter.Text Normal Private $nick $1-
       dec %i
     }
   }
@@ -1387,7 +1372,7 @@ alias -l DLF.SetNickColour {
 }
 
 alias -l DLF.Away.Filter {
-  if (%DLF.away == 1) DLF.Filter.Text RawAway $2-
+  if (%DLF.away == 1) DLF.Filter.Text Notice RawAway $2-
   haltdef
 }
 
@@ -1783,6 +1768,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd notice.server *This makes*times*
   DLF.hadd notice.server *is on the way!*
   DLF.hadd notice.server *has been sent sucessfully*
+  DLF.hadd notice.server *has been sent successfully*
   DLF.hadd notice.server *send will be initiated as soon as possible*
   DLF.hadd notice.server *«SoftServe»*
   DLF.hadd notice.server *You are the successful downloader number*
@@ -1976,6 +1962,7 @@ alias -l space returnex $chr(32)
 alias -l nbsp return $chr(160)
 alias -l amp return $chr(38)
 alias -l star return $chr(42)
+alias -l hashtag returnex $chr(35)
 alias -l dollar return $chr(36)
 alias -l comma return $chr(44)
 alias -l hyphen return $chr(45)
