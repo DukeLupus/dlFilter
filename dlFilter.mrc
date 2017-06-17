@@ -1,25 +1,18 @@
 /*
-dlFilter.mrc - Filter out messages on file sharing channels
+dlFilter.mrc
+Filter out messages on file sharing channels
 Authors: DukeLupus and Sophist
 
-Annoyed by advertising messages from the various file serving bots?
-Fed up with endless channel messages by
-other users searching for and requesting files?
-Are the responses to your own requests getting lost in the crowd?
+Annoyed by advertising messages from the various file serving bots? Fed up with endless channel messages by other users searching for and requesting files? Are the responses to your own requests getting lost in the crowd?
 
-This script filters out the crud, leaving
-only the useful messages displayed in the channel.
-By default, the filtered messages are thrown away,
-but you can direct them to custom windows if you wish.
+This script filters out the crud, leaving only the useful messages displayed in the channel. By default, the filtered messages are thrown away, but you can direct them to custom windows if you wish.
 
 Download from https://github.com/SanderSade/dlFilter/releases
 Update regularly to handle new forms of message.
 
 To load: use /load -rs dlFilter.mrc
 
-Note that dlFilter loads itself automatically as a first script.
-This avoids problems where other scripts halt events
-preventing this scripts events from running.
+Note that dlFilter loads itself automatically as a first script. This avoids problems where other scripts halt events preventing this scripts events from running.
 
 Acknowledgements
 ================
@@ -29,8 +22,7 @@ o GetFileName from TipiTunes' OS-Quicksearch
 o automatic version check based on code developed for dlFilter by TipiTunes
 o Support for AG6 & 7 by TipiTunes
 o Some of the spam definitions are from HugHug's SoftSnow filter.
-o Vadi wrote special function to vPowerGet dll that allows
-  sending files from DLF.@find.Results window to vPowerGet.
+o Vadi wrote special function to vPowerGet dll that allows sending files from DLF.@find.Results window to vPowerGet.
 */
 
 /* CHANGE LOG
@@ -52,6 +44,7 @@ o Vadi wrote special function to vPowerGet dll that allows
         Channel names can now be network#channel as well as #channel (any network)
         Create toolbar gif file from embedded data without needing to download it.
           (And code to turn gif into compressed encoded embedded data.)
+        Added about tab populated with first comment block in this file
 
       TODO
         Use native logging for custom windows instead of script logging
@@ -62,7 +55,6 @@ o Vadi wrote special function to vPowerGet dll that allows
           messages to the debug log.
         Menus to support network#channel
         Fuller implementation of script groups to enable / disable events
-        About dialog (using comment at start of this file)
         Custom filters empty on initialisation
         Right click menu items for changing options base on line clicked
         Right click menu items for adding to custom filters
@@ -436,8 +428,9 @@ dialog -l DLF.Options.GUI {
   text "", 99, 67 2 82 8, right hide
   check "Enable/disable dlFilter", 5, 2 2 62 8
   tab "Main", 1, 1 10 151 198
-  tab "Filtering/Spam/Security", 2
+  tab "Other", 2
   tab "Custom", 3
+  tab "About", 98
   button "Close", 4, 2 211 45 11, ok flat
   check "Show/hide filtered lines", 21, 51 211 100 11, push
   ; tab 1 Main
@@ -461,7 +454,7 @@ dialog -l DLF.Options.GUI {
   button "dlFilter website", 67, 4 186 70 10, tab 1 flat
   button "Update dlFilter", 66, 78 186 70 10, tab 1 flat disable
   check "Check for beta versions", 68, 4 198 136 8, tab 1
-  ; Tab 2 Filtering / Spam / Security
+  ; Tab 2 Other
   box " Windows ", 22, 4 25 144 56, tab 2
   check "Filter server notices to separate window", 23, 7 34 120 8, tab 2
   check "Filter server adverts to separate window", 38, 7 43 138 8, tab 2
@@ -488,6 +481,8 @@ dialog -l DLF.Options.GUI {
   button "Add", 46, 5 61 67 12, tab 3 flat disable
   button "Remove", 52, 79 61 68 12, tab 3 flat disable
   list 51, 4 74 144 123, tab 3 hsbar vsbar size sort extsel
+  ; tab 98 About
+  edit "", 97, 3 25 147 181, multi read vsbar tab 98
 }
 
 ; Initialise variables
@@ -599,6 +594,30 @@ on *:dialog:DLF.Options.GUI:init:0: {
   did -c DLF.Options.GUI 37 1
   DLF.Options.SetCustomType
   DLF.Update.Run
+  DLF.Options.About
+}
+
+alias -l DLF.Options.About {
+  if ($fopen(dlFilter)) .fclose dlFilter
+  .fopen dlFilter $script
+  var %line = $fread(dlFilter)
+  while ((!$feof) && (!$ferr) && ($left(%line,2) != $+(/,*))) {
+    %line = $fread(dlFilter)
+  }
+  if (($feof) || ($ferr)) DLF.Options.AboutError
+  var %i = 0
+  %line = $fread(dlFilter)
+  while ((!$feof) && (!$ferr) && ($left(%line,2) != $+(*,/))) {
+    did -a DLF.Options.GUI 97 %line $+ $crlf
+    inc %i
+    %line = $fread(dlFilter)
+  }
+  .fclose dlFilter
+}
+
+alias -l DLF.Options.AboutError {
+  if ($fopen(dlFilter)) .fclose dlFilter
+  DLF.Error Unable to find About text to populate About tab.
 }
 
 ; Handle all checkbox clicks and save
