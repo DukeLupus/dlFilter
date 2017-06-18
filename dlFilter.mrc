@@ -150,7 +150,7 @@ alias -l DLF.Initialise {
 
 alias -l DLF.mIRCversion {
   ; We need returnex first implemented in 6.17
-  ; We need regml.group first implemented in 7.44
+  ; We currently need regml.group first implemented in 7.44 - but it is probably possible to work around this.
   if ($version < 7.44) {
     %DLF.enabled = 0
     return 7.44
@@ -158,7 +158,7 @@ alias -l DLF.mIRCversion {
   return 0
 }
 
-ctcp *:VERSION:*: .ctcpreply $nick VERSION $c(1,9,$DLF.logo version $DLF.SetVersion by DukeLupus & Sophist.) $+ $c(1,15,$space $+ Get it from $c(12,15,$u(https://github.com/SanderSade/dlFilter/releases)))
+ctcp *:VERSION:%DLF.channels: { if .ctcpreply $nick VERSION $c(1,9,$DLF.logo version $DLF.SetVersion by DukeLupus & Sophist.) $+ $c(1,15,$space $+ Get it from $c(12,15,$u(https://github.com/SanderSade/dlFilter/releases))) }
 
 on *:unload: {
   var %keepvars = $?!="Do you want to keep your dlFilter configuration?"
@@ -848,30 +848,29 @@ alias -l DLF.Groups.Bootstrap {
 
 ; Channel user activity
 ; join, art, quit, nick changes, kick
-on ^*:join:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.joins)) DLF.User.Channel Join $chan $nick $br($address) has joined $chan
-on ^*:part:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.parts)) DLF.User.Channel Part $chan $nick $br($address) has left $chan
-on ^*:kick:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.kicks)) DLF.User.Channel Kick $chan $knick $br($address($knick,5)) was kicked from $chan by $nick $br($1-)
-; TODO check that channel is on correct network
-on ^*:nick: if ($DLF.IsNonChannelEvent(%DLF.nicks)) DLF.User.NoChannel $newnick Nick $nick $br($address) is now known as $newnick
-on ^*:quit: if ($DLF.IsNonChannelEvent(%DLF.quits)) DLF.User.NoChannel $nick Quit $nick $br($address) Quit $br($1-).
+on ^*:join:%DLF.channels: { if ($DLF.IsChannelEvent(%DLF.joins)) DLF.User.Channel Join $chan $nick $br($address) has joined $chan }
+on ^*:part:%DLF.channels: { if ($DLF.IsChannelEvent(%DLF.parts)) DLF.User.Channel Part $chan $nick $br($address) has left $chan }
+on ^*:kick:%DLF.channels: { if ($DLF.IsChannelEvent(%DLF.kicks)) DLF.User.Channel Kick $chan $knick $br($address($knick,5)) was kicked from $chan by $nick $br($1-) }
+on ^*:nick: { if ($DLF.IsNonChannelEvent(%DLF.nicks)) DLF.User.NoChannel $newnick Nick $nick $br($address) is now known as $newnick }
+on ^*:quit: { if ($DLF.IsNonChannelEvent(%DLF.quits)) DLF.User.NoChannel $nick Quit $nick $br($address) Quit $br($1-). }
 
 ; Channel mode changes
 ; ban, unban, op, deop, voice, devoice etc.
-on ^*:ban:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.usrmode)) halt
-on ^*:unban:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.usrmode)) halt
-on ^*:op:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.usrmode)) halt
-on ^*:deop:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.usrmode)) halt
-on ^*:voice:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.usrmode)) halt
-on ^*:devoice:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.usrmode)) halt
-on ^*:serverop:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.usrmode)) halt
-on ^*:serverdeop:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.usrmode)) halt
-on ^*:servervoice:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.usrmode)) halt
-on ^*:serverdevoice:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.usrmode)) halt
-on ^*:mode:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.chmode)) halt
-on ^*:servermode:%DLF.channels: if ($DLF.IsChannelEvent(%DLF.chmode)) halt
+on ^*:ban:%DLF.channels: { if ($DLF.IsChannelEvent(%DLF.usrmode)) halt }
+on ^*:unban:%DLF.channels: { if ($DLF.IsChannelEvent(%DLF.usrmode)) halt }
+on ^*:op:%DLF.channels: { if ($DLF.IsChannelEvent(%DLF.usrmode)) halt }
+on ^*:deop:%DLF.channels: { if ($DLF.IsChannelEvent(%DLF.usrmode)) halt }
+on ^*:voice:%DLF.channels: { if ($DLF.IsChannelEvent(%DLF.usrmode)) halt }
+on ^*:devoice:%DLF.channels: { if ($DLF.IsChannelEvent(%DLF.usrmode)) halt }
+on ^*:serverop:%DLF.channels: { if ($DLF.IsChannelEvent(%DLF.usrmode)) halt }
+on ^*:serverdeop:%DLF.channels: { if ($DLF.IsChannelEvent(%DLF.usrmode)) halt }
+on ^*:servervoice:%DLF.channels: { if ($DLF.IsChannelEvent(%DLF.usrmode)) halt }
+on ^*:serverdevoice:%DLF.channels: { if ($DLF.IsChannelEvent(%DLF.usrmode)) halt }
+on ^*:mode:%DLF.channels: { if ($DLF.IsChannelEvent(%DLF.chmode)) halt }
+on ^*:servermode:%DLF.channels: { if ($DLF.IsChannelEvent(%DLF.chmode)) halt }
 
-; Channel messages
-on *:input:#: {
+; Channel inputs
+on *:input:%DLF.channels: {
   if ($DLF.IsChannelEvent) {
     if (($1 == @find) || ($1 == @locator)) DLF.Channel.FindRequest $1-
     if (($left($1,1) isin !@) && ($right($1,-1) ison $chan)) DLF.Channel.ServerRequest $1-
@@ -880,29 +879,28 @@ on *:input:#: {
 alias -l DLF.Channel.ServerRequest echo -at DLF.Channel.ServerRequest called: $1-
 alias -l DLF.Channel.FindRequest echo -at DLF.Channel.FindRequest called: $1-
 
-on ^*:text:*:%DLF.channels: if ($DLF.IsChannelEvent) DLF.Channels.Text $1-
-on ^*:action:*:%DLF.channels: if ($DLF.IsChannelEvent) DLF.Channels.Action $1-
-on ^*:notice:*:%DLF.channels: if ($DLF.IsChannelEvent) DLF.Channels.Notice $1-
-on ^*:notice:*:#: if ($DLF.Channels.IsoNotice) DLF.Channels.oNotice $1-
-
-; Channel ctcp
-ctcp *:*ping*:%DLF.channels: if ($DLF.IsChannelEvent) haltdef
-ctcp *:*:%DLF.channels: if ($DLF.IsChannelEvent) DLF.Channels.ctcp $1-
-ctcp ^*:DCC CHAT:?: DLF.dcc.ChatRequest $1-
-ctcp ^*:DCC SEND:?: DLF.dcc.SendRequest $1-
-alias -l DLF.dcc.ChatRequest echo -st DLF.dcc.ChatRequest called: $1-
-alias -l DLF.dcc.SendRequest echo -st DLF.dcc.SendRequest called: $1-
+; Channel messages
+on ^*:text:*:%DLF.channels: { if ($DLF.IsChannelEvent) DLF.Channels.Text $1- }
+on ^*:action:*:%DLF.channels: { if ($DLF.IsChannelEvent) DLF.Channels.Action $1- }
+on ^*:notice:*:%DLF.channels: { if ($DLF.IsChannelEvent) DLF.Channels.Notice $1- }
+on ^*:notice:*:#: { if ($DLF.Channels.IsoNotice) DLF.Channels.oNotice $1- }
 
 ; Private messages
-on ^*:text:*:?: DLF.Private.Text $1-
-on ^*:notice:*:?: DLF.Private.Notice $1-
-on ^*:action:*:?: DLF.Private.Action $1-
+on ^*:text:*:?: { DLF.Private.Text $1- }
+on ^*:notice:*:?: { DLF.Private.Notice $1- }
+on ^*:action:*:?: { DLF.Private.Action $1- }
 
-; ctcp replies
-on *:CTCPREPLY:*: DLF.ctcp.Reply $1-
+; ctcp
+ctcp *:*ping*:%DLF.channels: { if ($DLF.IsChannelEvent) haltdef }
+ctcp *:*:%DLF.channels: { if ($DLF.IsChannelEvent) DLF.Channels.ctcp $1- }
+ctcp ^*:DCC CHAT:?: { DLF.dcc.ChatRequest $1- }
+ctcp ^*:DCC SEND:?: { DLF.dcc.SendRequest $1- }
+alias -l DLF.dcc.ChatRequest echo -st DLF.dcc.ChatRequest called: $1-
+alias -l DLF.dcc.SendRequest echo -st DLF.dcc.SendRequest called: $1-
+on *:CTCPREPLY:*: { DLF.ctcp.Reply $1- }
 
 ; Filter away messages
-raw 301:*: DLF.Away.Filter $1-
+raw 301:*: { DLF.Away.Filter $1- }
 #dlf_events end
 
 ; ========== Event processing code ==========
@@ -1009,9 +1007,7 @@ alias -l DLF.Channels.ctcp {
   }
 }
 
-on ^*:open:*: {
-  DLF.Private.Text $1-
-}
+on ^*:open:*: { DLF.Private.Text $1- }
 
 alias -l DLF.Private.Text {
   if ((%DLF.nocomchan.dcc == 1) && (%DLF.accepthis == $target)) return
@@ -1039,7 +1035,7 @@ alias -l DLF.Private.Text {
   }
   if ((%DLF.privspam == 1) && ($hfind(DLF.priv.spam,%txt,1,W)) && (!$window($1))) DLF.Private.SpamFilter $1-
   if ((%DLF.searchresults == 1) && (%DLF.searchactive == 1)) {
-    if ($hfind(DLF.search.headers,%txt,1,W)) DLF.Find.Headers $nick $1-
+    if ($hfind(DLF.@find.headers,%txt,1,W)) DLF.Find.Headers $nick $1-
     if ((*Omen* iswm $1) && ($pling isin $2)) DLF.Find.Results $nick $1-
     if ($pos($1,$pling,1) == 1) DLF.Find.Results $nick $1-
     if (($1 == $colon) && ($pos($2,$pling,1) == 1)) DLF.Find.Results $nick $1-
@@ -1062,8 +1058,7 @@ alias -l DLF.Private.Notice {
   if ((%DLF.searchresults == 1) && (%DLF.searchactive == 1)) {
     if (No match found for* iswm %txt) DLF.Filter.Server $nick $1-
     if (*I have*match* for*in listfile* iswm %txt) DLF.Filter.Server $nick $1-
-    tokenize $asc($space) %txt
-    if ($pos($1,$pling,1) == 1) DLF.Find.Results $nick $1-
+    if ($left($1,1) == $pling) DLF.Find.Results $nick $1-
   }
 }
 
@@ -1194,6 +1189,11 @@ on *:close:@#*: {
   }
 }
 
+alias -l DLF.Find.Headers {
+  if (($window($1)) && (!$line($1,0))) .window -c $1
+  DLF.Filter.Server $1-
+}
+
 alias -l DLF.Filter.Server {
   var %line = $tag($1) $2-
   if ($2 == $colon) %line = $remtok(%line,$colon,1,$asc($space))
@@ -1240,12 +1240,6 @@ alias -l DLF.Private.SpamFilter {
 
 alias -l DLF.Channel.FindRequest {
   .set -u600 %DLF.searchactive 1
-}
-
-alias -l DLF.Find.Headers {
-  if (($window($1)) && (!$line($1,0))) .window -c $1
-  DLF.Filter.Server $1-
-  halt
 }
 
 alias -l DLF.Find.Results {
@@ -1517,7 +1511,7 @@ alias -l DLF.hadd {
   hadd %h %n $2-
 }
 
-alias -l DLF.CreateHashTables {
+alias DLF.CreateHashTables {
   var %matches = 0
   if ($hget(DLF.text.ads)) hfree DLF.text.ads
   DLF.hadd text.ads *Type*@*
@@ -1817,42 +1811,42 @@ alias -l DLF.CreateHashTables {
   DLF.hadd priv.spam *porn*http*
   inc %matches $hget(DLF.priv.spam,0).item
 
-  if ($hget(DLF.search.headers)) hfree DLF.search.headers
-  DLF.hadd search.headers *Search Result*OmeNServE*
-  DLF.hadd search.headers *OmeN*Search Result*ServE*
-  DLF.hadd search.headers *Matches for*Copy and paste in channel*
-  DLF.hadd search.headers *Total*files found*
-  DLF.hadd search.headers *Search Results*QwIRC*
-  DLF.hadd search.headers *Search Result*Too many files*Type*
-  DLF.hadd search.headers *@Find Results*SysReset*
-  DLF.hadd search.headers *End of @Find*
-  DLF.hadd search.headers *I have*match*for*in listfile*
-  DLF.hadd search.headers *SoftServe*Search result*
-  DLF.hadd search.headers *Tengo*coincidencia* para*
-  DLF.hadd search.headers *I have*match*for*Copy and Paste*
-  DLF.hadd search.headers *Too many results*@*
-  DLF.hadd search.headers *Tengo*resultado*slots*
-  DLF.hadd search.headers *I have*matches for*You might want to get my list by typing*
-  DLF.hadd search.headers *Résultat De Recherche*OmeNServE*
-  DLF.hadd search.headers *Resultados De Busqueda*OmenServe*
-  DLF.hadd search.headers *Total de*fichier*Trouvé*
-  DLF.hadd search.headers *Fichier* Correspondant pour*Copie*
-  DLF.hadd search.headers *Search Result*Matches For*Copy And Paste*
-  DLF.hadd search.headers *Resultados de la búsqueda*DragonServe*
-  DLF.hadd search.headers *Results for your search*DragonServe*
-  DLF.hadd search.headers *«SoftServe»*
-  DLF.hadd search.headers *search for*returned*results on list*
-  DLF.hadd search.headers *List trigger:*Slots*Next Send*CPS in use*CPS Record*
-  DLF.hadd search.headers *Searched*files and found*matching*To get a file, copy !*
-  DLF.hadd search.headers *Note*Hey look at what i found!*
-  DLF.hadd search.headers *Note*MP3-MP3*
-  DLF.hadd search.headers *Search Result*Matches For*Get My List Of*Files By Typing @*
-  DLF.hadd search.headers *Resultado Da Busca*Arquivos*Pegue A Minha Lista De*@*
-  DLF.hadd search.headers *J'ai Trop de Résultats Correspondants*@*
-  DLF.hadd search.headers *Search Results*Found*matches for*Type @*to download my list*
-  DLF.hadd search.headers *I have found*file*for your query*Displaying*
-  DLF.hadd search.headers *From list*found*displaying*
-  inc %matches $hget(DLF.search.headers,0).item
+  if ($hget(DLF.@find.headers)) hfree DLF.@find.headers
+  DLF.hadd @find.headers *Search Result*OmeNServE*
+  DLF.hadd @find.headers *OmeN*Search Result*ServE*
+  DLF.hadd @find.headers *Matches for*Copy and paste in channel*
+  DLF.hadd @find.headers *Total*files found*
+  DLF.hadd @find.headers *Search Results*QwIRC*
+  DLF.hadd @find.headers *Search Result*Too many files*Type*
+  DLF.hadd @find.headers *@Find Results*SysReset*
+  DLF.hadd @find.headers *End of @Find*
+  DLF.hadd @find.headers *I have*match*for*in listfile*
+  DLF.hadd @find.headers *SoftServe*Search result*
+  DLF.hadd @find.headers *Tengo*coincidencia* para*
+  DLF.hadd @find.headers *I have*match*for*Copy and Paste*
+  DLF.hadd @find.headers *Too many results*@*
+  DLF.hadd @find.headers *Tengo*resultado*slots*
+  DLF.hadd @find.headers *I have*matches for*You might want to get my list by typing*
+  DLF.hadd @find.headers *Résultat De Recherche*OmeNServE*
+  DLF.hadd @find.headers *Resultados De Busqueda*OmenServe*
+  DLF.hadd @find.headers *Total de*fichier*Trouvé*
+  DLF.hadd @find.headers *Fichier* Correspondant pour*Copie*
+  DLF.hadd @find.headers *Search Result*Matches For*Copy And Paste*
+  DLF.hadd @find.headers *Resultados de la búsqueda*DragonServe*
+  DLF.hadd @find.headers *Results for your search*DragonServe*
+  DLF.hadd @find.headers *«SoftServe»*
+  DLF.hadd @find.headers *search for*returned*results on list*
+  DLF.hadd @find.headers *List trigger:*Slots*Next Send*CPS in use*CPS Record*
+  DLF.hadd @find.headers *Searched*files and found*matching*To get a file, copy !*
+  DLF.hadd @find.headers *Note*Hey look at what i found!*
+  DLF.hadd @find.headers *Note*MP3-MP3*
+  DLF.hadd @find.headers *Search Result*Matches For*Get My List Of*Files By Typing @*
+  DLF.hadd @find.headers *Resultado Da Busca*Arquivos*Pegue A Minha Lista De*@*
+  DLF.hadd @find.headers *J'ai Trop de Résultats Correspondants*@*
+  DLF.hadd @find.headers *Search Results*Found*matches for*Type @*to download my list*
+  DLF.hadd @find.headers *I have found*file*for your query*Displaying*
+  DLF.hadd @find.headers *From list*found*displaying*
+  inc %matches $hget(DLF.@find.headers,0).item
 
   if ($hget(DLF.priv.server)) hfree DLF.priv.server
   DLF.hadd priv.server Sorry, I'm making a new list right now, please try later*
@@ -2169,30 +2163,31 @@ alias DLF.GenerateBinaryFile {
 ; Run this with //DLF.debug only if you are asked to
 ; by someone providing dlFilter support.
 alias DLF.debug {
+  var %file = dlFilter.debug.txt
   echo 14 -s [dlFilter] Debug started.
-  if ($show) echo 14 -s [dlFilter] Creating dlFilter.debug.txt
-  write -c dlFilter.debug.txt --- Start of debug info --- $fulldate ---
-  write -i dlFilter.debug.txt
-  write dlFilter.debug.txt Executing $script from $scriptdir
-  write dlFilter.debug.txt dlFilter version %DLF.version
-  write dlFilter.debug.txt mIRC version $version $iif($portable,portable)
-  write dlFilter.debug.txt Running Windows $os
-  write dlFilter.debug.txt Host: $host
-  write dlFilter.debug.txt IP: $ip
-  write -i dlFilter.debug.txt
-  write -i dlFilter.debug.txt
+  if ($show) echo 14 -s [dlFilter] Creating %file
+  write -c %file --- Start of debug info --- $fulldate ---
+  write -i %file
+  write %file Executing $script from $scriptdir
+  write %file dlFilter version %DLF.version
+  write %file mIRC version $version $iif($portable,portable)
+  write %file Running Windows $os
+  write %file Host: $host
+  write %file IP: $ip
+  write -i %file
+  write -i %file
   var %cs = $scon(0)
   if ($show) echo 14 -s [dlFilter] %cs servers
-  write dlFilter.debug.txt --- Servers --- %cs servers
-  write -i dlFilter.debug.txt
+  write %file --- Servers --- %cs servers
+  write -i %file
   var %i = 1
   while (%i <= %cs) {
     var %st = $scon(%i).status
     if (%st == connected) %st = $iif($scon(%i).ssl,securely) %st to $+($scon(%i).server,$chr(40),$scon(%i).serverip,:,$scon(%i).port,$chr(41)) as $scon(%i).me
     if ($show) echo 14 -s [dlFilter] Server %i is $scon(%i).servertarget $+ : %st
-    write dlFilter.debug.txt Server %i is $scon(%i).servertarget $+ : %st
+    write %file Server %i is $scon(%i).servertarget $+ : %st
     if (%st != disconnected) {
-      write dlFilter.debug.txt $chr(9) ChanTypes= $+ $scon(%i).chantypes $+ , ChanModes= $+ [ $+ $scon(%i).chanmodes $+ ], Modespl= $+ $scon(%i).modespl $+ , Nickmode= $+ $scon(%i).nickmode $+ , Usermode= $+ $scon(%i).usermode
+      write %file $chr(9) ChanTypes= $+ $scon(%i).chantypes $+ , ChanModes= $+ [ $+ $scon(%i).chanmodes $+ ], Modespl= $+ $scon(%i).modespl $+ , Nickmode= $+ $scon(%i).nickmode $+ , Usermode= $+ $scon(%i).usermode
       var %cid = $cid
       scid $scon(%i)
       var %nochans = $chan(0)
@@ -2203,29 +2198,29 @@ alias DLF.debug {
       }
       scid %cid
       %chans = $sorttok(%chans,44)
-      write dlFilter.debug.txt $chr(9) Channels: $replace(%chans,$chr(44),$chr(44) $+ $chr(32))
+      write %file $chr(9) Channels: $replace(%chans,$chr(44),$chr(44) $+ $chr(32))
     }
     inc %i
   }
-  write -i dlFilter.debug.txt
-  write -i dlFilter.debug.txt
+  write -i %file
+  write -i %file
   var %scripts = $script(0)
   if ($show) echo 14 -s [dlFilter] %scripts scripts loaded
-  write dlFilter.debug.txt --- Scripts --- %scripts scripts loaded
-  write -i dlFilter.debug.txt
+  write %file --- Scripts --- %scripts scripts loaded
+  write -i %file
   var %i = 1
   while (%i <= %scripts) {
     if ($show) echo 14 -s [dlFilter] Script %i is $script(%i)
-    write dlFilter.debug.txt Script %i is $script(%i) and is $lines($script(%i)) lines and $file($script(%i)).size bytes
+    write %file Script %i is $script(%i) and is $lines($script(%i)) lines and $file($script(%i)).size bytes
     inc %i
   }
-  write -i dlFilter.debug.txt
-  write -i dlFilter.debug.txt
+  write -i %file
+  write -i %file
   var %vars = $var(*,0)
   var %DLFvars = $var(DLF.*,0)
   if ($show) echo 14 -s [dlFilter] Found %vars variables, of which %DLFvars are dlFilter variables.
-  write dlFilter.debug.txt --- dlFilter Variables --- %vars variables, of which %DLFvars are dlFilter variables.
-  write -i dlFilter.debug.txt
+  write %file --- dlFilter Variables --- %vars variables, of which %DLFvars are dlFilter variables.
+  write -i %file
   var %vars = $null
   while (%DLFvars) {
     %vars = $addtok(%vars,$var(DLF.*,%DLFvars),44)
@@ -2235,32 +2230,32 @@ alias DLF.debug {
   var %DLFvars = $numtok(%vars,44)
   while (%DLFvars) {
     var %v = $gettok(%vars,%DLFvars,44)
-    write dlFilter.debug.txt %v = $var($right(%v,-1),1).value
+    write %file %v = $var($right(%v,-1),1).value
     dec %DLFvars
   }
-  write -i dlFilter.debug.txt
-  write -i dlFilter.debug.txt
+  write -i %file
+  write -i %file
   var %grps = $group(0)
   if ($show) echo 14 -s [dlFilter] %grps group(s) found
-  write dlFilter.debug.txt --- Groups --- %grps group(s) found
-  write -i dlFilter.debug.txt
+  write %file --- Groups --- %grps group(s) found
+  write -i %file
   var %i = 1
   while (%i <= %grps) {
-    write dlFilter.debug.txt Group %i $iif($group(%i).status == on,on: $+ $chr(160),off:) $group(%i) from $group(%i).fname
+    write %file Group %i $iif($group(%i).status == on,on: $+ $chr(160),off:) $group(%i) from $group(%i).fname
     inc %i
   }
-  write -i dlFilter.debug.txt
-  write -i dlFilter.debug.txt
+  write -i %file
+  write -i %file
   var %hs = $hget(0)
   if ($show) echo 14 -s [dlFilter] %hs hash table(s) found
-  write dlFilter.debug.txt --- Hash tables --- %hs hash table(s) found
-  write -i dlFilter.debug.txt
+  write %file --- Hash tables --- %hs hash table(s) found
+  write -i %file
   var %i = 1
   while (%i <= %hs) {
-    write dlFilter.debug.txt Table %i $+ : $hget(%i) $+ , items $hget(%i, 0).item $+ , slots $hget(%i).size
+    write %file Table %i $+ : $hget(%i) $+ , items $hget(%i, 0).item $+ , slots $hget(%i).size
     inc %i
   }
-  write -i dlFilter.debug.txt
-  write dlFilter.debug.txt --- End of debug info --- $fulldate ---
+  write -i %file
+  write %file --- End of debug info --- $fulldate ---
   echo 14 -s [dlFilter] Debug ended.
 }
