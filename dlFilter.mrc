@@ -42,15 +42,17 @@ o Vadi wrote special function to vPowerGet dll that allows sending files from DL
           New About tab.
           Channels / custom filters list - double click to edit.
         Menu and events broken out into aliases
-        Add extra options for windows for Server Ads and per connection
-        Remove New Release filters
-        Improve DLF.debug code
-        Create toolbar gif file from embedded data without needing to download it.
+        Added extra options for windows for Server Ads and per connection
+        Added extra option to check @find result trigger's match server sending them
+        Removed New Release filters
+        Improved DLF.debug code
+        Created toolbar gif file from embedded data without needing to download it.
           (And code to turn gif into compressed encoded embedded data.)
         Use native timestamps for custom windows instead of script timestamps
         Double-click in find results window to download the file
 
       TODO
+        Implement toolbar functionality
         Implement extra windows for fileserver ads and multi-server
         Option for custom windows per server or (as now) common
         Development debug functionality - if mIRC debug is on, add DLF debug messages to the debug log.
@@ -74,7 +76,6 @@ o Vadi wrote special function to vPowerGet dll that allows sending files from DL
         Use alias for status messages
         Hash tables for message matching instead of lists of ifs
         Options dialog layout improvements
-        Layout
           Enable / disable now global
           Custom filter Add / Remove button enable / disable
           Custom filter list multi-select
@@ -89,7 +90,7 @@ o Vadi wrote special function to vPowerGet dll that allows sending files from DL
         Allow user to choose whether to delete configuration variables on unload
         Limit load/start/connect update check to once per 7 days.
           (Options update check still runs every time options dialog is loaded.)
-        All aliases and dialogs local (-l flag)
+        Most aliases and dialogs local (-l flag)
 */
 
 alias -l DLF.SetVersion {
@@ -455,8 +456,8 @@ alias -l DLF.Private.Text {
   }
   if ($DLF.@find.IsResponse) {
     if ($hiswm(priv.findheaders,%txt)) DLF.@Find.PrivHeaders $nick $1-
-    if ($hiswm(priv.findresults,%txt)) DLF.@Find.Results $nick $1-
-    if ((*Omen* iswm $strip($1)) && ($left($strip($2),1) == $pling)) DLF.@Find.Results $nick $2-
+    if ($hiswm(priv.findresults,%txt)) DLF.@Find.Results Normal Private $nick $1-
+    if ((*Omen* iswm $strip($1)) && ($left($strip($2),1) == $pling)) DLF.@Find.Results Normal Private $nick $2-
   }
   if ((%DLF.privspam == 1) && ($hiswm(priv.spam,%txt)) && (!$window($1))) DLF.Private.SpamFilter $1-
   if ($hiswm(priv.server,%txt)) DLF.Window.Server $nick $1-
@@ -471,11 +472,11 @@ alias -l DLF.Private.Notice {
     DLF.Warning Regular user $nick $br($address) tried to send you a notice: $1-
     halt
   }
-  if (*SLOTS My mom always told me not to talk to strangers* iswm %txt) DLF.Window.Filtered Notice Notice $nick $1-
-  if (*CTCP flood detected, protection enabled* iswm %txt) DLF.Window.Filtered Notice Notice $nick $1-
+  if (*SLOTS My mom always told me not to talk to strangers* iswm %txt) DLF.Window.Filtered Notice Private $nick $1-
+  if (*CTCP flood detected, protection enabled* iswm %txt) DLF.Window.Filtered Notice Private $nick $1-
   if ($DLF.@find.IsResponse) {
     if ($hiswm(notice.findheader,%txt)) DLF.Window.Server $nick $1-
-    if ($left($1,1) == $pling) DLF.@Find.Results $nick $1-
+    if ($left($1,1) == $pling) DLF.@Find.Results Notice Private $nick $1-
   }
   if ($hiswm(notice.server,%txt)) DLF.Window.Server $nick $1-
   if ($hiswm(notice.findheader,%txt)) DLF.Window.Server $nick $1-
@@ -555,7 +556,7 @@ alias -l DLF.Window.FilteredNickColour {
 }
 
 alias -l DLF.Window.Filtered {
-  if (($1 == Normal) && ($2 == Private) && ($window($3))) .window -c $3
+  if (($2 == Private) && ($window($3))) .window -c $3
   var %log = $qt($+($logdir,$nopath($mklogfn(@dlF.Filtered.All))))
   var %nc = $+($network,$2)
   if ($1 == Normal) var %line = $sqbr(%nc) $tag($3) $4-
@@ -779,10 +780,10 @@ alias -l DLF.@Find.PrivHeaders {
 }
 
 alias -l DLF.@Find.Results {
-  if (($window($1)) && (!$line($1,0))) .window -c $1
+  if ((%DLF.searchspam) && ($strip($4) != $+($pling,$3))) DLF.Window.Filtered $1-
+  if (($window($3)) && (!$line($3,0))) .window -c $3
   if (!$window(@dlF.@find.Results)) window -slk0wnz @dlF.@find.Results
-  var %line = $right($2-,$calc($len($2-) - ($pos($2-,$pling,1) - 1)))
-  aline -n @dlF.@find.Results %line
+  aline -n @dlF.@find.Results $strip($4) $5-
   window -b @dlF.@find.Results
   titlebar @dlF.@find.Results -=- $line(@dlF.@find.Results,0) results so far -=- Right-click for options or double-click to download
   halt
@@ -1016,28 +1017,28 @@ alias DLF.Options.Toggle dialog $iif($dialog(DLF.Options.GUI),-c,-md) DLF.Option
 
 dialog -l DLF.Options.GUI {
   title dlFilter v $+ $DLF.SetVersion
-  size -1 -1 152 213
+  size -1 -1 152 222
   option dbu notheme
   text "", 20, 67 2 82 8, right hide
   check "Enable/disable dlFilter", 10, 2 2 62 8
-  tab "Channels", 200, 1 9 150 188
+  tab "Channels", 200, 1 9 150 197
   tab "Filters", 400
   tab "Other", 600
   tab "Custom", 800
   tab "About", 900
-  button "Close", 30, 2 200 50 11, ok default flat
-  check "Show/hide filtered lines", 40, 58 200 92 11, push
+  button "Close", 30, 2 209 50 11, ok default flat
+  check "Show/hide filtered lines", 40, 58 209 92 11, push
   ; tab Channels
   text "Channel to add: (type or select from dropdown)", 210, 5 25 144 8, tab 200
   combo 220, 4 33 144 6, tab 200 drop edit
   button "Add", 230, 5 46 67 11, tab 200 flat disable
   button "Remove", 240, 79 46 68 11, tab 200 flat disable
-  list 250, 4 59 144 93, tab 200 vsbar size sort extsel
-  box " Update ", 500, 4 153 144 41, tab 200
-  text "Checking for dlFilter updates...", 510, 7 161 140 8, tab 200
-  button "dlFilter website", 520, 7 170 65 11, tab 200 flat
-  button "Update dlFilter", 530, 79 170 65 11, tab 200 flat disable
-  check "Check for beta versions", 540, 7 183 136 8, tab 200
+  list 250, 4 59 144 102, tab 200 vsbar size sort extsel
+  box " Update ", 500, 4 162 144 41, tab 200
+  text "Checking for dlFilter updates...", 510, 7 170 140 8, tab 200
+  button "dlFilter website", 520, 7 179 65 11, tab 200 flat
+  button "Update dlFilter", 530, 79 179 65 11, tab 200 flat disable
+  check "Check for beta versions", 540, 7 192 136 8, tab 200
   ; tab Main
   box " General ", 405, 4 23 144 56, tab 400
   check "Filter adverts and announcements", 410, 7 32 133 8, tab 400
@@ -1055,23 +1056,24 @@ dialog -l DLF.Options.GUI {
   check "Away and thank-you messages", 490, 7 143 133 8, tab 400
   check "User mode changes", 495, 7 152 133 8, tab 400
   ; Tab Other
-  box " Custom Windows ", 605, 4 23 144 56, tab 600
+  box " Custom Windows ", 605, 4 23 144 65, tab 600
   check "Filter server responses to separate window", 610, 7 32 120 8, tab 600
   check "Filter server adverts to separate window", 615, 7 41 138 8, tab 600
   check "Separate filter windows per connection", 620, 7 50 138 8, tab 600
   check "Group @find/@locator results", 625, 7 59 138 8, tab 600
-  check "Filter oNotices to separate @#window (OpsTalk)", 630, 7 68 138 8, tab 600
-  box " Spam and security ", 640, 4 80 144 114, tab 600
-  check "Filter spam on channel", 645, 7 89 138 8, tab 600
-  check "... and Notify if you are an op", 650, 15 98 130 8, tab 600
-  check "Filter private spam", 655, 7 107 138 8, tab 600
-  check "... and Notify if you are op in common channel", 660, 15 116 130 8, tab 600
-  check "... and /ignore spammer for 1h (asks confirmation)", 665, 15 125 130 8, tab 600
-  check "Don't accept any messages or files from users with whom you do not have a common channel", 670, 7 133 138 16, tab 600 multi
-  check "... but accept DCC / query chats", 675, 15 149 130 8, tab 600
-  check "Do not accept files from regular users (except mIRC trusted users)", 680, 7 158 138 16, tab 600 multi
-  check "... block only potentially dangerous filetypes", 685, 15 174 130 8, tab 600
-  check "Do not accept private messages from regulars", 690, 7 183 138 8, tab 600
+  check "... and check trigger matches server nickname", 626, 15 68 130 8, tab 600
+  check "Filter oNotices to separate @#window (OpsTalk)", 630, 7 77 138 8, tab 600
+  box " Spam and security ", 640, 4 89 144 114, tab 600
+  check "Filter spam on channel", 645, 7 98 138 8, tab 600
+  check "... and Notify if you are an op", 650, 15 107 130 8, tab 600
+  check "Filter private spam", 655, 7 116 138 8, tab 600
+  check "... and Notify if you are op in common channel", 660, 15 125 130 8, tab 600
+  check "... and /ignore spammer for 1h (asks confirmation)", 665, 15 134 130 8, tab 600
+  check "Don't accept any messages or files from users with whom you do not have a common channel", 670, 7 142 138 16, tab 600 multi
+  check "... but accept DCC / query chats", 675, 15 158 130 8, tab 600
+  check "Do not accept files from regular users (except mIRC trusted users)", 680, 7 167 138 16, tab 600 multi
+  check "... block only potentially dangerous filetypes", 685, 15 183 130 8, tab 600
+  check "Do not accept private messages from regulars", 690, 7 192 138 8, tab 600
   ; tab Custom
   check "Enable custom filters", 810, 5 26 100 8, tab 800
   text "Message type:", 820, 5 38 50 8, tab 800
@@ -1079,7 +1081,7 @@ dialog -l DLF.Options.GUI {
   edit "", 840, 4 48 144 12, tab 800 autohs
   button "Add", 850, 5 62 67 11, tab 800 flat disable
   button "Remove", 860, 79 62 68 11, tab 800 flat disable
-  list 870, 4 75 144 119, tab 800 hsbar vsbar size sort extsel
+  list 870, 4 75 144 128, tab 800 hsbar vsbar size sort extsel
   ; tab About
   edit "", 920, 3 25 146 170, multi read vsbar tab 900
 }
@@ -1121,6 +1123,7 @@ alias -l DLF.Options.Initialise {
   DLF.Option.Init serverads 0
   DLF.Option.Init perconnect 1
   DLF.Option.Init searchresults 1
+  DLF.Option.Init searchspam 0
   DLF.Option.Init o.enabled 1
   ; Other tab Spam and Security box
   DLF.Option.Init chspam 1
@@ -1186,6 +1189,7 @@ on *:dialog:DLF.Options.GUI:init:0: {
   if (%DLF.serverads == 1) did -c DLF.Options.GUI 615
   if (%DLF.perconnect == 1) did -c DLF.Options.GUI 620
   if (%DLF.searchresults == 1) did -c DLF.Options.GUI 625
+  if (%DLF.searchspam == 1) did -c DLF.Options.GUI 626
   if (%DLF.chspam == 1) did -c DLF.Options.GUI 645
   else %DLF.chspam.opnotify = 0
   if (%DLF.chspam.opnotify == 1) did -c DLF.Options.GUI 650
@@ -1213,6 +1217,7 @@ on *:dialog:DLF.Options.GUI:init:0: {
 }
 
 alias -l DLF.Options.SetLinkedFields {
+  DLF.Options.LinkedFields 625 626
   DLF.Options.LinkedFields 645 650
   DLF.Options.LinkedFields 655 660 665
   DLF.Options.LinkedFields 670 675
@@ -1494,6 +1499,7 @@ alias -l DLF.Options.Save {
   %DLF.serverads = $did(615).state
   %DLF.perconnect = $did(620).state
   %DLF.searchresults = $did(625).state
+  %DLF.searchspam = $did(626).state
   %DLF.chspam = $did(645).state
   %DLF.chspam.opnotify = $did(650).state
   %DLF.privspam = $did(655).state
@@ -1697,7 +1703,10 @@ alias -l DLF.CreateGif {
 ; ========== Define message matching hash tables ==========
 alias -l hiswm {
   var %h = DLF. $+ $1
-  if (!$hget(%h)) DLF.CreateHashTables
+  if (!$hget(%h)) {
+    DLF.Warning Hash table %h does not exist - attempting to recreate it...
+    DLF.CreateHashTables
+  }
   return $hfind(%h,$2,1,W)
 }
 
@@ -2014,40 +2023,40 @@ alias DLF.CreateHashTables {
   inc %matches $hget(DLF.priv.spam,0).item
 
   if ($hget(DLF.priv.findheaders)) hfree DLF.priv.findheaders
-  DLF.hadd find.headers *Search Result*OmeNServE*
-  DLF.hadd find.headers *OmeN*Search Result*ServE*
-  DLF.hadd find.headers *Matches for*Copy and paste in channel*
-  DLF.hadd find.headers *Total*files found*
-  DLF.hadd find.headers *Search Results*QwIRC*
-  DLF.hadd find.headers *Search Result*Too many files*Type*
-  DLF.hadd find.headers *@Find Results*SysReset*
-  DLF.hadd find.headers *End of @Find*
-  DLF.hadd find.headers *I have*match*for*in listfile*
-  DLF.hadd find.headers *SoftServe*Search result*
-  DLF.hadd find.headers *Tengo*coincidencia* para*
-  DLF.hadd find.headers *I have*match*for*Copy and Paste*
-  DLF.hadd find.headers *Too many results*@*
-  DLF.hadd find.headers *Tengo*resultado*slots*
-  DLF.hadd find.headers *I have*matches for*You might want to get my list by typing*
-  DLF.hadd find.headers *Résultat De Recherche*OmeNServE*
-  DLF.hadd find.headers *Resultados De Busqueda*OmenServe*
-  DLF.hadd find.headers *Total de*fichier*Trouvé*
-  DLF.hadd find.headers *Fichier* Correspondant pour*Copie*
-  DLF.hadd find.headers *Search Result*Matches For*Copy And Paste*
-  DLF.hadd find.headers *Resultados de la búsqueda*DragonServe*
-  DLF.hadd find.headers *Results for your search*DragonServe*
-  DLF.hadd find.headers *«SoftServe»*
-  DLF.hadd find.headers *search for*returned*results on list*
-  DLF.hadd find.headers *List trigger:*Slots*Next Send*CPS in use*CPS Record*
-  DLF.hadd find.headers *Searched*files and found*matching*To get a file, copy !*
-  DLF.hadd find.headers *Note*Hey look at what i found!*
-  DLF.hadd find.headers *Note*MP3-MP3*
-  DLF.hadd find.headers *Search Result*Matches For*Get My List Of*Files By Typing @*
-  DLF.hadd find.headers *Resultado Da Busca*Arquivos*Pegue A Minha Lista De*@*
-  DLF.hadd find.headers *J'ai Trop de Résultats Correspondants*@*
-  DLF.hadd find.headers *Search Results*Found*matches for*Type @*to download my list*
-  DLF.hadd find.headers *I have found*file*for your query*Displaying*
-  DLF.hadd find.headers *From list*found*displaying*
+  DLF.hadd priv.findheaders *Search Result*OmeNServE*
+  DLF.hadd priv.findheaders *OmeN*Search Result*ServE*
+  DLF.hadd priv.findheaders *Matches for*Copy and paste in channel*
+  DLF.hadd priv.findheaders *Total*files found*
+  DLF.hadd priv.findheaders *Search Results*QwIRC*
+  DLF.hadd priv.findheaders *Search Result*Too many files*Type*
+  DLF.hadd priv.findheaders *@Find Results*SysReset*
+  DLF.hadd priv.findheaders *End of @Find*
+  DLF.hadd priv.findheaders *I have*match*for*in listfile*
+  DLF.hadd priv.findheaders *SoftServe*Search result*
+  DLF.hadd priv.findheaders *Tengo*coincidencia* para*
+  DLF.hadd priv.findheaders *I have*match*for*Copy and Paste*
+  DLF.hadd priv.findheaders *Too many results*@*
+  DLF.hadd priv.findheaders *Tengo*resultado*slots*
+  DLF.hadd priv.findheaders *I have*matches for*You might want to get my list by typing*
+  DLF.hadd priv.findheaders *Résultat De Recherche*OmeNServE*
+  DLF.hadd priv.findheaders *Resultados De Busqueda*OmenServe*
+  DLF.hadd priv.findheaders *Total de*fichier*Trouvé*
+  DLF.hadd priv.findheaders *Fichier* Correspondant pour*Copie*
+  DLF.hadd priv.findheaders *Search Result*Matches For*Copy And Paste*
+  DLF.hadd priv.findheaders *Resultados de la búsqueda*DragonServe*
+  DLF.hadd priv.findheaders *Results for your search*DragonServe*
+  DLF.hadd priv.findheaders *«SoftServe»*
+  DLF.hadd priv.findheaders *search for*returned*results on list*
+  DLF.hadd priv.findheaders *List trigger:*Slots*Next Send*CPS in use*CPS Record*
+  DLF.hadd priv.findheaders *Searched*files and found*matching*To get a file, copy !*
+  DLF.hadd priv.findheaders *Note*Hey look at what i found!*
+  DLF.hadd priv.findheaders *Note*MP3-MP3*
+  DLF.hadd priv.findheaders *Search Result*Matches For*Get My List Of*Files By Typing @*
+  DLF.hadd priv.findheaders *Resultado Da Busca*Arquivos*Pegue A Minha Lista De*@*
+  DLF.hadd priv.findheaders *J'ai Trop de Résultats Correspondants*@*
+  DLF.hadd priv.findheaders *Search Results*Found*matches for*Type @*to download my list*
+  DLF.hadd priv.findheaders *I have found*file*for your query*Displaying*
+  DLF.hadd priv.findheaders *From list*found*displaying*
   inc %matches $hget(DLF.priv.findheaders,0).item
 
   if ($hget(DLF.priv.findresults)) hfree DLF.priv.findresults
