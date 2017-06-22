@@ -43,13 +43,14 @@ o Vadi wrote special function to vPowerGet dll that allows sending files from DL
           Channels / custom filters list - double click to edit.
         Menu and events broken out into aliases
         Added extra options for windows for Server Ads and per connection
-        Added extra option to check @find result trigger's match server sending them
+        Added extra option to check @find result trigger matches nickname sending them
         Removed New Release filters
         Improved DLF.debug code
         Created toolbar gif file from embedded data without needing to download it.
           (And code to turn gif into compressed encoded embedded data.)
         Use native timestamps for custom windows instead of script timestamps
         Double-click in find results window to download the file
+        Filter search now retains line colours
 
       TODO
         Implement toolbar functionality
@@ -647,7 +648,7 @@ alias -l DLF.Window.Search {
   window %flags %ws
   var %sstring = $+($star,$2-,$star)
   titlebar %ws -=- Searching for %sstring
-  filter -wwbpch4 %wf %ws %sstring
+  filter -wwcbzph4 %wf %ws %sstring
   var %matches = $iif($filtered == 0,No matches,$iif($filtered == 1,One match,$filtered matches))
   titlebar %ws -=- Search finished. %matches found for $qt(%sstring)
 }
@@ -780,8 +781,12 @@ alias -l DLF.@Find.PrivHeaders {
 }
 
 alias -l DLF.@Find.Results {
-  if ((%DLF.searchspam) && ($strip($4) != $+($pling,$3))) DLF.Window.Filtered $1-
   if (($window($3)) && (!$line($3,0))) .window -c $3
+  var %msg = $5-
+  if($strip($4) != $+($pling,$3)) {
+    if (%DLF.searchspam) DLF.Window.Filtered $1-
+    else %msg = %msg $c(4,0,** Received from $nick **)
+  }
   if (!$window(@dlF.@find.Results)) window -slk0wnz @dlF.@find.Results
   aline -n @dlF.@find.Results $strip($4) $5-
   window -b @dlF.@find.Results
@@ -821,7 +826,8 @@ alias -l DLF.@find.Get {
       var %chan = $comchan(%nick,%i)
       echo -s $network %chan $DLF.IsChannel($network,%chan)
       if ($DLF.IsChannel($network,%chan)) {
-        msg %chan %trig %fn
+        ; Use editbox not msg so other scripts (like sbClient) get On Input event
+        editbox -n %chan %trig %fn
         scid %cid
         cline 15 $active $1
         return
