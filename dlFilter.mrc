@@ -50,7 +50,9 @@ o Vadi wrote special function to vPowerGet dll that allows sending files from DL
           (And code to turn gif into compressed encoded embedded data.)
         Use native timestamps for custom windows instead of script timestamps
         Double-click in find results window to download the file
-        Filter search now retains line colours
+        Search in Filter window now retains line colours
+        Restricted ctcp Version responses to people in common channel or PM
+        DLF.Debug.DLF now displays custom debug window filtered to dlF channels with halt reasons
 
       TODO
         Implement toolbar functionality
@@ -99,23 +101,29 @@ alias -l DLF.SetVersion {
   return %DLF.version
 }
 
-; ctcp does not work as per help file i.e. cannot specify channel
-; and all ctcp messages are private
-; so we will only reply to people who are in a common dlFilter channel
-ctcp *:VERSION:*: {
+ctcp ^*:VERSION:#: { DLF.Halt ctcp VERSION in any channel }
+ctcp ^*:VERSION:?: {
+  ; dlFilter version response only to people who are in a common dlFilter channel
   var %i = $comchan($nick,0)
   while (%i) {
     var %chan = $comchan($nick,%i)
-    if ($DLF.IsChannel($network,%chan)) {
+    if ($DLF.Chan.IsDlfChan($network,%chan)) {
       .ctcpreply $nick VERSION $c(1,9,$DLF.logo Version $DLF.SetVersion by DukeLupus & Sophist.) $+ $c(1,15,$space $+ Get it from $c(12,15,$u(https://github.com/SanderSade/dlFilter/releases)))
-      return
+      break
     }
     dec %i
   }
+  ; Other script VERSION responses only to people who are in a common channel or PM
+  if ($comchan($nick,0)) return
+  if ($window($nick)) return
+  if ($window($+(=,$nick)) return
+  DLF.Halt ctcp VERSION in private from someone not in common dlF channel or chat
 }
 
 alias -l DLF.mIRCversion {
   var %app = $nopath($mircexe)
+  ; AdiIRC - not sure what version is specifically needed
+  ; 2.8 is the version at the time of starting to think about AdiIRC support.
   if ($left(%app,6) == AdiIRC) {
     if ($version >= 2.8) return 0
     %DLF.enabled = 0
@@ -154,6 +162,8 @@ on *:load: {
   DLF.Error During load: $qt($error)
 }
 
+on *:signal:DLF.Update.ReLoad: DLF.Initialise
+
 alias DLF.Initialise {
   ; Delete obsolete variables
   .unset %DLF.custom.selected
@@ -182,8 +192,8 @@ on *:unload: {
   }
   DLF.Status Closing open dlFilter windows
   if ($dialog(DLF.Options.GUI)) .dialog -x DLF.Options.GUI DLF.Options.GUI
-  close -a@ @dlF.Filtered.*
-  close -a@ @dlF.FilteredSearch.*
+  close -a@ @dlF.Filter.*
+  close -a@ @dlF.FilterSearch.*
   close -a@ @dlF.Server.*
   close -a@ @dlF.ServerSearch.*
   close -a@ @dlF.@find.*
@@ -197,7 +207,7 @@ on *:unload: {
 ; ========== Main popup menus ==========
 menu menubar {
   dlFilter
-  .$iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Option.ToggleShowFilter
+  .$iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Options.ToggleShowFilter
   .Options: DLF.Options.Show
   .Visit filter website: .url -a https://github.com/SanderSade/dlFilter
   .-
@@ -210,99 +220,21 @@ menu channel {
   Send oNotice: DLF.oNotice.Open
   -
   dlFilter
-  ..$iif($DLF.IsChannel($network,$chan),Remove this channel from,Add this channel to) filtering: DLF.Channels.AddRemove
+  ..$iif($DLF.Chan.IsDlfChan($network,$chan),Remove this channel from,Add this channel to) filtering: DLF.Chan.AddRemove
   ..$iif(%DLF.netchans == $hashtag, $style(3)) Set filtering to all channels: {
-    DLF.Channels.Set $hashtag
+    DLF.Chan.Set $hashtag
     DLF.Status $c(6,Channels set to $c(4,$hashtag))
   }
   ..-
-  ..$iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Option.ToggleShowFilter
+  ..$iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Options.ToggleShowFilter
   ..Options: DLF.Options.Show
-}
-
-alias -l DLF.Channels.AddRemove {
-  if (!$DLF.IsChannel($network,$chan)) DLF.Channels.Add $chan $network
-  else DLF.Channels.Remove $chan $network
-  if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 6 1 %DLF.netchans
-  DLF.Status $c(6,Channels set to $c(4,%DLF.netchans))
-}
-
-alias -l DLF.Channels.Add {
-  var %netchan = $iif($1,$1,$+($network,$chan))
-  %DLF.netchans = $remtok(%DLF.netchans,%chan,$asc($comma))
-  if (%DLF.netchans != $hashtag) DLF.Channels.Set $addtok(%DLF.netchans,%netchan,$asc($comma))
-  else DLF.Channels.Set %netchan
-}
-
-alias -l DLF.Channels.Remove {
-  var %net = $iif($0 >= 2,$2,$network)
-  var %chan = $iif($0 >= 1,$1,$chan)
-  var %netchan = $+(%net,%chan)
-  if ($istok(%DLF.netchans,%netchan,$asc($comma))) DLF.Channels.Set $remtok(%DLF.netchans,$+(%net,%chan),1,$asc($comma))
-  else DLF.Channels.Set $remtok(%DLF.netchans,%chan,1,$asc($comma))
-}
-
-alias -l DLF.Option.ToggleShowFilter {
-  DLF.Option.Toggle showfiltered 40
-  if (%DLF.showfiltered == 0) close -@ @dlF.Filtered*
-}
-
-alias -l DLF.Option.Toggle {
-  var %newval = $iif([ % [ $+ DLF. [ $+ [ $1 ] ] ] ],0,1)
-  % [ $+ [ DLF. [ $+ [ $1 ] ] ] ] = %newval
-  if (($2 != $null) && ($dialog(DLF.Options.GUI))) did $iif(%newval,-c,-u) DLF.Options.GUI $2
-  DLF.Status Option $1 $iif(%newval,set,cleared)
-}
-
-menu @dlF.*Search.* {
-  Copy line: {
-    .clipboard
-    .clipboard $sline($active,1)
-    cline 14 $active $sline($active,1).ln
-  }
-  Clear: clear
-  Close: window -c $active
-  Options: DLF.Options.Show
 }
 
 ; ============================== Event catching ==============================
 
-; Convert network#channel to just #channel for On statements
-alias -l DLF.Channels.Set {
-  %DLF.netchans = $replace($1-,$space,$comma)
-  var %r = $+(/,[^,$comma,#]+,$lbr,?=#[^,$comma,#]*,$rbr,/g)
-  %DLF.channels = $regsubex(%DLF.netchans,%r,$null)
-}
-
-; Check if channel is set whether it is network#channel or just #channel
-alias -l DLF.IsChannelEvent {
-  if ($2 == 0) return $false
-  return $DLF.IsChannel($network,$1)
-}
-
-alias -l DLF.IsChannel {
-  if (%DLF.netchans == $hashtag) return $true
-  if ($findtok(%DLF.netchans,$2,$asc($comma))) return $true
-  if ($findtok(%DLF.netchans,$+($1,$2),$asc($comma))) return $true
-  return $false
-}
-
-; Check whether non-channel event (quit or nickname) is from a network where we are in a defined channel
-alias -l DLF.IsNonChannelEvent {
-  if ($1 == 0) return $false
-  if (%DLF.netchans == $hashtag) return $true
-  var %i = $chan(0)
-  while (%i) {
-    if ($istok(%DLF.netchans,$chan(%i),$asc($comma))) return $true
-    if ($istok(%DLF.netchans,$+($network,$chan(%i)),$asc($comma))) return $true
-    dec %i
-  }
-  return $false
-}
-
 ; Following is just in case groups get reset to default...
 ; Primarily for developers when e.g. script is reloaded on change by authors autoreload script
-#dlf_bootstrap off
+#dlf_bootstrap on
 on *:text:*:*: DLF.Groups.Bootstrap
 alias -l DLF.Groups.Bootstrap {
   if (%DLF.enabled != $null) DLF.Groups.Events
@@ -310,63 +242,66 @@ alias -l DLF.Groups.Bootstrap {
 }
 #dlf_bootstrap end
 
+alias -l DLF.Groups.Events {
+  if (%DLF.enabled) .enable #dlf_events
+  else .disable #dlf_events
+}
+
 ;#dlf_events off
 #dlf_events on
 
 ; Channel user activity
 ; join, art, quit, nick changes, kick
-on ^*:join:%DLF.channels: { if ($DLF.IsChannelEvent($chan,%DLF.joins)) DLF.User.Channel Join $chan $nick $br($address) has joined $chan }
-on ^*:part:%DLF.channels: { if ($DLF.IsChannelEvent($chan,%DLF.parts)) DLF.User.Channel Part $chan $nick $br($address) has left $chan }
-on ^*:kick:%DLF.channels: { if ($DLF.IsChannelEvent($chan,%DLF.kicks)) DLF.User.Channel Kick $chan $knick $br($address($knick,5)) was kicked from $chan by $nick $br($1-) }
-on ^*:nick: { if ($DLF.IsNonChannelEvent(%DLF.nicks)) DLF.User.NoChannel $newnick Nick $nick $br($address) is now known as $newnick }
-on ^*:quit: { if ($DLF.IsNonChannelEvent(%DLF.quits)) DLF.User.NoChannel $nick Quit $nick $br($address) Quit $br($1-). }
+on ^*:join:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan,%DLF.joins)) DLF.User.Channel Join $chan $nick $br($address) has joined $chan }
+on ^*:part:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan,%DLF.parts)) DLF.User.Channel Part $chan $nick $br($address) has left $chan }
+on ^*:kick:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan,%DLF.kicks)) DLF.User.Channel Kick $chan $knick $br($address($knick,5)) was kicked from $chan by $nick $br($1-) }
+on ^*:nick: { if ($DLF.Chan.IsUserEvent(%DLF.nicks)) DLF.User.NoChannel $newnick Nick $nick $br($address) is now known as $newnick }
+on ^*:quit: { if ($DLF.Chan.IsUserEvent(%DLF.quits)) DLF.User.NoChannel $nick Quit $nick $br($address) Quit $br($1-). }
 
 ; Channel mode changes
 ; ban, unban, op, deop, voice, devoice etc.
-on ^*:ban:%DLF.channels: { if ($DLF.IsChannelEvent($chan,%DLF.usrmode)) halt }
-on ^*:unban:%DLF.channels: { if ($DLF.IsChannelEvent($chan,%DLF.usrmode)) halt }
-on ^*:op:%DLF.channels: { if ($DLF.IsChannelEvent($chan,%DLF.usrmode)) halt }
-on ^*:deop:%DLF.channels: { if ($DLF.IsChannelEvent($chan,%DLF.usrmode)) halt }
-on ^*:voice:%DLF.channels: { if ($DLF.IsChannelEvent($chan,%DLF.usrmode)) halt }
-on ^*:devoice:%DLF.channels: { if ($DLF.IsChannelEvent($chan,%DLF.usrmode)) halt }
-on ^*:serverop:%DLF.channels: { if ($DLF.IsChannelEvent($chan,%DLF.usrmode)) halt }
-on ^*:serverdeop:%DLF.channels: { if ($DLF.IsChannelEvent($chan,%DLF.usrmode)) halt }
-on ^*:servervoice:%DLF.channels: { if ($DLF.IsChannelEvent($chan,%DLF.usrmode)) halt }
-on ^*:serverdevoice:%DLF.channels: { if ($DLF.IsChannelEvent($chan,%DLF.usrmode)) halt }
-on ^*:mode:%DLF.channels: { if ($DLF.IsChannelEvent($chan,%DLF.chmode)) halt }
-on ^*:servermode:%DLF.channels: { if ($DLF.IsChannelEvent($chan,%DLF.chmode)) halt }
+on ^*:ban:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan,%DLF.usrmode)) DLF.Halt usermode ban in dlF channel }
+on ^*:unban:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan,%DLF.usrmode)) DLF.Halt usermode unban in dlF channel }
+on ^*:op:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan,%DLF.usrmode)) DLF.Halt usermode op in dlF channel }
+on ^*:deop:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan,%DLF.usrmode)) DLF.Halt usermode deop in dlF channel }
+on ^*:voice:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan,%DLF.usrmode)) DLF.Halt usermode voice in dlF channel }
+on ^*:devoice:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan,%DLF.usrmode)) DLF.Halt usermode devoice in dlF channel }
+on ^*:serverop:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan,%DLF.usrmode)) DLF.Halt usermode serverop in dlF channel }
+on ^*:serverdeop:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan,%DLF.usrmode)) DLF.Halt usermode serverdeop in dlF channel }
+on ^*:servervoice:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan,%DLF.usrmode)) DLF.Halt usermode servervoice in dlF channel }
+on ^*:serverdevoice:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan,%DLF.usrmode)) DLF.Halt usermode severdevoice in dlF channel }
+on ^*:mode:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan,%DLF.chmode)) DLF.Halt chanmode in dlF channel }
+on ^*:servermode:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan,%DLF.chmode)) DLF.Halt serverchanmode in dlF channel }
 
 ; Channel inputs
 on *:input:%DLF.channels: {
-  if ($DLF.IsChannelEvent($chan)) {
-    if (($1 == @find) || ($1 == @locator)) DLF.Channel.FindRequest $1-
-    if (($left($1,1) isin !@) && ($right($1,-1) ison $chan)) DLF.Channel.ServerRequest $1-
+  if ($DLF.Chan.IsChanEvent($chan)) {
+    if (($1 == @find) || ($1 == @locator)) DLF.@find.Request $1-
+    if (($left($1,1) isin !@) && ($right($1,-1) ison $chan)) DLF.Chan.ServerRequest $1-
   }
 }
-alias -l DLF.Channel.ServerRequest echo -at DLF.Channel.ServerRequest called: $1-
 
 ; Channel messages
-on ^*:text:*:%DLF.channels: { if ($DLF.IsChannelEvent($chan)) DLF.Channels.Text $1- }
-on ^*:action:*:%DLF.channels: { if ($DLF.IsChannelEvent($chan)) DLF.Channels.Action $1- }
-on ^*:notice:*:%DLF.channels: { if ($DLF.IsChannelEvent($chan)) DLF.Channels.Notice $1- }
+on ^*:text:*:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan)) DLF.Chan.Text $1- }
+on ^*:action:*:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan)) DLF.Chan.Action $1- }
+on ^*:notice:*:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan)) DLF.Chan.Notice $1- }
 on ^*:notice:*:#: { if ($DLF.oNotice.IsoNotice) DLF.oNotice.Channel $1- }
 
 ; Private messages
-on ^*:text:*:?: { DLF.Private.Text $1- }
-on ^*:notice:*:?: { DLF.Private.Notice $1- }
-on ^*:action:*:?: { DLF.Private.Action $1- }
+on ^*:text:*:?: { DLF.Priv.Text $1- }
+on ^*:notice:*:?: { DLF.Priv.Notice $1- }
+on ^*:action:*:?: { DLF.Priv.Action $1- }
 on ^*:open:*: {
   echo -s ON OPEN $target $nick $1-
-  DLF.Private.Text $1-
+  DLF.Priv.Text $1-
 }
 
 ; ctcp
-ctcp *:*ping*:%DLF.channels: { if ($DLF.IsChannelEvent($chan)) haltdef }
-ctcp *:*:%DLF.channels: { if ($DLF.IsChannelEvent($chan)) DLF.Channels.ctcp $1- }
-ctcp ^*:DCC CHAT:?: { DLF.dcc.ChatRequest $1- }
-ctcp ^*:DCC SEND:?: { DLF.dcc.SendRequest $1- }
-alias -l DLF.dcc.ChatRequest echo -st DLF.dcc.ChatRequest called: $1-
-alias -l DLF.dcc.SendRequest echo -st DLF.dcc.SendRequest called: $1-
+ctcp *:*ping*:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan)) DLF.Halt ping in dlF channel }
+ctcp *:*:%DLF.channels: { if ($DLF.Chan.IsChanEvent($chan)) DLF.Chan.ctcp $1- }
+ctcp ^*:DCC CHAT:?: { DLF.ctcp.ChatRequest $1- }
+ctcp ^*:DCC SEND:?: { DLF.ctcp.SendRequest $1- }
+ctcp *:*:?: { DLF.ctcp.Private $1- }
 on *:CTCPREPLY:*: { DLF.ctcp.Reply $1- }
 
 ; Filter away messages
@@ -378,7 +313,7 @@ raw 301:*: { DLF.Away.Filter $1- }
 ; join, part, kick
 alias -l DLF.User.Channel {
   if (%DLF.showstatus == 1) echo -stnc $1 $sqbr($2) $star $3-
-  DLF.Window.Filtered $1-
+  DLF.Win.Filter $1-
 }
 
 ; Non-channel user activity
@@ -388,7 +323,7 @@ alias -l DLF.User.NoChannel {
     var %i = $comchan($1,0)
     while (%i) {
       var %chan = $comchan($1,%i)
-      if ($DLF.IsChannel($network,%chan) == $false) echo -ct $2 %chan $star $3-
+      if ($DLF.Chan.IsDlfChan($network,%chan) == $false) echo -ct $2 %chan $star $3-
       dec %i
     }
   }
@@ -396,134 +331,243 @@ alias -l DLF.User.NoChannel {
 }
 
 ; Channel messages
-alias -l DLF.Channels.Text {
+alias -l DLF.Chan.AddRemove {
+  if (!$DLF.Chan.IsDlfChan($network,$chan)) DLF.Chan.Add $chan $network
+  else DLF.Chan.Remove $chan $network
+  if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 6 1 %DLF.netchans
+  DLF.Status $c(6,Channels set to $c(4,%DLF.netchans))
+}
+
+alias -l DLF.Chan.Add {
+  var %netchan = $iif($1,$1,$+($network,$chan))
+  %DLF.netchans = $remtok(%DLF.netchans,%chan,$asc($comma))
+  if (%DLF.netchans != $hashtag) DLF.Chan.Set $addtok(%DLF.netchans,%netchan,$asc($comma))
+  else DLF.Chan.Set %netchan
+}
+
+alias -l DLF.Chan.Remove {
+  var %net = $iif($0 >= 2,$2,$network)
+  var %chan = $iif($0 >= 1,$1,$chan)
+  var %netchan = $+(%net,%chan)
+  if ($istok(%DLF.netchans,%netchan,$asc($comma))) DLF.Chan.Set $remtok(%DLF.netchans,$+(%net,%chan),1,$asc($comma))
+  else DLF.Chan.Set $remtok(%DLF.netchans,%chan,1,$asc($comma))
+}
+
+; Convert network#channel to just #channel for On statements
+alias -l DLF.Chan.Set {
+  %DLF.netchans = $replace($1-,$space,$comma)
+  var %r = $+(/,[^,$comma,#]+,$lbr,?=#[^,$comma,#]*,$rbr,/g)
+  %DLF.channels = $regsubex(%DLF.netchans,%r,$null)
+}
+
+; Check if channel is set whether it is network#channel or just #channel
+alias -l DLF.Chan.IsChanEvent {
+  if ($2 == 0) return $false
+  return $DLF.Chan.IsDlfChan($network,$1)
+}
+
+alias -l DLF.Chan.IsDlfChan {
+  if (%DLF.netchans == $hashtag) return $true
+  if ($istok(%DLF.netchans,$2,$asc($comma))) return $true
+  if ($istok(%DLF.netchans,$+($1,$2),$asc($comma))) return $true
+  return $false
+}
+
+; Check whether non-channel event (quit or nickname) is from a network where we are in a defined channel
+alias -l DLF.Chan.IsUserEvent {
+  if ($1 == 0) return $false
+  if (%DLF.netchans == $hashtag) return $true
+  var %i = $chan(0)
+  while (%i) {
+    if ($istok(%DLF.netchans,$chan(%i),$asc($comma))) return $true
+    if ($istok(%DLF.netchans,$+($network,$chan(%i)),$asc($comma))) return $true
+    dec %i
+  }
+  return $false
+}
+
+alias -l DLF.Chan.Text {
   DLF.Custom.Check chantext Normal $chan $nick $1-
   var %txt = $strip($1-)
-  if ((%DLF.ads == 1) && ($hiswm(chantext.ads,%txt))) DLF.Window.FilteredNickColour Normal $chan $nick $1-
-  if ((%DLF.requests == 1) && ($hiswm(chantext.cmds,%txt))) DLF.Window.Filtered Normal $chan $nick $1-
-  if ((%DLF.away == 1) && ($hiswm(chantext.away,%txt))) DLF.Window.Filtered Normal $chan $nick $1-
-  if ($hiswm(chantext.always,%txt)) DLF.Window.Filtered Normal $chan $nick $1-
+  if ((%DLF.ads == 1) && ($hiswm(chantext.ads,%txt))) DLF.Chan.FilterNickColour Normal $chan $nick $1-
+  if ((%DLF.requests == 1) && ($hiswm(chantext.cmds,%txt))) DLF.Win.Filter Normal $chan $nick $1-
+  if ((%DLF.away == 1) && ($hiswm(chantext.away,%txt))) DLF.Win.Filter Normal $chan $nick $1-
+  if ($hiswm(chantext.always,%txt)) DLF.Win.Filter Normal $chan $nick $1-
   /*if (%DLF.chspam == 1) {
     ;no channel spam right now
   }
   */
 }
 
-alias -l DLF.Channels.Action {
+alias -l DLF.Chan.Action {
   DLF.Custom.Check chanaction Action $chan $nick $1-
   var %DLF.action = $strip($1-)
-  if ((%DLF.ads == 1) && ($hiswm(chanaction.ads,%DLF.action))) DLF.Window.Filtered Action $chan $nick $1-
-  if ((%DLF.away == 1) && ($hiswm(chanaction.away,%DLF.action))) DLF.Window.Filtered Action $chan $nick $1-
+  if ((%DLF.ads == 1) && ($hiswm(chanaction.ads,%DLF.action))) DLF.Win.Filter Action $chan $nick $1-
+  if ((%DLF.away == 1) && ($hiswm(chanaction.away,%DLF.action))) DLF.Win.Filter Action $chan $nick $1-
 }
 
-alias -l DLF.Channels.Notice {
+alias -l DLF.Chan.Notice {
   DLF.Custom.Check channotice Notice $chan $nick $1-
-  if ((%DLF.chspam == 1) && ($hiswm(channotice.spam,$strip($1-)))) DLF.Channel.SpamFilter $chan $nick $1-
+  if ((%DLF.chspam == 1) && ($hiswm(channotice.spam,$strip($1-)))) DLF.Chan.SpamFilter $chan $nick $1-
 }
 
-alias -l DLF.Channels.ctcp {
+alias -l DLF.Chan.ctcp {
   DLF.Custom.Check chanctcp Notice $target $nick $1-
-  if ($hiswm(ctcp.spam,$1-)) {
-    DLF.SetNickColour $chan $nick
-    haltdef
+  if ($hiswm(chanctcp.spam,$1-)) {
+    DLF.Chan.SetNickColour $chan $nick
+    DLF.Halt ctcp in dlF channel
   }
 }
 
+alias -l DLF.Chan.FilterNickColour {
+  DLF.Chan.SetNickColour $1 $2
+  DLF.Win.Filter $1-
+}
+
+alias -l DLF.Chan.SpamFilter {
+  if ((%DLF.chspam.opnotify == 1) && ($me isop $1)) {
+    DLF.Warning $c(4,Channel spam detected:) $sqbr($1) $tag($2) $br($address($2,1)) -->> $c(4,$3-)
+  }
+  DLF.Halt spam in #dlF channel
+}
+
+alias -l DLF.Chan.SetNickColour {
+  if ((%DLF.colornicks == 1) && ($nick($1,$2).color == $color(nicklist))) cline 2 $1 $2
+}
+
+alias -l DLF.Chan.ServerRequest {
+  echo -at DLF.Chan.ServerRequest called: $1-
+}
+
 ; Private messages
-alias -l DLF.Private.Text {
+alias -l DLF.Priv.Text {
   if ((%DLF.nocomchan.dcc == 1) && (%DLF.accepthis == $target)) return
   if ($+(*,$dollar,decode*) iswm $1-) DLF.Warning Do not paste any messages containing $b($dollar $+ decode) to your mIRC. They are mIRC worms & the people sending them are infected. Instead, please report such messages to the channel ops.
 
   DLF.Custom.Check privtext Normal Private $nick $1-
   var %txt = $strip($1-)
-  ; TO-DO Work out what the next line does
-  if ($window(1)) DLF.Check.CommonChan $nick $1-
-  if ((%DLF.noregmsg == 1) && ($DLF.Check.RegularUser($nick) == IsRegular)) {
+  if ($DLF.@find.IsResponse) {
+    if ($hiswm(privtext.findheader,%txt)) DLF.@find.PrivHeaders $nick $1-
+    if ($hiswm(priv.findresult,%txt)) DLF.@find.Results Normal Private $nick $1-
+    if ((*Omen* iswm $strip($1)) && ($left($strip($2),1) == $pling)) DLF.@find.Results Normal Private $nick $2-
+  }
+  DLF.Priv.CommonChan $nick $1-
+  if ((%DLF.noregmsg == 1) && ($DLF.Priv.IsRegularUser($nick))) {
     DLF.Warning Regular user $nick $br($address($nick,0)) tried to: $1-
     if ($window($nick)) window -c $nick
-    halt
+    DLF.Halt private text from regular user
   }
   if (%DLF.privrequests == 1) {
     if ($nick === $me) return
-    var %fword = $strip($1)
+    var %trigger = $strip($1)
     var %nicklist = @ $+ $me
     var %nickfile = ! $+ $me
-    if ((%nicklist == %fword) || (%nickfile == %fword) || (%nickfile == $gettok($strip($1),1,$asc($hyphen)))) {
+    if ((%nicklist == %trigger) || (%nickfile == %trigger) || (%nickfile == $gettok($strip($1),1,$asc($hyphen)))) {
       .msg $1 Please $u(do not request in private) $+ . All commands go to $u(channel).
       .msg $1 You may have to go to $c(2,mIRC options --->> Sounds --->> Requests) and uncheck $qt($c(3,Send '!nick file' as private message))
       if (($window($nick)) && ($line($nick,0) == 0)) .window -c $nick
-      halt
+      DLF.Halt server request to me in private text
     }
   }
-  if ($DLF.@find.IsResponse) {
-    if ($hiswm(priv.findheaders,%txt)) DLF.@Find.PrivHeaders $nick $1-
-    if ($hiswm(priv.findresults,%txt)) DLF.@Find.Results Normal Private $nick $1-
-    if ((*Omen* iswm $strip($1)) && ($left($strip($2),1) == $pling)) DLF.@Find.Results Normal Private $nick $2-
-  }
-  if ((%DLF.privspam == 1) && ($hiswm(priv.spam,%txt)) && (!$window($1))) DLF.Private.SpamFilter $1-
-  if ($hiswm(priv.server,%txt)) DLF.Window.Server $nick $1-
-  if ((%DLF.away == 1)  && ($hiswm(priv.away,%txt))) DLF.Window.Filtered Normal Private $nick $1-
+  if ((%DLF.privspam == 1) && ($hiswm(privtext.spam,%txt)) && (!$window($1))) DLF.Priv.SpamFilter $1-
+  if ($hiswm(privtext.server,%txt)) DLF.Win.Server $nick $1-
+  if ((%DLF.away == 1)  && ($hiswm(privtext.away,%txt))) DLF.Win.Filter Normal Private $nick $1-
 }
 
-alias -l DLF.Private.Notice {
+alias -l DLF.Priv.Notice {
   DLF.Custom.Check privnotice Notice Private $nick $1-
   var %txt = $strip($1-)
-  DLF.Check.CommonChan $nick %txt
-  if ((%DLF.noregmsg == 1) && ($DLF.Check.RegularUser($nick) == IsRegular)) {
+  DLF.Priv.CommonChan $nick %txt
+  if ((%DLF.noregmsg == 1) && ($DLF.Priv.IsRegularUser($nick))) {
     DLF.Warning Regular user $nick $br($address) tried to send you a notice: $1-
-    halt
+    DLF.Halt private notice from regular user
   }
-  if (*SLOTS My mom always told me not to talk to strangers* iswm %txt) DLF.Window.Filtered Notice Private $nick $1-
-  if (*CTCP flood detected, protection enabled* iswm %txt) DLF.Window.Filtered Notice Private $nick $1-
+  if ($hiswm(privnotice.dnd,%txt)) DLF.Win.Filter Notice Private $nick $1-
+  if ($hiswm(privnotice.findheader,%txt)) DLF.Win.Server $nick $1-
   if ($DLF.@find.IsResponse) {
-    if ($hiswm(notice.findheader,%txt)) DLF.Window.Server $nick $1-
-    if ($left($1,1) == $pling) DLF.@Find.Results Notice Private $nick $1-
+    if ($hiswm(priv.findresult,%txt)) DLF.@find.Results Notice Private $nick $1-
   }
-  if ($hiswm(notice.server,%txt)) DLF.Window.Server $nick $1-
-  if ($hiswm(notice.findheader,%txt)) DLF.Window.Server $nick $1-
+  if ($hiswm(privnotice.server,%txt)) DLF.Win.Server $nick $1-
 }
 
-alias -l DLF.@find.IsResponse {
-  if (%DLF.searchresults == 0) return $false
-  var %net = $network $+ #*
-  var %n = $wildtok(%DLF.@find.active,%net,0,$asc($space))
-  while (%n) {
-    var %netchan = $wildtok(%DLF.@find.active,%net,%n,$asc($space))
-    var %chan = $hashtag $+ $gettok(%netchan,2,$asc($hashtag))
-    if ($nick ison %chan) return $true
-    dec %n
-  }
-  return $false
-}
-
-alias -l DLF.Private.Action {
+alias -l DLF.Priv.Action {
   DLF.Custom.Check privaction Action Private $nick $1-
-  DLF.Check.CommonChan $nick $1-
-  if ((%DLF.noregmsg == 1) && ($DLF.Check.RegularUser($nick) == IsRegular)) {
+  DLF.Priv.CommonChan $nick $1-
+  if ((%DLF.noregmsg == 1) && ($DLF.Priv.IsRegularUser($nick))) {
     DLF.Warning Regular user $nick $br($address) tried to send you an action: $1-
     .window -c $1
     .close -m $1
-    halt
+    DLF.Halt private action (/me) from regular user
   }
 }
 
-ctcp *:*: {
+alias -l DLF.Priv.SpamFilter {
+  if ((%DLF.privspam.opnotify == 1) && ($comchan($1,1).op)) {
+    DLF.Warning Spam detected: $c(4,15,$tag($1) $br($address($1,1)) -->> $b($2-))
+    echo $comchan($1,1) Private spam detected: $c(4,15,$tag($1) $br($address($1,1)) -->> $b($2-))
+  }
+  if ((%DLF.spam.addignore == 1) && ($input(Spam received from $1 ( $+ $address($1,1) $+ ). Spam was: " $+ $2- $+ ". Add this user to ignore for one hour?,yq,Add spammer to /ignore?) == $true)) /ignore -wu3600 $1 4
+  DLF.Win.Filter Normal Private $1-
+}
+
+alias -l DLF.Priv.CommonChan {
+  if ((%DLF.accepthis == $1) && (%DLF.nocomchan.dcc == 1)) {
+    .unset %DLF.accepthis
+    return
+  }
+  if ($DLF.Priv.IsRegularUser($1) == $false) return
+  if (($comchan($1,0) == 0) && (%DLF.nocomchan == 1)) {
+    if (($window($1)) && (!$line($1,0))) {
+      DLF.Status $b($1) (no common channel) tried: $c(4,15,$2-)
+      .window -c $1
+    }
+    if (($window($eq $+ $1)) && (%DLF.nocomchan.dcc == 0)) {
+      .window -c $eq $+ $1
+    }
+    DLF.Halt private message from user with no common channel
+  }
+}
+
+alias -l DLF.Priv.IsRegularUser {
+  if ($1 == $me) return $false
+  if ($1 == ChanServ) return $false
+  if ($1 == NickServ) return $false
+  if ($1 == MemoServ) return $false
+  if ($1 == OperServ) return $false
+  if ($1 == BotServ) return $false
+  if ($1 == HostServ) return $false
+  if ($1 == HelpServ) return $false
+  if ($1 == GroupServ) return $false
+  if ($1 == InfoServ) return $false
+  var %i = $comchan($1,0)
+  while (%i) {
+    if (($1 isop $comchan($1,%i)) || ($1 isvoice $comchan($1,%i))) return $false
+    dec %i
+  }
+  return $true
+}
+
+alias -l DLF.ctcp.ChatRequest echo -st DLF.ctcp.ChatRequest called: $1-
+
+alias -l DLF.ctcp.SendRequest echo -st DLF.ctcp.SendRequest called: $1-
+
+alias -l DLF.ctcp.Private {
   if ((%DLF.nocomchan.dcc == 1) && ($1-2 === DCC CHAT)) {
     %DLF.accepthis = $nick
-    goto :return
+    return
   }
   DLF.Custom.Check privctcp Notice Private $nick $1-
-  if (%DLF.nocomchan == 1) DLF.Check.CommonChan $nick $1-
+  if (%DLF.nocomchan == 1) DLF.Priv.CommonChan $nick $1-
   if ((%DLF.askregfile == 1) && (DCC SEND isin $1-)) {
-    if ($DLF.Check.RegularUser($nick) == IsRegular) {
+    if ($DLF.Priv.IsRegularUser($nick)) {
       ; Allow files from regular users if nickname is in mIRC DCC trust list
       var %addr = $address($nick,5)
       if (%addr != $null) {
-        %rcntr = $trust(0)
-        while (%rcntr) {
-          echo -s $trust(%rcntr) %addr
-          if ($trust(%rcntr) iswm %addr) goto :return
-          dec %rcntr
+        var %i = $trust(0)
+        while (%i) {
+          echo -s $trust(%i) %addr
+          if ($trust(%i) iswm %addr) return
+          dec %i
         }
       }
       ; If not in trust list check for dangerous filetypes
@@ -538,191 +582,31 @@ ctcp *:*: {
           && (%ext != .pif) $&
           && (%ext != .vbs) $&
           && (%ext != .doc) $&
-          && (%ext != .js)) goto :return
+          && (%ext != .js)) return
       }
       DLF.Status $c(3,Regular user $nick $br($address) tried to send you a file $qt($gettok($1-,3-$numtok($1-,$asc($space)), $asc($space))))
-      halt
+      DLF.Halt dcc send cancelled
     }
   }
-  if ((%DLF.noregmsg == 1) && (($DLF.Check.RegularUser($nick) == IsRegular)) && (DCC send !isin $1-)) {
+  if ((%DLF.noregmsg == 1) && ($DLF.Priv.IsRegularUser($nick)) && (DCC send !isin $1-)) {
     DLF.Warning Regular user $nick $br($address) tried to: $1-
-    halt
+    DLF.Halt private ctcp from regular user
   }
-  :return
-}
-
-alias -l DLF.Window.FilteredNickColour {
-  DLF.SetNickColour $1 $2
-  DLF.Window.Filtered $1-
-}
-
-alias -l DLF.Window.Filtered {
-  if (($2 == Private) && ($window($3))) .window -c $3
-  var %log = $qt($+($logdir,$nopath($mklogfn(@dlF.Filtered.All))))
-  var %nc = $+($network,$2)
-  if ($1 == Normal) var %line = $sqbr(%nc) $tag($3) $4-
-  else var %line = $sqbr(%nc) $3-
-  if (%DLF.showfiltered == 1) {
-    if (!$window(@dlF.Filtered.All)) {
-      window -k0nwz @dlF.Filtered.All
-      titlebar @dlF.Filtered.All -=- Right-click for options
-      if (%DLF.filtered.log) loadbuf $iif(%DLF.filtered.limit,4900) -p @dlF.Filtered.All %log
-    }
-
-    if ((%DLF.filtered.limit == 1) && ($line(@dlF.Filtered.All,0) >= 5000)) dline @dlF.Filtered.All 1-100
-    if (%DLF.filtered.timestamp == 1) %line = $timestamp %line
-    if (%DLF.filtered.strip == 1) %line = $strip(%line)
-    if (%DLF.filtered.wrap == 1) aline -p $color($1) @dlF.Filtered.All %line
-    else aline $color($1) @dlF.Filtered.All %line
-  }
-  if (%DLF.filtered.log == 1) write %log $sqbr($logstamp) $sqbr(%nc) $tag($3) $strip($4-)
-  halt
-}
-
-alias -l DLF.Window.Server {
-  if (%DLF.server == 0) return
-  var %line = $tag($1) $2-
-  if ($2 == $colon) %line = $remtok(%line,$colon,1,$asc($space))
-  if (%DLF.server.log == 1) write $qt($+($logdir,DLF.Server.log) $sqbr($logstamp) $strip(%line)
-  if (!$window(@dlF.Server.All)) {
-    window -k0nwz @dlF.Server.All
-    titlebar @dlF.Server.All -=- Right-click for options
-  }
-  if ((%DLF.server.limit == 1) && ($line(@dlF.Server.All,0) >= 5000)) dline @dlF.Server.All $+(1-,$calc($line(@dlF.Server.All,0) - 4900))
-  if (%DLF.server.timestamp == 1) %line = $timestamp %line
-  if (%DLF.server.strip == 1) %line = $strip(%line)
-  if (%DLF.server.wrap == 1) aline -p @dlF.Server.All %line
-  else aline @dlF.Server.All %line
-  halt
-}
-
-menu @dlF.Filtered.* {
-  Search: DLF.Window.Search $menu $?="Enter search string"
-  -
-  $iif(%DLF.filtered.timestamp == 1,$style(1)) Timestamp: DLF.Option.Toggle filtered.timestamp
-  $iif(%DLF.filtered.strip == 1,$style(1)) Strip codes: DLF.Option.Toggle filtered.strip
-  $iif(%DLF.filtered.wrap == 1,$style(1)) Wrap lines: DLF.Option.Toggle filtered.wrap
-  $iif(%DLF.filtered.limit == 1,$style(1)) Limit number of lines: DLF.Option.Toggle filtered.limit
-  $iif(%DLF.filtered.log == 1,$style(1)) Log: DLF.Option.Toggle filtered.log
-  -
-  Clear: clear
-  Options: DLF.Options.Show
-  Disable: {
-    %DLF.showfiltered = 0
-    close -@ DLF.Filtered*.*
-  }
-  -
-}
-
-menu @dlF.Server.* {
-  Search: DLF.Window.Search $menu $?="Enter search string"
-  -
-  $iif(%DLF.server.timestamp == 1,$style(1)) Timestamp: DLF.Option.Toggle server.timestamp
-  $iif(%DLF.server.strip == 1,$style(1)) Strip codes: DLF.Option.Toggle server.strip
-  $iif(%DLF.server.wrap == 1,$style(1)) Wrap lines: DLF.Option.Toggle server.wrap
-  $iif(%DLF.server.limit == 1,$style(1)) Limit number of lines: DLF.Option.Toggle server.limit
-  $iif(%DLF.server.log == 1,$style(1)) Log: DLF.Option.Toggle server.log
-  -
-  Clear: clear
-  Options: DLF.Options.Show
-  Disable: {
-    %DLF.server = 0
-    close -@ DLF.Server*.*
-  }
-  -
-}
-
-on *:input:@dlF.*Search.*: DLF.Window.Search $target $1-
-
-alias -l DLF.Window.Search {
-  if ($2 == $null) return
-  var %wf = $gettok($1,2,$asc($period))
-  if ($right(%wf,6) != Search) %ws = $+(%wf,Search)
-  else {
-    %ws = %wf
-    %wf = $left(%wf,-6)
-  }
-  var %wf = $puttok($1,%wf,2,$asc($period))
-  var %ws = $puttok($1,%ws,2,$asc($period))
-  var %flags = $+(-ealbk0w,$iif($gettok($1,-1,$asc($period)) == All,z))
-  window %flags %ws
-  var %sstring = $+($star,$2-,$star)
-  titlebar %ws -=- Searching for %sstring
-  filter -wwcbzph4 %wf %ws %sstring
-  var %matches = $iif($filtered == 0,No matches,$iif($filtered == 1,One match,$filtered matches))
-  titlebar %ws -=- Search finished. %matches found for $qt(%sstring)
-}
-
-alias -l DLF.Channel.SpamFilter {
-  if ((%DLF.chspam.opnotify == 1) && ($me isop $1)) {
-    DLF.Warning $c(4,Channel spam detected:) $sqbr($1) $tag($2) $br($address($2,1)) -->> $c(4,$3-)
-  }
-  halt
-}
-
-alias -l DLF.Private.SpamFilter {
-  if ((%DLF.privspam.opnotify == 1) && ($comchan($1,1).op)) {
-    DLF.Warning Spam detected: $c(4,15,$tag($1) $br($address($1,1)) -->> $b($2-))
-    echo $comchan($1,1) Private spam detected: $c(4,15,$tag($1) $br($address($1,1)) -->> $b($2-))
-  }
-  if ((%DLF.spam.addignore == 1) && ($input(Spam received from $1 ( $+ $address($1,1) $+ ). Spam was: " $+ $2- $+ ". Add this user to ignore for one hour?,yq,Add spammer to /ignore?) == $true)) /ignore -wu3600 $1 4
-  DLF.Window.Filtered Normal Private $1-
-}
-
-alias -l DLF.Check.CommonChan {
-  if ((%DLF.accepthis == $1) && (%DLF.nocomchan.dcc == 1)) {
-    .unset %DLF.accepthis
-    return
-  }
-  if ((!$comchan($1,1)) && (%DLF.nocomchan == 1)) {
-    if (($1 == X) || ($1 == ChanServ) || ($1 == NickServ) || ($1 == MemoServ) || ($1 == Global)) return
-    if (($window($1)) && (!$line($1,0))) {
-      DLF.Status $b($1) (no common channel) tried: $c(4,15,$2-)
-      .window -c $1
-    }
-    if (($window($eq $+ $1)) && (%DLF.nocomchan.dcc == 0)) {
-      .window -c $eq $+ $1
-    }
-    halt
-  }
-}
-
-alias -l DLF.Check.RegularUser {
-  if ($1 == $me) return $1
-  if ($1 == ChanServ) return $1
-  if ($1 == NickServ) return $1
-  if ($1 == MemoServ) return $1
-  if ($1 == OperServ) return $1
-  if ($1 == BotServ) return $1
-  if ($1 == HostServ) return $1
-  if ($1 == HelpServ) return $1
-  if ($1 == GroupServ) return $1
-  if ($1 == InfoServ) return $1
-  var %rcntr = $comchan($1,0)
-  while (%rcntr) {
-    if (($1 isop $comchan($1,%rcntr)) || ($1 isvoice $comchan($1,%rcntr))) return $comchan($1,%rcntr)
-    dec %rcntr
-  }
-  return IsRegular
 }
 
 alias -l DLF.ctcp.Reply {
-  if ($hiswm(ctcp.reply,$1-)) halt
-  if (%DLF.nocomchan == 1) DLF.Check.CommonChan $nick $1-
-  if ((%DLF.noregmsg == 1) && (($DLF.Check.RegularUser($nick) == IsRegular)) && (DCC send !isin $1-)) {
+  if ($hiswm(ctcp.reply,$1-)) DLF.Halt
+  if (%DLF.nocomchan == 1) DLF.Priv.CommonChan $nick $1-
+  if ((%DLF.noregmsg == 1) && ($DLF.Priv.IsRegularUser($nick)) && (DCC send !isin $1-)) {
     DLF.Warning Regular user $nick ( $+ $address $+ ) tried to: $1-
-    halt
+    DLF.Halt private ctcp reply from regular user
   }
   DLF.Custom.Check privctcp Notice Private $nick $1-
 }
 
-alias -l DLF.SetNickColour {
-  if ((%DLF.colornicks == 1) && ($nick($1,$2).color == $color(nicklist))) cline 2 $1 $2
-}
-
 alias -l DLF.Away.Filter {
-  if (%DLF.away == 1) DLF.Window.Filtered Notice RawAway $2-
-  haltdef
+  if (%DLF.away == 1) DLF.Win.Filter Notice RawAway $2-
+  DLF.Halt away message
 }
 
 ; ========== Custom Filters ==========
@@ -735,7 +619,7 @@ alias -l DLF.Custom.Check {
     var %i = $numtok(%custom,$asc($comma))
     var %txt = $replace($strip($5-),$nbsp,$space)
     while (%i) {
-      if ($gettok(%custom,%i,$asc($comma)) iswm %txt) DLF.Window.Filtered $2-
+      if ($gettok(%custom,%i,$asc($comma)) iswm %txt) DLF.Win.Filter $2-
       dec %i
     }
   }
@@ -770,30 +654,116 @@ alias -l DLF.Custom.Remove {
   else DLF.Error Invalid message type: %type
 }
 
-; ========== @find ==========
-alias -l DLF.Channel.FindRequest {
-  .set -u600 %DLF.@find.active $addtok(%DLF.@find.active,$network $+ $chan,$asc($space))
-}
+; ========== Custom Window handling ==========
+alias -l DLF.Win.Filter {
+  if (($2 == Private) && ($window($3))) .window -c $3
+  var %log = $qt($+($logdir,$nopath($mklogfn(@dlF.Filter.All))))
+  var %nc = $+($network,$2)
+  if ($1 == Normal) var %line = $sqbr(%nc) $tag($3) $4-
+  else var %line = $sqbr(%nc) $3-
+  if (%DLF.showfiltered == 1) {
+    if (!$window(@dlF.Filter.All)) {
+      window -k0nwz @dlF.Filter.All
+      titlebar @dlF.Filter.All -=- Right-click for options
+      if (%DLF.filtered.log) loadbuf $iif(%DLF.filtered.limit,4900) -p @dlF.Filter.All %log
+    }
 
-alias -l DLF.@Find.PrivHeaders {
-  if (($window($1)) && (!$line($1,0))) .window -c $1
-  DLF.Window.Server $1-
-}
-
-alias -l DLF.@Find.Results {
-  if (($window($3)) && (!$line($3,0))) .window -c $3
-  var %msg = $5-
-  if($strip($4) != $+($pling,$3)) {
-    if (%DLF.searchspam) DLF.Window.Filtered $1-
-    else %msg = %msg $c(4,0,** Received from $nick **)
+    if ((%DLF.filtered.limit == 1) && ($line(@dlF.Filter.All,0) >= 5000)) dline @dlF.Filter.All 1-100
+    if (%DLF.filtered.timestamp == 1) %line = $timestamp %line
+    if (%DLF.filtered.strip == 1) %line = $strip(%line)
+    if (%DLF.filtered.wrap == 1) aline -p $color($1) @dlF.Filter.All %line
+    else aline $color($1) @dlF.Filter.All %line
   }
-  if (!$window(@dlF.@find.Results)) window -slk0wnz @dlF.@find.Results
-  aline -n @dlF.@find.Results $strip($4) $5-
-  window -b @dlF.@find.Results
-  titlebar @dlF.@find.Results -=- $line(@dlF.@find.Results,0) results so far -=- Right-click for options or double-click to download
-  halt
+  if (%DLF.filtered.log == 1) write %log $sqbr($logstamp) $sqbr(%nc) $tag($3) $strip($4-)
+  DLF.Halt sent to @dlF.Filter.All window
 }
 
+alias -l DLF.Win.Server {
+  if (%DLF.server == 0) return
+  var %line = $tag($1) $2-
+  if ($2 == $colon) %line = $remtok(%line,$colon,1,$asc($space))
+  if (%DLF.server.log == 1) write $qt($+($logdir,DLF.Server.log) $sqbr($logstamp) $strip(%line)
+  if (!$window(@dlF.Server.All)) {
+    window -k0nwz @dlF.Server.All
+    titlebar @dlF.Server.All -=- Right-click for options
+  }
+  if ((%DLF.server.limit == 1) && ($line(@dlF.Server.All,0) >= 5000)) dline @dlF.Server.All $+(1-,$calc($line(@dlF.Server.All,0) - 4900))
+  if (%DLF.server.timestamp == 1) %line = $timestamp %line
+  if (%DLF.server.strip == 1) %line = $strip(%line)
+  if (%DLF.server.wrap == 1) aline -p @dlF.Server.All %line
+  else aline @dlF.Server.All %line
+  DLF.Halt sent to @dlF.Server.All window
+}
+
+menu @dlF.Filter.* {
+  Search: DLF.Win.Search $menu $?="Enter search string"
+  -
+  $iif(%DLF.filtered.timestamp == 1,$style(1)) Timestamp: DLF.Options.ToggleOption filtered.timestamp
+  $iif(%DLF.filtered.strip == 1,$style(1)) Strip codes: DLF.Options.ToggleOption filtered.strip
+  $iif(%DLF.filtered.wrap == 1,$style(1)) Wrap lines: DLF.Options.ToggleOption filtered.wrap
+  $iif(%DLF.filtered.limit == 1,$style(1)) Limit number of lines: DLF.Options.ToggleOption filtered.limit
+  $iif(%DLF.filtered.log == 1,$style(1)) Log: DLF.Options.ToggleOption filtered.log
+  -
+  Clear: clear
+  Options: DLF.Options.Show
+  Disable: {
+    %DLF.showfiltered = 0
+    close -@ @dlF.Filter*.*
+  }
+  -
+}
+
+menu @dlF.Server.* {
+  Search: DLF.Win.Search $menu $?="Enter search string"
+  -
+  $iif(%DLF.server.timestamp == 1,$style(1)) Timestamp: DLF.Options.ToggleOption server.timestamp
+  $iif(%DLF.server.strip == 1,$style(1)) Strip codes: DLF.Options.ToggleOption server.strip
+  $iif(%DLF.server.wrap == 1,$style(1)) Wrap lines: DLF.Options.ToggleOption server.wrap
+  $iif(%DLF.server.limit == 1,$style(1)) Limit number of lines: DLF.Options.ToggleOption server.limit
+  $iif(%DLF.server.log == 1,$style(1)) Log: DLF.Options.ToggleOption server.log
+  -
+  Clear: clear
+  Options: DLF.Options.Show
+  Disable: {
+    %DLF.server = 0
+    close -@ DLF.Server*.*
+  }
+  -
+}
+
+menu @dlF.*Search.* {
+  Copy line: {
+    .clipboard
+    .clipboard $sline($active,1)
+    cline 14 $active $sline($active,1).ln
+  }
+  Clear: clear
+  Close: window -c $active
+  Options: DLF.Options.Show
+}
+
+on *:input:@dlF.*Search.*: DLF.Win.Search $target $1-
+
+alias -l DLF.Win.Search {
+  if ($2 == $null) return
+  var %wf = $gettok($1,2,$asc($period))
+  if ($right(%wf,6) != Search) %ws = $+(%wf,Search)
+  else {
+    %ws = %wf
+    %wf = $left(%wf,-6)
+  }
+  var %wf = $puttok($1,%wf,2,$asc($period))
+  var %ws = $puttok($1,%ws,2,$asc($period))
+  var %flags = $+(-ealbk0w,$iif($gettok($1,-1,$asc($period)) == All,z))
+  window %flags %ws
+  var %sstring = $+($star,$2-,$star)
+  titlebar %ws -=- Searching for %sstring
+  filter -wwcbzph4 %wf %ws %sstring
+  var %matches = $iif($filtered == 0,No matches,$iif($filtered == 1,One match,$filtered matches))
+  titlebar %ws -=- Search finished. %matches found for $qt(%sstring)
+}
+
+; ========== @find ==========
 menu @dlF.@find.Results {
   dclick: DLF.@find.Get $1
   .-
@@ -807,6 +777,42 @@ menu @dlF.@find.Results {
   .-
   Close: window -c $active
   .-
+}
+
+alias -l DLF.@find.Request {
+  .set -u600 %DLF.@find.active $addtok(%DLF.@find.active,$network $+ $chan,$asc($space))
+}
+
+alias -l DLF.@find.IsResponse {
+  if (%DLF.searchresults == 0) return $false
+  var %net = $network $+ #*
+  var %n = $wildtok(%DLF.@find.active,%net,0,$asc($space))
+  while (%n) {
+    var %netchan = $wildtok(%DLF.@find.active,%net,%n,$asc($space))
+    var %chan = $hashtag $+ $gettok(%netchan,2,$asc($hashtag))
+    if ($nick ison %chan) return $true
+    dec %n
+  }
+  return $false
+}
+
+alias -l DLF.@find.PrivHeaders {
+  if (($window($1)) && (!$line($1,0))) .window -c $1
+  DLF.Win.Server $1-
+}
+
+alias -l DLF.@find.Results {
+  if (($window($3)) && (!$line($3,0))) .window -c $3
+  var %msg = $5-
+  if($strip($4) != $+($pling,$3)) {
+    if (%DLF.searchspam) DLF.Win.Filter $1-
+    else %msg = %msg $c(4,0,** Received from $nick **)
+  }
+  if (!$window(@dlF.@find.Results)) window -slk0wnz @dlF.@find.Results
+  aline -n @dlF.@find.Results $strip($4) $5-
+  window -b @dlF.@find.Results
+  titlebar @dlF.@find.Results -=- $line(@dlF.@find.Results,0) results so far -=- Right-click for options or double-click to download
+  DLF.Halt @find result line added to @dlF.@find.Results
 }
 
 alias -l DLF.@find.Get {
@@ -824,8 +830,8 @@ alias -l DLF.@find.Get {
     var %i = $comchan(%nick,0)
     while (%i) {
       var %chan = $comchan(%nick,%i)
-      echo -s $network %chan $DLF.IsChannel($network,%chan)
-      if ($DLF.IsChannel($network,%chan)) {
+      echo -s $network %chan $DLF.Chan.IsDlfChan($network,%chan)
+      if ($DLF.Chan.IsDlfChan($network,%chan)) {
         ; Use editbox not msg so other scripts (like sbClient) get On Input event
         editbox -n %chan %trig %fn
         scid %cid
@@ -934,6 +940,18 @@ alias -l DLF.@find.SaveResults {
 }
 
 ; ========== oNotice ==========
+menu @#* {
+  Clear: clear
+  $iif(%DLF.o.timestamp == 1,$style(1)) Timestamp: DLF.oNotice.TimestampToggle
+  $iif(%DLF.o.log == 1,$style(1)) Logging: DLF.Options.ToggleOption o.log
+  Options: DLF.Options.Show
+  -
+  Close: DLF.oNotice.Close $active
+  -
+}
+
+on *:close:@#*: DLF.oNotice.Close $target
+
 alias DLF.oNotice.IsoNotice {
   if (%DLF.o.enabled != 1) return 0
   if ($target != $+(@,$chan)) return 0
@@ -953,7 +971,7 @@ alias -l DLF.oNotice.Channel {
   aline -ph %omsg
   ;if (%DLF.o.timestamp == 1) var %omsg = $timestamp %omsg
   DLF.oNotice.Log %chatwindow $gettok(%omsg,2-,$asc($space))
-  halt
+  DLF.Halt oNotice sent to %chatwindow
 }
 
 alias -l DLF.oNotice.Open {
@@ -981,20 +999,8 @@ on *:input:@#* {
   DLF.oNotice.Log $active %omsg
 }
 
-on *:close:@#*: DLF.oNotice.Close $target
-
-menu @#* {
-  Clear: clear
-  $iif(%DLF.o.timestamp == 1,$style(1)) Timestamp: DLF.oNotice.TimestampToggle
-  $iif(%DLF.o.log == 1,$style(1)) Logging: DLF.Option.Toggle o.log
-  Options: DLF.Options.Show
-  -
-  Close: DLF.oNotice.Close $active
-  -
-}
-
 alias -l DLF.oNotice.TimestampToggle {
-  DLF.Option.Toggle o.timestamp
+  DLF.Options.ToggleOption o.timestamp
   var %i = $window(@#*,0)
   while (%i) {
     var %win = $window(@#*,%i)
@@ -1097,75 +1103,87 @@ alias -l DLF.Options.Initialise {
   ; Options Dialog variables in display order
 
   ; All tabs
-  DLF.Option.Init enabled 1
-  DLF.Option.Init showfiltered = 1
+  DLF.Options.InitOption enabled 1
+  DLF.Options.InitOption showfiltered = 1
 
   ; Main tab
   if (%DLF.channels == $null) {
-    DLF.Channels.Set $hashtag
+    DLF.Chan.Set $hashtag
     DLF.Status Channels set to $c(4,all) $+ .
   }
   elseif (%DLF.netchans == $null) %DLF.netchans = %DLF.channels
   ; Main tab General box
-  DLF.Option.Init ads 1
-  DLF.Option.Init requests 1
-  DLF.Option.Init chmode 0
-  DLF.Option.Init privrequests 1
+  DLF.Options.InitOption ads 1
+  DLF.Options.InitOption requests 1
+  DLF.Options.InitOption chmode 0
+  DLF.Options.InitOption privrequests 1
   ; Main tab User events box
-  DLF.Option.Init joins 0
-  DLF.Option.Init parts 0
-  DLF.Option.Init quits 0
-  DLF.Option.Init nicks 0
-  DLF.Option.Init kicks 0
-  DLF.Option.Init showstatus 0
-  DLF.Option.Init away 1
-  DLF.Option.Init usrmode 0
+  DLF.Options.InitOption joins 0
+  DLF.Options.InitOption parts 0
+  DLF.Options.InitOption quits 0
+  DLF.Options.InitOption nicks 0
+  DLF.Options.InitOption kicks 0
+  DLF.Options.InitOption showstatus 0
+  DLF.Options.InitOption away 1
+  DLF.Options.InitOption usrmode 0
   ; Main tab Check for updates
-  DLF.Option.Init betas 0
+  DLF.Options.InitOption betas 0
 
   ; Other tab
   ; Other tab Windows box
-  DLF.Option.Init server 1
-  DLF.Option.Init serverads 0
-  DLF.Option.Init perconnect 1
-  DLF.Option.Init searchresults 1
-  DLF.Option.Init searchspam 0
-  DLF.Option.Init o.enabled 1
+  DLF.Options.InitOption server 1
+  DLF.Options.InitOption serverads 0
+  DLF.Options.InitOption perconnect 1
+  DLF.Options.InitOption searchresults 1
+  DLF.Options.InitOption searchspam 0
+  DLF.Options.InitOption o.enabled 1
   ; Other tab Spam and Security box
-  DLF.Option.Init chspam 1
-  DLF.Option.Init chspam.opnotify 1
-  DLF.Option.Init privspam 1
-  DLF.Option.Init privspam.opnotify 1
-  DLF.Option.Init spam.addignore 0
-  DLF.Option.Init nocomchan 1
-  DLF.Option.Init nocomchan.dcc 0
-  DLF.Option.Init askregfile 1
-  DLF.Option.Init askregfile.type 0
-  DLF.Option.Init noregmsg 0
+  DLF.Options.InitOption chspam 1
+  DLF.Options.InitOption chspam.opnotify 1
+  DLF.Options.InitOption privspam 1
+  DLF.Options.InitOption privspam.opnotify 1
+  DLF.Options.InitOption spam.addignore 0
+  DLF.Options.InitOption nocomchan 1
+  DLF.Options.InitOption nocomchan.dcc 0
+  DLF.Options.InitOption askregfile 1
+  DLF.Options.InitOption askregfile.type 0
+  DLF.Options.InitOption noregmsg 0
   ; Other tab - no box
-  DLF.Option.Init colornicks 0
+  DLF.Options.InitOption colornicks 0
 
   ; Custom tab
-  DLF.Option.Init custom.enabled 1
-  DLF.Option.Init custom.chantext $addtok(%DLF.custom.chantext,$replace(*this is an example custom filter*,$space,$nbsp),$asc($comma))
+  DLF.Options.InitOption custom.enabled 1
+  DLF.Options.InitOption custom.chantext $addtok(%DLF.custom.chantext,$replace(*this is an example custom filter*,$space,$nbsp),$asc($comma))
 
   ; Options only available in menu not options
   ; TODO Consider adding these as options
-  DLF.Option.Init server.limit 1
-  DLF.Option.Init server.timestamp 1
-  DLF.Option.Init server.wrap 1
-  DLF.Option.Init server.strip 0
-  DLF.Option.Init filtered.limit 1
-  DLF.Option.Init filtered.timestamp 1
-  DLF.Option.Init filtered.wrap 0
-  DLF.Option.Init filtered.strip 0
-  DLF.Option.Init o.timestamp 1
-  DLF.Option.Init o.log 1
+  DLF.Options.InitOption server.limit 1
+  DLF.Options.InitOption server.timestamp 1
+  DLF.Options.InitOption server.wrap 1
+  DLF.Options.InitOption server.strip 0
+  DLF.Options.InitOption filtered.limit 1
+  DLF.Options.InitOption filtered.timestamp 1
+  DLF.Options.InitOption filtered.wrap 0
+  DLF.Options.InitOption filtered.strip 0
+  DLF.Options.InitOption o.timestamp 1
+  DLF.Options.InitOption o.log 1
 }
 
-alias -l DLF.Option.Init {
+alias -l DLF.Options.InitOption {
   if (% [ $+ DLF. [ $+ [ $1 ] ] ] != $null) return
   % [ $+ [ DLF. [ $+ [ $1 ] ] ] ] = $2
+}
+
+alias -l DLF.Options.ToggleShowFilter {
+  DLF.Options.ToggleOption showfiltered 40
+  if (%DLF.showfiltered == 0) close -@ @dlF.Filter*
+}
+
+alias -l DLF.Options.ToggleOption {
+  var %newval = $iif([ % [ $+ DLF. [ $+ [ $1 ] ] ] ],0,1)
+  % [ $+ [ DLF. [ $+ [ $1 ] ] ] ] = %newval
+  if (($2 != $null) && ($dialog(DLF.Options.GUI))) did $iif(%newval,-c,-u) DLF.Options.GUI $2
+  DLF.Status Option $1 $iif(%newval,set,cleared)
 }
 
 on *:dialog:DLF.Options.GUI:init:0: {
@@ -1321,7 +1339,7 @@ on *:dialog:DLF.Options.GUI:sclick:230: {
   var %chan = $did(220).text
   if ($pos(%chan,$hashtag,0) == 0) %chan = $hashtag $+ %chan
   if (($scon(0) == 1) && ($left(%chan,1) == $hashtag)) %chan = $network $+ %chan
-  DLF.Channels.Add %chan
+  DLF.Chan.Add %chan
   ; Clear edit field, list selection and disable add button
   DLF.Options.InitChannelList
 }
@@ -1331,7 +1349,7 @@ on *:dialog:DLF.Options.GUI:sclick:240: DLF.Options.RemoveChannel
 alias -l DLF.Options.RemoveChannel {
   var %i = $did(250,0).sel
   while (%i) {
-    DLF.Channels.Remove $did(250,$did(250,%i).sel).text
+    DLF.Chan.Remove $did(250,$did(250,%i).sel).text
     dec %i
   }
   did -b DLF.Options.GUI 240
@@ -1390,7 +1408,7 @@ alias -l DLF.Options.About {
 on *:dialog:DLF.Options.GUI:sclick:10,40,540,410-430,460-495,610-630,645-690,810: {
   DLF.Options.SetLinkedFields
   DLF.Options.Save
-  if (%DLF.showfiltered == 0) close -@ @dlF.Filtered*.*
+  if (%DLF.showfiltered == 0) close -@ @dlF.Filter*.*
   if (($did == 540) && (!$sock(DLF.Socket.Update))) DLF.Update.CheckVersions
 }
 
@@ -1485,7 +1503,7 @@ alias -l DLF.Options.Error {
 }
 
 alias -l DLF.Options.Save {
-  DLF.Channels.Set %DLF.netchans
+  DLF.Chan.Set %DLF.netchans
   %DLF.showfiltered = $did(40).state
   %DLF.enabled = $did(10).state
   DLF.Groups.Events
@@ -1521,11 +1539,6 @@ alias -l DLF.Options.Save {
   %DLF.o.enabled = $did(630).state
   %DLF.custom.enabled = $did(810).state
   %DLF.betas = $did(540).state
-}
-
-alias -l DLF.Groups.Events {
-  if (%DLF.enabled) .enable #dlf_events
-  else .disable #dlf_events
 }
 
 ; ========== Check version for updates ==========
@@ -1692,8 +1705,6 @@ on *:sockclose:DLF.Socket.Download: {
   .reload -rs1 $script
 }
 
-on *:signal:DLF.Update.ReLoad: DLF.Initialise
-
 alias -l DLF.Download.Error {
   DLF.Update.ErrorMsg Unable to download new version of dlFilter!
 }
@@ -1723,7 +1734,7 @@ alias -l DLF.hadd {
   hadd %h %n $2-
 }
 
-alias DLF.CreateHashTables {
+alias -l DLF.CreateHashTables {
   var %matches = 0
   if ($hget(DLF.chantext.ads)) hfree DLF.chantext.ads
   DLF.hadd chantext.ads *Type*@*
@@ -1923,87 +1934,92 @@ alias DLF.CreateHashTables {
   DLF.hadd chanaction.ads *get AMIP*plug-in at http*amip.tools-for.net*
   inc %matches $hget(DLF.chanaction.ads,0).item
 
-  if ($hget(DLF.notice.server)) hfree DLF.notice.server
-  DLF.hadd notice.server *I have added*
-  DLF.hadd notice.server *After waiting*min*
-  DLF.hadd notice.server *This makes*times*
-  DLF.hadd notice.server *is on the way!*
-  DLF.hadd notice.server *has been sent sucessfully*
-  DLF.hadd notice.server *has been sent successfully*
-  DLF.hadd notice.server *send will be initiated as soon as possible*
-  DLF.hadd notice.server *«SoftServe»*
-  DLF.hadd notice.server *You are the successful downloader number*
-  DLF.hadd notice.server *You are in*
-  DLF.hadd notice.server *Request Denied*
-  DLF.hadd notice.server *OmeNServE v*
-  DLF.hadd notice.server *«OmeN»*
-  DLF.hadd notice.server *is not found*
-  DLF.hadd notice.server *file not located*
-  DLF.hadd notice.server *I don't have the file*
-  DLF.hadd notice.server *is on its way*
-  DLF.hadd notice.server *±*
-  DLF.hadd notice.server *Transfer Started*File*
-  DLF.hadd notice.server *is on it's way!*
-  DLF.hadd notice.server *Requested File's*
-  DLF.hadd notice.server *Please make a resume request!*
-  DLF.hadd notice.server *File Transfer of*
-  DLF.hadd notice.server *Please reinitiate File-transfer!*
-  DLF.hadd notice.server *on its way*
-  DLF.hadd notice.server *OS-Limits*
-  DLF.hadd notice.server *Transfer Complete*I have successfully sent*QwIRC
-  DLF.hadd notice.server *Request Accepted*File*Queue position*
-  DLF.hadd notice.server *Le Transfert de*Est Completé*
-  DLF.hadd notice.server *Query refused*in*seconds*
-  DLF.hadd notice.server *Keeptrack*omen*
-  DLF.hadd notice.server *U Got A File From Me*files since*
-  DLF.hadd notice.server *Transfer Complete*sent*
-  DLF.hadd notice.server *Transmision de*finalizada*
-  DLF.hadd notice.server *Send Failed*at*Please make a resume request*
-  DLF.hadd notice.server *t×PLåY*
-  DLF.hadd notice.server *OS-Limites V*t×PLåY*
-  DLF.hadd notice.server *rßPLåY2*
-  DLF.hadd notice.server Request Accepted*Has Been Placed In The Priority Queue At Position*
-  DLF.hadd notice.server *esta en camino!*
-  DLF.hadd notice.server *Envio cancelado*
-  DLF.hadd notice.server *de mi lista de espera*
-  DLF.hadd notice.server *Después de esperar*min*
-  DLF.hadd notice.server *veces que he enviado*
-  DLF.hadd notice.server *archivos, Disfrutalo*
-  DLF.hadd notice.server Thank you for*.*!
-  DLF.hadd notice.server *veces que env*
-  DLF.hadd notice.server *zip va en camino*
-  DLF.hadd notice.server *Enviando*(*)*
-  DLF.hadd notice.server *Unable to locate any files with*associated within them*
-  DLF.hadd notice.server *Has Been Placed In The Priority Queue At Position*Omenserve*
-  DLF.hadd notice.server *Thanks*for sharing*with me*
-  DLF.hadd notice.server *«[RDC]»*
-  DLF.hadd notice.server *Your send of*was successfully completed*
-  DLF.hadd notice.server *AFK, auto away after*minutes*
-  DLF.hadd notice.server *Envío completo*DragonServe*
-  DLF.hadd notice.server *Empieza transferencia*DragonServe*
-  DLF.hadd notice.server *Ahora has recibido*DragonServe*
-  DLF.hadd notice.server *Starting Transfer*DragonServe*
-  DLF.hadd notice.server *You have now received*from me*for a total of*sent since*
-  DLF.hadd notice.server *Thanks For File*It is File*That I have recieved*
-  DLF.hadd notice.server *Thank You*I have now received*file*from you*for a total of*
-  DLF.hadd notice.server *You Are Downloader Number*Overall Downloader Number*
-  DLF.hadd notice.server *DCC Get of*FAILED Please Re-Send file*
-  DLF.hadd notice.server *request for*acknowledged*send will be initiated as soon as possible*
-  DLF.hadd notice.server *file not located*
-  DLF.hadd notice.server *t×PLÅY*
-  DLF.hadd notice.server *I'm currently away*your message has been logged*
-  DLF.hadd notice.server *If your message is urgent, you may page me by typing*PAGE*
-  DLF.hadd notice.server *Gracias*Ahora he recibido*DragonServe*
-  DLF.hadd notice.server *Request Accepted*List Has Been Placed In The Priority Queue At Position*
-  DLF.hadd notice.server *Send Complete*File*Sent*times*
-  DLF.hadd notice.server *Sent*Files Allowed per day*User Class*BWI-Limits*
-  DLF.hadd notice.server *Now I have received*DragonServe*
-  inc %matches $hget(DLF.notice.server,0).item
+  if ($hget(DLF.privnotice.server)) hfree DLF.privnotice.server
+  DLF.hadd privnotice.server *I have added*
+  DLF.hadd privnotice.server *After waiting*min*
+  DLF.hadd privnotice.server *This makes*times*
+  DLF.hadd privnotice.server *is on the way!*
+  DLF.hadd privnotice.server *has been sent sucessfully*
+  DLF.hadd privnotice.server *has been sent successfully*
+  DLF.hadd privnotice.server *send will be initiated as soon as possible*
+  DLF.hadd privnotice.server *«SoftServe»*
+  DLF.hadd privnotice.server *You are the successful downloader number*
+  DLF.hadd privnotice.server *You are in*
+  DLF.hadd privnotice.server *Request Denied*
+  DLF.hadd privnotice.server *OmeNServE v*
+  DLF.hadd privnotice.server *«OmeN»*
+  DLF.hadd privnotice.server *is not found*
+  DLF.hadd privnotice.server *file not located*
+  DLF.hadd privnotice.server *I don't have the file*
+  DLF.hadd privnotice.server *is on its way*
+  DLF.hadd privnotice.server *±*
+  DLF.hadd privnotice.server *Transfer Started*File*
+  DLF.hadd privnotice.server *is on it's way!*
+  DLF.hadd privnotice.server *Requested File's*
+  DLF.hadd privnotice.server *Please make a resume request!*
+  DLF.hadd privnotice.server *File Transfer of*
+  DLF.hadd privnotice.server *Please reinitiate File-transfer!*
+  DLF.hadd privnotice.server *on its way*
+  DLF.hadd privnotice.server *OS-Limits*
+  DLF.hadd privnotice.server *Transfer Complete*I have successfully sent*QwIRC
+  DLF.hadd privnotice.server *Request Accepted*File*Queue position*
+  DLF.hadd privnotice.server *Le Transfert de*Est Completé*
+  DLF.hadd privnotice.server *Query refused*in*seconds*
+  DLF.hadd privnotice.server *Keeptrack*omen*
+  DLF.hadd privnotice.server *U Got A File From Me*files since*
+  DLF.hadd privnotice.server *Transfer Complete*sent*
+  DLF.hadd privnotice.server *Transmision de*finalizada*
+  DLF.hadd privnotice.server *Send Failed*at*Please make a resume request*
+  DLF.hadd privnotice.server *t×PLåY*
+  DLF.hadd privnotice.server *OS-Limites V*t×PLåY*
+  DLF.hadd privnotice.server *rßPLåY2*
+  DLF.hadd privnotice.server Request Accepted*Has Been Placed In The Priority Queue At Position*
+  DLF.hadd privnotice.server *esta en camino!*
+  DLF.hadd privnotice.server *Envio cancelado*
+  DLF.hadd privnotice.server *de mi lista de espera*
+  DLF.hadd privnotice.server *Después de esperar*min*
+  DLF.hadd privnotice.server *veces que he enviado*
+  DLF.hadd privnotice.server *archivos, Disfrutalo*
+  DLF.hadd privnotice.server Thank you for*.*!
+  DLF.hadd privnotice.server *veces que env*
+  DLF.hadd privnotice.server *zip va en camino*
+  DLF.hadd privnotice.server *Enviando*(*)*
+  DLF.hadd privnotice.server *Unable to locate any files with*associated within them*
+  DLF.hadd privnotice.server *Has Been Placed In The Priority Queue At Position*Omenserve*
+  DLF.hadd privnotice.server *Thanks*for sharing*with me*
+  DLF.hadd privnotice.server *«[RDC]»*
+  DLF.hadd privnotice.server *Your send of*was successfully completed*
+  DLF.hadd privnotice.server *AFK, auto away after*minutes*
+  DLF.hadd privnotice.server *Envío completo*DragonServe*
+  DLF.hadd privnotice.server *Empieza transferencia*DragonServe*
+  DLF.hadd privnotice.server *Ahora has recibido*DragonServe*
+  DLF.hadd privnotice.server *Starting Transfer*DragonServe*
+  DLF.hadd privnotice.server *You have now received*from me*for a total of*sent since*
+  DLF.hadd privnotice.server *Thanks For File*It is File*That I have recieved*
+  DLF.hadd privnotice.server *Thank You*I have now received*file*from you*for a total of*
+  DLF.hadd privnotice.server *You Are Downloader Number*Overall Downloader Number*
+  DLF.hadd privnotice.server *DCC Get of*FAILED Please Re-Send file*
+  DLF.hadd privnotice.server *request for*acknowledged*send will be initiated as soon as possible*
+  DLF.hadd privnotice.server *file not located*
+  DLF.hadd privnotice.server *t×PLÅY*
+  DLF.hadd privnotice.server *I'm currently away*your message has been logged*
+  DLF.hadd privnotice.server *If your message is urgent, you may page me by typing*PAGE*
+  DLF.hadd privnotice.server *Gracias*Ahora he recibido*DragonServe*
+  DLF.hadd privnotice.server *Request Accepted*List Has Been Placed In The Priority Queue At Position*
+  DLF.hadd privnotice.server *Send Complete*File*Sent*times*
+  DLF.hadd privnotice.server *Sent*Files Allowed per day*User Class*BWI-Limits*
+  DLF.hadd privnotice.server *Now I have received*DragonServe*
+  inc %matches $hget(DLF.privnotice.server,0).item
 
-  if ($hget(DLF.notice.findheader)) hfree DLF.notice.findheader
-  DLF.hadd notice.findheader No match found for*
-  DLF.hadd notice.findheader *I have*match* for*in listfile*
-  inc %matches $hget(DLF.notice.findheader,0).item
+  if ($hget(DLF.privnotice.dnd)) hfree DLF.privnotice.dnd
+  DLF.hadd privnotice.dnd *SLOTS My mom always told me not to talk to strangers*
+  DLF.hadd privnotice.dnd *CTCP flood detected, protection enabled*
+  inc %matches $hget(DLF.privnotice.dnd,0).item
+
+  if ($hget(DLF.privnotice.findheader)) hfree DLF.privnotice.findheader
+  DLF.hadd privnotice.findheader No match found for*
+  DLF.hadd privnotice.findheader *I have*match* for*in listfile*
+  inc %matches $hget(DLF.privnotice.findheader,0).item
 
   if ($hget(DLF.channotice.spam)) hfree DLF.channotice.spam
   DLF.hadd channotice.spam *WWW.TURKSMSBOT.CJB.NET*
@@ -2016,101 +2032,101 @@ alias DLF.CreateHashTables {
   DLF.hadd ctcp.reply *MP3*
   inc %matches $hget(DLF.ctcp.reply,0).item
 
-  if ($hget(DLF.priv.spam)) hfree DLF.priv.spam
-  DLF.hadd priv.spam *www*sex*
-  DLF.hadd priv.spam *www*xxx*
-  DLF.hadd priv.spam *http*sex*
-  DLF.hadd priv.spam *http*xxx*
-  DLF.hadd priv.spam *sex*www*
-  DLF.hadd priv.spam *xxx*www*
-  DLF.hadd priv.spam *sex*http*
-  DLF.hadd priv.spam *xxx*http*
-  DLF.hadd priv.spam *porn*http*
-  inc %matches $hget(DLF.priv.spam,0).item
+  if ($hget(DLF.privtext.spam)) hfree DLF.privtext.spam
+  DLF.hadd privtext.spam *www*sex*
+  DLF.hadd privtext.spam *www*xxx*
+  DLF.hadd privtext.spam *http*sex*
+  DLF.hadd privtext.spam *http*xxx*
+  DLF.hadd privtext.spam *sex*www*
+  DLF.hadd privtext.spam *xxx*www*
+  DLF.hadd privtext.spam *sex*http*
+  DLF.hadd privtext.spam *xxx*http*
+  DLF.hadd privtext.spam *porn*http*
+  inc %matches $hget(DLF.privtext.spam,0).item
 
-  if ($hget(DLF.priv.findheaders)) hfree DLF.priv.findheaders
-  DLF.hadd priv.findheaders *Search Result*OmeNServE*
-  DLF.hadd priv.findheaders *OmeN*Search Result*ServE*
-  DLF.hadd priv.findheaders *Matches for*Copy and paste in channel*
-  DLF.hadd priv.findheaders *Total*files found*
-  DLF.hadd priv.findheaders *Search Results*QwIRC*
-  DLF.hadd priv.findheaders *Search Result*Too many files*Type*
-  DLF.hadd priv.findheaders *@Find Results*SysReset*
-  DLF.hadd priv.findheaders *End of @Find*
-  DLF.hadd priv.findheaders *I have*match*for*in listfile*
-  DLF.hadd priv.findheaders *SoftServe*Search result*
-  DLF.hadd priv.findheaders *Tengo*coincidencia* para*
-  DLF.hadd priv.findheaders *I have*match*for*Copy and Paste*
-  DLF.hadd priv.findheaders *Too many results*@*
-  DLF.hadd priv.findheaders *Tengo*resultado*slots*
-  DLF.hadd priv.findheaders *I have*matches for*You might want to get my list by typing*
-  DLF.hadd priv.findheaders *Résultat De Recherche*OmeNServE*
-  DLF.hadd priv.findheaders *Resultados De Busqueda*OmenServe*
-  DLF.hadd priv.findheaders *Total de*fichier*Trouvé*
-  DLF.hadd priv.findheaders *Fichier* Correspondant pour*Copie*
-  DLF.hadd priv.findheaders *Search Result*Matches For*Copy And Paste*
-  DLF.hadd priv.findheaders *Resultados de la búsqueda*DragonServe*
-  DLF.hadd priv.findheaders *Results for your search*DragonServe*
-  DLF.hadd priv.findheaders *«SoftServe»*
-  DLF.hadd priv.findheaders *search for*returned*results on list*
-  DLF.hadd priv.findheaders *List trigger:*Slots*Next Send*CPS in use*CPS Record*
-  DLF.hadd priv.findheaders *Searched*files and found*matching*To get a file, copy !*
-  DLF.hadd priv.findheaders *Note*Hey look at what i found!*
-  DLF.hadd priv.findheaders *Note*MP3-MP3*
-  DLF.hadd priv.findheaders *Search Result*Matches For*Get My List Of*Files By Typing @*
-  DLF.hadd priv.findheaders *Resultado Da Busca*Arquivos*Pegue A Minha Lista De*@*
-  DLF.hadd priv.findheaders *J'ai Trop de Résultats Correspondants*@*
-  DLF.hadd priv.findheaders *Search Results*Found*matches for*Type @*to download my list*
-  DLF.hadd priv.findheaders *I have found*file*for your query*Displaying*
-  DLF.hadd priv.findheaders *From list*found*displaying*
-  inc %matches $hget(DLF.priv.findheaders,0).item
+  if ($hget(DLF.privtext.findheader)) hfree DLF.privtext.findheader
+  DLF.hadd privtext.findheader *Search Result*OmeNServE*
+  DLF.hadd privtext.findheader *OmeN*Search Result*ServE*
+  DLF.hadd privtext.findheader *Matches for*Copy and paste in channel*
+  DLF.hadd privtext.findheader *Total*files found*
+  DLF.hadd privtext.findheader *Search Results*QwIRC*
+  DLF.hadd privtext.findheader *Search Result*Too many files*Type*
+  DLF.hadd privtext.findheader *@Find Results*SysReset*
+  DLF.hadd privtext.findheader *End of @Find*
+  DLF.hadd privtext.findheader *I have*match*for*in listfile*
+  DLF.hadd privtext.findheader *SoftServe*Search result*
+  DLF.hadd privtext.findheader *Tengo*coincidencia* para*
+  DLF.hadd privtext.findheader *I have*match*for*Copy and Paste*
+  DLF.hadd privtext.findheader *Too many results*@*
+  DLF.hadd privtext.findheader *Tengo*resultado*slots*
+  DLF.hadd privtext.findheader *I have*matches for*You might want to get my list by typing*
+  DLF.hadd privtext.findheader *Résultat De Recherche*OmeNServE*
+  DLF.hadd privtext.findheader *Resultados De Busqueda*OmenServe*
+  DLF.hadd privtext.findheader *Total de*fichier*Trouvé*
+  DLF.hadd privtext.findheader *Fichier* Correspondant pour*Copie*
+  DLF.hadd privtext.findheader *Search Result*Matches For*Copy And Paste*
+  DLF.hadd privtext.findheader *Resultados de la búsqueda*DragonServe*
+  DLF.hadd privtext.findheader *Results for your search*DragonServe*
+  DLF.hadd privtext.findheader *«SoftServe»*
+  DLF.hadd privtext.findheader *search for*returned*results on list*
+  DLF.hadd privtext.findheader *List trigger:*Slots*Next Send*CPS in use*CPS Record*
+  DLF.hadd privtext.findheader *Searched*files and found*matching*To get a file, copy !*
+  DLF.hadd privtext.findheader *Note*Hey look at what i found!*
+  DLF.hadd privtext.findheader *Note*MP3-MP3*
+  DLF.hadd privtext.findheader *Search Result*Matches For*Get My List Of*Files By Typing @*
+  DLF.hadd privtext.findheader *Resultado Da Busca*Arquivos*Pegue A Minha Lista De*@*
+  DLF.hadd privtext.findheader *J'ai Trop de Résultats Correspondants*@*
+  DLF.hadd privtext.findheader *Search Results*Found*matches for*Type @*to download my list*
+  DLF.hadd privtext.findheader *I have found*file*for your query*Displaying*
+  DLF.hadd privtext.findheader *From list*found*displaying*
+  inc %matches $hget(DLF.privtext.findheader,0).item
 
-  if ($hget(DLF.priv.findresults)) hfree DLF.priv.findresults
-  DLF.hadd priv.findresults !*
-  DLF.hadd priv.findresults : !*
-  inc %matches $hget(DLF.priv.findresults,0).item
+  if ($hget(DLF.priv.findresult)) hfree DLF.priv.findresult
+  DLF.hadd priv.findresult !*
+  DLF.hadd priv.findresult : !*
+  inc %matches $hget(DLF.priv.findresult,0).item
 
-  if ($hget(DLF.priv.server)) hfree DLF.priv.server
-  DLF.hadd priv.server Sorry, I'm making a new list right now, please try later*
-  DLF.hadd priv.server *Request Denied*OmeNServE*
-  DLF.hadd priv.server *Sorry for cancelling this send*OmeNServE*
-  DLF.hadd priv.server Lo Siento, no te puedo enviar mi lista ahora, intenta despues*
-  DLF.hadd priv.server Lo siento, pero estoy creando una nueva lista ahora*
-  DLF.hadd priv.server I have successfully sent you*OS*
-  DLF.hadd priv.server *Petición rechazada*DragonServe*
-  DLF.hadd priv.server *I don't have*Please check your spelling or get my newest list by typing @* in the channel*
-  DLF.hadd priv.server *you already have*in my que*has NOT been added to my que*
-  DLF.hadd priv.server *You already have*in my que*Type @*-help for more info*
-  DLF.hadd priv.server *Request Denied*Reason: *DragonServe*
-  DLF.hadd priv.server *You already have*requests in my queue*is not queued*
-  DLF.hadd priv.server *Queue Status*File*Position*Waiting Time*OmeNServE*
-  DLF.hadd priv.server *Empieza transferencia*IMPORTANTE*dccallow*
-  DLF.hadd priv.server *Sorry, I'm too busy to send my list right now, please try later*
-  DLF.hadd priv.server *Please standby for acknowledgement. I am using a secure query event*
-  inc %matches $hget(DLF.priv.server,0).item
+  if ($hget(DLF.privtext.server)) hfree DLF.privtext.server
+  DLF.hadd privtext.server Sorry, I'm making a new list right now, please try later*
+  DLF.hadd privtext.server *Request Denied*OmeNServE*
+  DLF.hadd privtext.server *Sorry for cancelling this send*OmeNServE*
+  DLF.hadd privtext.server Lo Siento, no te puedo enviar mi lista ahora, intenta despues*
+  DLF.hadd privtext.server Lo siento, pero estoy creando una nueva lista ahora*
+  DLF.hadd privtext.server I have successfully sent you*OS*
+  DLF.hadd privtext.server *Petición rechazada*DragonServe*
+  DLF.hadd privtext.server *I don't have*Please check your spelling or get my newest list by typing @* in the channel*
+  DLF.hadd privtext.server *you already have*in my que*has NOT been added to my que*
+  DLF.hadd privtext.server *You already have*in my que*Type @*-help for more info*
+  DLF.hadd privtext.server *Request Denied*Reason: *DragonServe*
+  DLF.hadd privtext.server *You already have*requests in my queue*is not queued*
+  DLF.hadd privtext.server *Queue Status*File*Position*Waiting Time*OmeNServE*
+  DLF.hadd privtext.server *Empieza transferencia*IMPORTANTE*dccallow*
+  DLF.hadd privtext.server *Sorry, I'm too busy to send my list right now, please try later*
+  DLF.hadd privtext.server *Please standby for acknowledgement. I am using a secure query event*
+  inc %matches $hget(DLF.privtext.server,0).item
 
-  if ($hget(DLF.priv.away)) hfree DLF.priv.away
-  DLF.hadd priv.away *AFK, auto away after*minutes. Gone*
-  DLF.hadd priv.away *Away*Reason*Auto Away*
-  DLF.hadd priv.away *Away*Reason*Duration*
-  DLF.hadd priv.away *Away*Reason*Gone for*Pager*
-  DLF.hadd priv.away *^Auto-Thanker^*
-  DLF.hadd priv.away *If i didn't know any better*I would have thought you were flooding me*
-  DLF.hadd priv.away *Message's from strangers are Auto-Rejected*
-  DLF.hadd priv.away *Dacia Script v1.2*
-  DLF.hadd priv.away *Away*SysReset*
-  DLF.hadd priv.away *automated msg*
-  inc %matches $hget(DLF.priv.away,0).item
+  if ($hget(DLF.privtext.away)) hfree DLF.privtext.away
+  DLF.hadd privtext.away *AFK, auto away after*minutes. Gone*
+  DLF.hadd privtext.away *Away*Reason*Auto Away*
+  DLF.hadd privtext.away *Away*Reason*Duration*
+  DLF.hadd privtext.away *Away*Reason*Gone for*Pager*
+  DLF.hadd privtext.away *^Auto-Thanker^*
+  DLF.hadd privtext.away *If i didn't know any better*I would have thought you were flooding me*
+  DLF.hadd privtext.away *Message's from strangers are Auto-Rejected*
+  DLF.hadd privtext.away *Dacia Script v1.2*
+  DLF.hadd privtext.away *Away*SysReset*
+  DLF.hadd privtext.away *automated msg*
+  inc %matches $hget(DLF.privtext.away,0).item
 
-  if ($hget(DLF.ctcp.spam)) hfree DLF.ctcp.spam
-  DLF.hadd ctcp.spam *SLOTS*
-  DLF.hadd ctcp.spam *OmeNServE*
-  DLF.hadd ctcp.spam *RAR*
-  DLF.hadd ctcp.spam *WMA*
-  DLF.hadd ctcp.spam *ASF*
-  DLF.hadd ctcp.spam *SOUND*
-  DLF.hadd ctcp.spam *MP*
-  inc %matches $hget(DLF.ctcp.spam,0).item
+  if ($hget(DLF.chanctcp.spam)) hfree DLF.chanctcp.spam
+  DLF.hadd chanctcp.spam *SLOTS*
+  DLF.hadd chanctcp.spam *OmeNServE*
+  DLF.hadd chanctcp.spam *RAR*
+  DLF.hadd chanctcp.spam *WMA*
+  DLF.hadd chanctcp.spam *ASF*
+  DLF.hadd chanctcp.spam *SOUND*
+  DLF.hadd chanctcp.spam *MP*
+  inc %matches $hget(DLF.chanctcp.spam,0).item
 
   DLF.Status Added %matches wildcard templates
 }
@@ -2130,8 +2146,8 @@ alias -l DLF.regml {
 ; ========== Status and error messages ==========
 alias -l DLF.logo return $rev([dlFilter])
 alias -l DLF.Status echo -ts $c(1,9,$DLF.logo $1-)
-alias -l DLF.Warning echo -tas $c(1,9,$DLF.logo $1-)
-alias -l DLF.Error DLF.Warning $c(4,$b(Error:)) $1-
+alias -l DLF.Warning echo -tas $c(1,9,$DLF.logo Warning: $1-)
+alias -l DLF.Error echo -tas $c(1,9,$DLF.logo $c(4,$b(Error:)) $1-)
 
 ; ========== Identifiers instead of $chr(xx) - more readable ==========
 alias -l space returnex $chr(32)
@@ -2174,7 +2190,7 @@ alias -l c {
     halt
   }
   elseif ($1 !isnum 0-15) {
-    DLF.Error Colour value invalid
+    DLF.Error Colour value invalid: $1
     halt
   }
   elseif (($0 >= 3) && ($2 isnum 0-15)) {
@@ -2365,10 +2381,49 @@ alias DLF.GenerateBinaryFile {
   echo 1 $rev(That's all folks!)
 }
 
-; ========== DLF.debug ==========
-; Run this with //DLF.debug only if you are asked to
+; ========== DLF.Debug.* ==========
+; Routines to help developers by providing a filtered debug window
+alias -l DLF.Halt {
+  DLF.Debug.Log Halted: $1-
+  halt
+}
+
+alias DLF.Debug.DLF {
+  if ((($0 == 0) && ($debug)) || ($1- == off)) debug off
+  else {
+    if (($0 == 0) || ($1 == on)) var %target = @dlF.Debug. $+ $network
+    else var %target = $qt($1-)
+    debug -ipt %target DLF.Debug.Filter
+  }
+}
+
+alias DLF.Debug.Filter {
+  ; This identifier should return $1- if it is a line dlF reacts to else $null
+  var %text = $1-
+  tokenize $asc($space)) $1-
+  if ($left($2,1) == $colon) {
+    var %user = $right($2,-1)
+    tokenize $asc($space)) $1 $3-
+  }
+  if ($1 == ->) {
+    var %server = $2
+    tokenize $asc($space)) $1 $3-
+  }
+  if (($2 == PING) || ($2 == PONG)) return $null
+  if (($1 == <-) && ($2 == PRIVMSG) && ($left($3,1) == $hashtag) && ($DLF.Chan.IsDlfChan($network,$3) == $false)) return $null
+  return %text
+}
+
+alias -l DLF.Debug.Log {
+  if ($0 == 0) return
+  if ($left($debug,1) == @) aline 4 $debug $1-
+  else write $debug $1-
+}
+
+; ========== DLF.Debug ==========
+; Run this with //DLF.Debug only if you are asked to
 ; by someone providing dlFilter support.
-alias DLF.debug {
+alias DLF.Debug {
   var %file = $qt($+($sysdir(downloads),dlFilter.debug.txt))
   echo 14 -s [dlFilter] Debug started.
   if ($show) echo 14 -s [dlFilter] Creating %file
