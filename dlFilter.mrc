@@ -52,25 +52,22 @@ o Vadi wrote special function to vPowerGet dll that allows sending files from DL
         Search in Filter window now retains line colours
         Restricted ctcp Version responses to people in common channel or PM
         DLF.Debug.DLF now displays custom debug window filtered to dlF channels with halt reasons
+        Only add *'s around custom filters if user hasn't explicitly included a *
+        Option for extra windows for fileserver ads
+        Multi-server support - option for for custom windows per connection.
+        Use hash tables for custom filters
 
       TODO
         Better icon file
-        Use hash tables for custom filters
-        Only ad *'s around custom filters if user hasn't explicitly included a *
-        Implement toolbar functionality
-        Implement extra windows for fileserver ads and multi-server
-        Option for custom windows per server or (as now) common
-        Development debug functionality - if mIRC debug is on, add DLF debug messages to the debug log.
+        Implement toolbar functionality with right click menu
         Right click menu items for changing options base on line clicked
         Right click menu items for adding to custom filters
         More menu options equivalent to dialog options
         More menu options for adding custom filters
         Somehow send us details of user adding custom filters for our own analysis (privacy issues?)
-        Add dlF icons to toolbar & options dialog
-        Add menu to toolbar item
         Use CTCP halt to stop DCC CHAT and SEND rather than convoluted ctcp/open processing
         Rewrite anti-chat code
-        Separate CTCP processing for these.
+        Separate CTCP event processing for DCC Chat, DCC Send and other ctcp messages.
         Track requests in channels and allow dcc sends and responses regardless of matching
         Send to... menus - do they work?
         Make it work on AdiIRC.
