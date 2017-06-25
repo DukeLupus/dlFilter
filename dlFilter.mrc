@@ -12,7 +12,7 @@ Update regularly to handle new forms of message.
 
 To load: use /load -rs dlFilter.mrc
 
-Note that dlFilter loads itself automatically as a first script. This avoids problems where other scripts halt events preventing this scripts events from running.
+Note that dlFilter loads itself automatically as a first script (or second if you are also running sbClient). This avoids problems where other scripts halt events preventing this scripts events from running.
 
 Acknowledgements
 ================
@@ -141,7 +141,7 @@ alias -l DLF.mIRCversion {
 ; ==================== Initialisation / Termination ====================
 on *:start: {
   ; Reload script if needed to be first to execute
-  if ($script != $script(1)) .reload -rs1 $qt($script)
+  DLF.LoadCheck .reload
   if (%DLF.JustLoaded) return
   DLF.Initialise
   return
@@ -152,7 +152,7 @@ on *:start: {
 
 on *:load: {
   ; Reload script if needed to be first to execute
-  if ($script != $script(1)) .load -rs1 $qt($script)
+  DLF.LoadCheck .load
 
   set -u1 %DLF.JustLoaded 1
   DLF.Initialise
@@ -162,6 +162,13 @@ on *:load: {
 
   :error
   DLF.Error During load: $qt($error)
+}
+
+alias DLF.LoadCheck {
+  var %sbc = $iif(sbClient.* iswm $nopath($script(1)) || sbClient.* iswm $nopath($script(2)),$true,$false)
+  if (($script == $script(1)) && (%sbc == $false)) return
+  if (($script == $script(2)) && (%sbc)) return
+  $1 $iif(%sbc,-rs2,-rs1) $qt($script)
 }
 
 on *:signal:DLF.Update.ReLoad: DLF.Initialise
@@ -315,6 +322,7 @@ raw 301:*: { DLF.Away.Filter $1- }
 ; Channel user activity
 ; join, part, kick
 alias -l DLF.User.Channel {
+  if ($3 == $me) return
   if (%DLF.showstatus == 1) echo -stnc $1 $sqbr($2) $star $3-
   DLF.Win.Filter $1-
 }
@@ -1149,7 +1157,7 @@ alias -l DLF.Options.Initialise {
   ; Main tab General box
   DLF.Options.InitOption ads 1
   DLF.Options.InitOption requests 1
-  DLF.Options.InitOption chmode 0
+  DLF.Options.InitOption chmode 1
   DLF.Options.InitOption privrequests 1
   ; Main tab User events box
   DLF.Options.InitOption joins 0
