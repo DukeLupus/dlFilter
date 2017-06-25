@@ -69,10 +69,10 @@ o Vadi wrote special function to vPowerGet dll that allows sending files from DL
         Rewrite anti-chat code
         Separate CTCP event processing for DCC Chat, DCC Send and other ctcp messages.
         Track requests in channels and allow DCC Sends regardless of whether server is regular user or not. Also automatically reissue the command if the file send is incomplete.
+        Can we automate a. offering to cancel a file request before sending if the file already exists in the correct directory and is the right size, and to automate the overwrite or resume options if it is the wrong size?
         @find windows per connection.
         Send to... menus - do they work?
         Make it work on AdiIRC.
-
 
   1.17  Update opening comments and add change log
         Use custom identifiers for creating bold, colour etc.
