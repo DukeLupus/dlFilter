@@ -68,9 +68,11 @@ o Vadi wrote special function to vPowerGet dll that allows sending files from DL
         Use CTCP halt to stop DCC CHAT and SEND rather than convoluted ctcp/open processing
         Rewrite anti-chat code
         Separate CTCP event processing for DCC Chat, DCC Send and other ctcp messages.
-        Track requests in channels and allow dcc sends and responses regardless of matching
+        Track requests in channels and allow DCC Sends regardless of whether server is regular user or not. Also automatically reissue the command if the file send is incomplete.
+        @find windows per connection.
         Send to... menus - do they work?
         Make it work on AdiIRC.
+
 
   1.17  Update opening comments and add change log
         Use custom identifiers for creating bold, colour etc.
