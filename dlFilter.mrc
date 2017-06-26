@@ -2020,8 +2020,8 @@ alias -l DLF.CreateHashTables {
   DLF.hadd privtext.server I have successfully sent you*OS*
   DLF.hadd privtext.server *Petición rechazada*DragonServe*
   DLF.hadd privtext.server *I don't have*Please check your spelling or get my newest list by typing @* in the channel*
-  DLF.hadd privtext.server *you already have*in my que*has NOT been added to my que*
-  DLF.hadd privtext.server *You already have*in my que*Type @*-help for more info*
+  DLF.hadd privtext.server *you already have*in my queue*has NOT been added to my queue*
+  DLF.hadd privtext.server *You already have*in my queue*Type @*-help for more info*
   DLF.hadd privtext.server *Request Denied*Reason: *DragonServe*
   DLF.hadd privtext.server *You already have*requests in my queue*is not queued*
   DLF.hadd privtext.server *Queue Status*File*Position*Waiting Time*OmeNServE*
@@ -2131,11 +2131,6 @@ alias -l DLF.CreateHashTables {
   DLF.hadd ctcp.reply *MP3*
   inc %matches $hget(DLF.ctcp.reply,0).item
 
-  if ($hget(DLF.findnotice.header)) hfree DLF.findnotice.header
-  DLF.hadd findnotice.header No match found for*
-  DLF.hadd findnotice.header *I have*match* for*in listfile*
-  inc %matches $hget(DLF.findnotice.header,0).item
-
   if ($hget(DLF.findtext.header)) hfree DLF.findtext.header
   DLF.hadd findtext.header *Search Result*OmeNServE*
   DLF.hadd findtext.header *OmeN*Search Result*ServE*
@@ -2172,6 +2167,11 @@ alias -l DLF.CreateHashTables {
   DLF.hadd findtext.header *I have found*file*for your query*Displaying*
   DLF.hadd findtext.header *From list*found*displaying*
   inc %matches $hget(DLF.findtext.header,0).item
+
+  if ($hget(DLF.findnotice.header)) hfree DLF.findnotice.header
+  DLF.hadd findnotice.header No match found for*
+  DLF.hadd findnotice.header *I have*match* for*in listfile*
+  inc %matches $hget(DLF.findnotice.header,0).item
 
   if ($hget(DLF.find.result)) hfree DLF.find.result
   DLF.hadd find.result !*
