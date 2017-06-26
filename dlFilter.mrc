@@ -323,7 +323,7 @@ raw 301:*: { DLF.Away.Filter $1- }
 alias -l DLF.User.Channel {
   if ($3 == $me) return
   if (%DLF.showstatus == 1) echo -stnc $1 $sqbr($2) $star $3-
-  DLF.Win.Filter $1-
+  DLF.Win.Filter $1-2 $star $3-
 }
 
 ; Non-channel user activity
@@ -1769,19 +1769,20 @@ alias -l hiswm {
     DLF.Warning Hash table %h does not exist - attempting to recreate it...
     DLF.CreateHashTables
   }
-  var %result = $hfind(%h,$2,1,W)
-  if (%result) DLF.Debug.Log Matched in $1 $+ : $2
+  var %result = $hfind(%h,$2,1,W).data
+  if (%result) DLF.Debug.Log Matched in $1 by $qt($hget(%h,%result))
   return %result
 }
 
 alias -l DLF.hadd {
   var %h = DLF. $+ $1
   if (!$hget(%h)) hmake %h 10
-  var %n = $hget($1, 0)
-  hadd %h %n $2-
+  var %n = $hget(%h, 0).item
+  inc %n
+  hadd %h i $+ %n $2-
 }
 
-alias -l DLF.CreateHashTables {
+alias DLF.CreateHashTables {
   var %matches = 0
   if ($hget(DLF.chantext.ads)) hfree DLF.chantext.ads
   DLF.hadd chantext.ads *Type*@*
