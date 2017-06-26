@@ -56,6 +56,7 @@ o Vadi wrote special function to vPowerGet dll that allows sending files from DL
         Option for extra windows for fileserver ads
         Multi-server support - option for for custom windows per connection.
         Use hash tables for custom filters
+        Colour server nicks now overrides colours set using generic colouring rules which are not based on user modes etc.
 
       TODO
         Better icon file
@@ -399,10 +400,10 @@ alias -l DLF.Chan.IsUserEvent {
 alias -l DLF.Chan.Text {
   DLF.CustFilt.Check chantext Normal $chan $nick $1-
   var %txt = $strip($1-)
-  if ((%DLF.requests == 1) && ($hiswm(chantext.cmds,%txt))) DLF.Win.Filter Normal $chan $nick $1-
   if ((%DLF.ads == 1) && ($hiswm(chantext.ads,%txt))) DLF.Chan.NickColour Ads Normal $chan $nick $1-
   if ((%DLF.ads == 1) && ($hiswm(chantext.spam,%txt))) DLF.Win.Filter Normal $chan $nick $1-
   if ($hiswm(chantext.always,%txt)) DLF.Win.Filter Normal $chan $nick $1-
+  if ((%DLF.requests == 1) && ($hiswm(chantext.cmds,%txt))) DLF.Win.Filter Normal $chan $nick $1-
   /*if (%DLF.chspam == 1) {
     ;no channel spam right now
   }
@@ -437,7 +438,25 @@ alias -l DLF.Chan.SpamFilter {
 }
 
 alias -l DLF.Chan.NickColour {
-  if ((%DLF.colornicks == 1) && ($nick($3,$4).color == $color(nicklist))) cline 6 $3 $4
+  if (%DLF.colornicks == 1) {
+    var %cnickrule = $cnick($nick($3,$4).pnick,1)
+    var %colour = $cnick(%cnickrule,1).color
+    if (%cnickrule) {
+      var %notnick = $false
+      %notnick = $iif($cnick(%cnickrule).modes != $null,$true,%notnick)
+      %notnick = $iif($cnick(%cnickrule).levels != $null,$true,%notnick)
+      %notnick = $iif($cnick(%cnickrule).anymode,$true,%notnick)
+      %notnick = $iif($cnick(%cnickrule).nomode,$true,%notnick)
+      %notnick = $iif($cnick(%cnickrule).ignore,$true,%notnick)
+      %notnick = $iif($cnick(%cnickrule).op,$true,%notnick)
+      %notnick = $iif($cnick(%cnickrule).voice,$true,%notnick)
+      %notnick = $iif($cnick(%cnickrule).protect,$true,%notnick)
+      %notnick = $iif($cnick(%cnickrule).notify,$true,%notnick)
+      %notnick = $iif($cnick(%cnickrule).idle,$true,%notnick)
+    }
+    else var %notnick = $true
+    if ((%notnick) && ($nick($3,$4).color == %colour)) cline 4 $3 $4
+  }
   if ($5 != $null) DLF.Win.Log $1-
 }
 
@@ -1782,7 +1801,7 @@ alias -l DLF.hadd {
   hadd %h i $+ %n $2-
 }
 
-alias DLF.CreateHashTables {
+alias -l DLF.CreateHashTables {
   var %matches = 0
   if ($hget(DLF.chantext.ads)) hfree DLF.chantext.ads
   DLF.hadd chantext.ads *Type*@*
@@ -1885,8 +1904,9 @@ alias DLF.CreateHashTables {
   DLF.hadd chantext.ads *rßPLåY*
   DLF.hadd chantext.ads *<*>*!*
   DLF.hadd chantext.ads @ * is now open via ftp @*
+  DLF.hadd chantext.ads @ --*
   DLF.hadd chantext.ads @ Use @*
-  DLF.hadd chantext.ads * CSE Fact *    CHANGING the way you search *
+  DLF.hadd chantext.ads * CSE Fact *
   inc %matches $hget(DLF.chantext.ads,0).item
 
   if ($hget(DLF.chantext.cmds)) hfree DLF.chantext.cmds
