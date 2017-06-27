@@ -2264,6 +2264,7 @@ alias -l DLF.CreateHashTables {
   hmake DLF.find.headregex 10
   hadd DLF.find.headregex ^\s*From\s+list\s+(@\S+)\s+found\s+([0-9]+),\s+displaying\s+([0-9]+):$ 1 2 3
   hadd DLF.find.headregex ^\s*Search\s+Result\W+More\s+than\s+([0-9]+)\s+Matches\s+For\s+.*?\s+Get\s+My\s+List\s+Of\s+[0-9,]+\s+Files\s+By\s+Typing\s+(@\S+)\s+In\s+The\s+Channel\s+Or\s+Refine\s+Your\s+Search.\s+Sending\s+first\s+([0-9]+)\s+Results\W+OmenServe 2 1 3
+  hadd DLF.find.headregex ^\s*Search\s+Result\W+([0-9]+)\s+Matches\s+For\s+.*?\s+Get\s+My\s+List\s+Of\s+[0-9,]+\s+Files\s+By\s+Typing\s+(@\S+)\s+In\s+The\s+Channel\s+Or\s+Refine\s+Your\s+Search.\s+Sending\s+first\s+([0-9]+)\s+Results\W+OmenServe 2 1 3
   inc %matches $hget(DLF.find.headregex,0).item
 
   if ($hget(DLF.find.result)) hfree DLF.find.result
