@@ -473,7 +473,7 @@ alias -l DLF.Priv.Text {
 
   var %txt = $strip($1-)
   if ($DLF.@find.IsResponse) {
-    DLF.@find.Subset Normal Private $nick $1-
+    DLF.@find.OnlyPartial Normal Private $nick $1-
     if ($hiswm(find.header,%txt)) DLF.Win.Server Normal Private $nick $1-
     if ($hiswm(find.result,%txt)) DLF.@find.Results Normal Private $nick $1-
     if ((*Omen* iswm $strip($1)) && ($left($strip($2),1) == $pling)) DLF.@find.Results Normal Private $nick $2-
@@ -505,7 +505,7 @@ alias -l DLF.Priv.Text {
 alias -l DLF.Priv.Notice {
   DLF.Watch.Called DLF.Priv.Notice
   if ($DLF.@find.IsResponse) {
-    DLF.@find.Subset Notice Private $nick $1-
+    DLF.@find.OnlyPartial Notice Private $nick $1-
     if ($hiswm(find.header,%txt)) DLF.Win.Server Notice Private $nick $1-
     if ($hiswm(find.result,%txt)) DLF.@find.Results Notice Private $nick $1-
   }
@@ -911,15 +911,13 @@ alias DLF.@find.IsResponse {
   return $false
 }
 
-alias DLF.@find.Subset {
-  if ($left($4,1) == $pling) return
+alias DLF.@find.OnlyPartial {
   var %txt = $strip($4-)
-  var %re = ^\s*From\s+list\s+(@\S+)\s+found\s+([0-9]+),\s+displaying\s+([0-9]+):$
-  var %r = $DLF.@find.Regex(%re,1 2 3,%txt)
-  if (%r == $null) {
-    var %re = ^\s*Search\s+Result\W+More\s+than\s+([0-9]+)\s+Matches\s+For\s+.*?\s+Get\s+My\s+List\s+Of\s+[0-9,]+\s+Files\s+By\s+Typing\s+(@\S+)\s+In\s+The\s+Channel\s+Or\s+Refine\s+Your\s+Search.\s+Sending\s+first\s+([0-9]+)\s+Results\W+OmenServe
-    var %r = $DLF.@find.Regex(%re,2 1 3,%txt)
-  }
+  if ($left(%txt,1) == $pling) return
+  var %re = $hfind(DLF.find.headregex,%txt,1,R).item
+  if (%re == $null) return
+
+  var %r = $DLF.@find.Regex(%re,$hget(DLF.find.headregex,%re),%txt)
   if (%r == $null) return
 
   var %list = $gettok(%r,1,$asc($space))
@@ -2259,6 +2257,12 @@ alias -l DLF.CreateHashTables {
   DLF.hadd find.header Found * matching files. Using: Findbot *
   DLF.hadd find.header No match found for*
   inc %matches $hget(DLF.find.header,0).item
+
+  if ($hget(DLF.find.headregex)) hfree DLF.find.headregex
+  hmake DLF.find.headregex 10
+  hadd DLF.find.headregex ^\s*From\s+list\s+(@\S+)\s+found\s+([0-9]+),\s+displaying\s+([0-9]+):$ 1 2 3
+  hadd DLF.find.headregex ^\s*Search\s+Result\W+More\s+than\s+([0-9]+)\s+Matches\s+For\s+.*?\s+Get\s+My\s+List\s+Of\s+[0-9,]+\s+Files\s+By\s+Typing\s+(@\S+)\s+In\s+The\s+Channel\s+Or\s+Refine\s+Your\s+Search.\s+Sending\s+first\s+([0-9]+)\s+Results\W+OmenServe 2 1 3
+  inc %matches $hget(DLF.find.headregex,0).item
 
   if ($hget(DLF.find.result)) hfree DLF.find.result
   DLF.hadd find.result !*
