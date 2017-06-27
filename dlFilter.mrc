@@ -57,12 +57,12 @@ o Vadi wrote special function to vPowerGet dll that allows sending files from DL
         Multi-server support - option for for custom windows per connection.
         Use hash tables for custom filters
         Colour server nicks now overrides colours set using generic colouring rules which are not based on user modes etc.
+        Added window description to title bar for all custom windows.
+        @find windows per connection.
+        Handle @find results from normal users rather than give error.
 
       TODO
         Make FilterSearch dynamic i.e. new lines which match are added.
-        Add window description to title bar.
-        @find results in per-server windows - always or by option?
-        Handle @find results from normal users rather than give error.
         Handle ps2 results to @find
         Better icon file
         Implement toolbar functionality with right click menu
@@ -76,7 +76,6 @@ o Vadi wrote special function to vPowerGet dll that allows sending files from DL
         Separate CTCP event processing for DCC Chat, DCC Send and other ctcp messages.
         Track requests in channels and allow DCC Sends regardless of whether server is regular user or not. Also automatically reissue the command if the file send is incomplete.
         Can we automate a. offering to cancel a file request before sending if the file already exists in the correct directory and is the right size, and to automate the overwrite or resume options if it is the wrong size?
-        @find windows per connection.
         Send to... menus - do they work?
         Make it work on AdiIRC.
 
