@@ -927,6 +927,7 @@ alias DLF.@find.OnlyPartial {
   var %win = $+(@dlF.@find.,$network)
   DLF.Win.Echo $1-
   DLF.@find.Results $1-3 %list Found %found $+ , but displaying only %displayed $c(3,:: Double click here to get the server's full list)
+  DLF.Chan.NickColour $1-3
 }
 
 alias -l DLF.@find.Regex {
@@ -953,6 +954,7 @@ alias -l DLF.@find.Results {
   window -b %win
   DLF.@find.TitleBar %win Right-click for options or double-click to download
   DLF.Halt @find result: Result for $strip($4) added to %win
+  DLF.Chan.NickColour $1-3
 }
 
 alias -l DLF.@find.TitleBar {
