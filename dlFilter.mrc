@@ -694,9 +694,8 @@ alias -l DLF.DccSend.Receiving {
 alias -l DLF.DccSend.FileRcvd {
   DLF.Watch.Called DLF.DccSend.FileRcvd : $nopath($filename)
   var %req = $DLF.DccSend.GetRequest($nopath($filename))
-  echo -s FILERCVD $network $nick %req
   if (%req == $null) return
-  hdel -s DLF.dccsend.requests %req
+  .hdel -s DLF.dccsend.requests %req
   var %chan = $gettok(%req,2,$asc(|))
   DLF.Win.Log Server ctcp %chan $nick DCC Get of $nopath($filename) from $nick complete
 }
