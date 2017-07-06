@@ -1,13 +1,19 @@
 /*
-dlFilter.mrc
-Filter out messages on file sharing channels
+DLFILTER -=- Firewall/anti-spam for file sharing channels.
 Authors: DukeLupus and Sophist
 
 Annoyed by advertising messages from the various file serving bots? Fed up with endless channel messages by other users searching for and requesting files? Are the responses to your own requests getting lost in the crowd?
 
-This script filters out the crud, leaving only the useful messages displayed in the channel. By default, the filtered messages are thrown away, but you can direct them to custom windows if you wish.
+This script filters out the crud, leaving only the useful messages displayed in the channel. By default, the filtered messages are thrown away, but you can direct them to custom windows if you wish. Functions include:
 
-Download from https://github.com/SanderSade/dlFilter/releases
+• Filter other peoples messages, server adverts and spam
+• Collect @find results into a custom window
+• Auto-accept requested files but reject any other files
+• Stop chat windows opening without your consent.
+• Harden your mIRC security settings
+• If you are a channel op, provide oNotice chat windows
+
+Download: https://github.com/SanderSade/dlFilter/releases
 Update regularly to handle new forms of message.
 
 To load: use /load -rs dlFilter.mrc
@@ -66,12 +72,12 @@ dlFilter uses the following code from other people:
         Own file requests are tracked and matching DCC Sends accepted regardless of whether server is regular user or not.
         Added dynamic titlebar to show channel and / or dlF filtering statistics
         Added Ops channel advertising option - an op can advertise dlFilter once every x minutes.
-        Add Ops private advertising option which version checks users as they join and if they are a mIRC user
-          reminds them to install or upgrade dlF.
+        Add Ops private advertising option which:
+          Version checks users as they join and if they are a mIRC user reminds them to install or upgrade dlF.
+          Send advert to users doing @join.
 
       TODO
-        Send private adverts to users doing @find.
-        Make Ads window an updating list of adverts rather than a scrolling filter
+        Check mIRC security settings not too lax
         Make download handle betas properly
         Convert "Regular user tried to" messages to filter messages (and limit showing warning messages if $me is not a regular user i.e. an op who can do something about it).
         Make FilterSearch dynamic i.e. new lines which match are added.
@@ -288,10 +294,7 @@ on ^*:join:%DLF.channels: {
     if (%DLF.joins) DLF.User.Channel Join $chan $nick $br($address) has joined $chan
   }
 }
-on ^*:part:%DLF.channels: {
-
-  if ($DLF.Chan.IsChanEvent(%DLF.parts)) DLF.User.Channel Part $chan $nick $br($address) has left $chan
-}
+on ^*:part:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.parts)) DLF.User.Channel Part $chan $nick $br($address) has left $chan }
 on ^*:kick:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.kicks)) DLF.User.Channel Kick $chan $knick $br($address($knick,5)) was kicked from $chan by $nick $br($1-) }
 on ^*:nick: { if ($DLF.Chan.IsUserEvent(%DLF.nicks)) DLF.User.NoChannel $newnick Nick $nick $br($address) is now known as $newnick }
 on ^*:quit: { if ($DLF.Chan.IsUserEvent(%DLF.quits)) DLF.User.NoChannel $nick Quit $nick $br($address) Quit $br($1-) }
@@ -320,6 +323,7 @@ on *:input:%DLF.channels: {
 }
 
 on *:filercvd:*: DLF.DccSend.FileRcvd $1-
+on *:getfail:*: DLF.DccSend.FileFailed $1-
 
 ; Channel messages
 on ^*:text:*:%DLF.channels: { if ($DLF.Chan.IsChanEvent) DLF.Chan.Text $1- }
@@ -459,6 +463,12 @@ alias -l DLF.Chan.Text {
   DLF.Watch.Called DLF.Chan.Text
   DLF.CustFilt.Check chantext Normal $chan $nick $1-
   var %txt = $strip($1-)
+  if ($hiswm(chantext.dlf,%txt)) {
+    ; Someone else is sending channel ads
+    set $+(-eu,$calc(%DLF.ops.advertchan.period * 60)) [ [ $+(%,DLF.opsnochanads.,$network,$chan) ] ] 1
+    DLF.Win.Ads Normal $chan $nick $1-
+  }
+  if (($me isop $chan) && (%DLF.ops.advertpriv == 1) && (@find * iswm %txt)) DLF.Ops.Advert@find $1-
   if ((%DLF.ads == 1) && ($hiswm(chantext.ads,%txt))) DLF.Win.Ads Normal $chan $nick $1-
   if ((%DLF.ads == 1) && ($hiswm(chantext.spam,%txt))) DLF.Win.Filter Normal $chan $nick $1-
   if ($hiswm(chantext.always,%txt)) DLF.Win.Filter Normal $chan $nick $1-
@@ -760,6 +770,20 @@ alias -l DLF.Ops.AdvertsEnable {
   else .timerDLF.Adverts off
 }
 
+alias -l DLF.Ops.Advert@find {
+  var %idx = $+($network,@,$nick)
+  if (!$hfind(DLF.ops.verRequested,%idx)) DLF.Ops.RequestVersion $nick
+  elseif ((!$hfind(DLF.ops.advert@find,%idx)) $&
+    && ($hfind(DLF.ops.mirc@find,%idx)) $&
+    && (!$hfind(DLF.ops.dlfVersion,%idx))) {
+    hadd -mu86400 DLF.ops.advert@find %idx $true
+    %msg = $c(1,9,$DLF.logo Make @find easier to use by installing the dlFilter mIRC script which collects the results together into a single window. Download it from $u($c(2,https://github.com/SanderSade/dlFilter/releases)) $+ .)
+    DLF.notice $nick %msg
+    DLF.Win.Log Filter text $chan $nick $1-
+    DLF.Win.Filter notice $chan $nick %msg
+  }
+}
+
 on *:signal:DLF.Ops.AdvertChan: { DLF.Ops.AdvertChan $1- }
 alias -l DLF.Ops.AdvertChan {
   var %cid = $cid
@@ -769,10 +793,15 @@ alias -l DLF.Ops.AdvertChan {
     var %j = $chan(0)
       while (%j) {
         var %c = $chan(%j)
+        ; skip advertising if another user has advertised in the channel
+        if ([ [ $+(%,DLF.opsnochanads.,$network,$chan) ] ] != $null) {
+          unset [ $+(%,DLF.noads.,$network,$chan) ]
+          continue
+        }
         if ((($istok(%DLF.netchans,$+($network,%c),$asc($space))) || ($istok(%DLF.netchans,%c,$asc($space)))) $&
         && ($me isop %c)) {
-          var %msg = $c(1,9,$DLF.logo Are the responses to your requests getting lost in the crowd? If you are using mIRC as your IRC client, then download dlFilter from $u($c(2,https://github.com/SanderSade/dlFilter/releases)) and make your time in %c less stressful.)
-          msg %c %msg
+          var %msg = $c(1,9,$DLF.logo Are the responses to your requests getting lost in the crowd? Are your @find spread about? If you are using mIRC as your IRC client, then download dlFilter from $u($c(2,https://github.com/SanderSade/dlFilter/releases)) and make your time in %c less stressful.)
+          DLF.msg %c %msg
           DLF.Win.Filter text %c $me %msg
         }
         dec %j
@@ -813,6 +842,13 @@ alias -l DLF.ops.VersionReply {
       DLF.Watch.Log dlf version added
     }
     else DLF.Watch.Log dlf version already known
+  }
+  elseif ((%mod == sbClient) && (%ver isnum)) {
+    if (!$hfind(DLF.ops.sbcUsers,%idx)) {
+      hadd -mu86340 DLF.ops.sbcUsers %idx %ver
+      DLF.Watch.Log sbc version added
+    }
+    else DLF.Watch.Log sbc version already known
   }
   elseif (%mod == mIRC) {
     if (!$hfind(DLF.ops.mircUsers,%idx)) {
@@ -932,7 +968,7 @@ alias DLF.DccSend.Request {
 }
 
 alias DLF.DccSend.SendNotice {
-  var %req = $DLF.DccSend.GetRequest($1-)
+  var %req = $DLF.DccSend.GetRequest($3-)
   if (%req == $null) return
   var %chan = $gettok(%req,2,$asc(|))
   if ($DLF.DccSend.IsFile($3-) != $null) DLF.Win.Server Notice %chan $nick $1-
@@ -940,7 +976,7 @@ alias DLF.DccSend.SendNotice {
 
 alias -l DLF.DccSend.Send {
   DLF.Watch.Called DLF.DccSend.Send
-  if ($chr(8238) isin $filename) DLF.Halt Halted: DCC Send refused - filename contains malicious unicode U+8238
+  ;if ($chr(8238) isin $filename) DLF.Halt Halted: DCC Send refused - filename contains malicious unicode U+8238
   if ($DLF.DccSend.IsFile($3-)) {
     DLF.DccSend.Receiving $3-
     DLF.Watch.Log DCC Send accepted - trigger found
@@ -985,9 +1021,21 @@ alias -l DLF.DccSend.FileRcvd {
   DLF.Win.Log Server ctcp %chan $nick DCC Get of $nopath($filename) from $nick complete
 }
 
+alias -l DLF.DccSend.FileFailed {
+  var %fn = $nopath($filename)
+  DLF.Watch.Called DLF.DccSend.FileFailed : %fn
+  var %req = $DLF.DccSend.GetRequest(%fn)
+  if (%req == $null) return
+  .hdel -s DLF.dccsend.requests %req
+  var %chan = $gettok(%req,2,$asc(|))
+  var %trig = $gettok(%req,3,$asc(|))
+  DLF.Win.Log Server ctcp %chan $nick DCC Get of $nopath($filename) from $nick failed - retrying
+  DLF.chan.editsend %chan %trig %fn
+}
+
 alias -l DLF.DccSend.GetRequest {
   tokenize $asc($space) $strip($1-)
-  var %file = $replace($DLF.GetFileName($1-),$space,$underscore)
+  var %file = $replace($noqt($DLF.GetFileName($1-)),$space,$underscore)
   return $hfind(DLF.dccsend.requests,$+($network,|#*|!,$nick,|,%file),1,w).item
 }
 
@@ -1015,22 +1063,29 @@ alias -l DLF.DccSend.IsFile {
   if ($right($gettok(%req,3,$asc(|)),-1) != $nick) return $false
   DLF.Watch.Log File request found: %trig $1-
 
-  ; If sending user is op or voice add trust automatically else ask user
-  var %chan = $gettok(%req,2,$asc(|))
+  if (%DLF.servertrust == 0) return $true
+  if (%DLF.DccSend.IsTrusted($nick)) return $true
+
+  ; Temporarily add DCC trust
   var %desc = $nick
   var %addr = $address($nick,5)
   if (%addr == $null) %addr = $nick
   else %desc = %desc ( $+ %addr $+ )
-  if (%DLF.servertrust == 0) return $true
-  if (%DLF.DccSend.IsTrusted($nick)) return $true
-  if (($nick isop %chan) || ($nick isvoice %chan)) DLF.DccSend.AddTrust %addr %desc
-  elseif ($?!="Add %desc to trust list?") DLF.DccSend.AddTrust %addr %desc
+
+  [ $+(.timerDlfRemoveTrust,%addr) ] 1 1 .signal DLF.DccSend.RemoveTrust %addr %desc
+  DLF.DccSend.AddTrust %addr %desc
   return $true
 }
 
 alias -l DLF.DccSend.AddTrust {
-  .dcc trust $1
   DLF.Watch.Log Trust: Added $2-
+  .dcc trust $1
+}
+
+on *:signal:DLF.DccSend.RemoveTrust: DLF.DccSend.RemoveTrust $1-
+alias -l DLF.DccSend.RemoveTrust {
+  DLF.Watch.Log Trust: Removed $2-
+  .dcc trust -r $1
 }
 
 alias -l DLF.DccSend.IsTrusted {
@@ -1144,10 +1199,10 @@ alias -l DLF.Win.Log {
     if (%DLF.serverads == 0) %type = Filter
   }
   else DLF.Error DLF.Win.Log: Invalid window name: $1
+  var %vars = $iif(%type == Server,DLF.server.,DLF.filtered.)
 
   var %win = $+(@dlF.,%type,.,$iif(%DLF.perconnect,$network,All))
-  var %vars = $iif(%type == Server,DLF.server.,DLF.filtered.)
-  var %lfn = $mklogfn(%win)
+  var %lfn = $mklogfn($iif(%type == Ads,$replace(%win,.Ads.,.Filter.),%win))
   if (%DLF.perconnect == 0) %lfn = $nopath(%lfn)
   %lfn = $qt($+($logdir,%lfn))
   var %log   = [ [ $+(%,%vars,log) ] ]
@@ -1165,19 +1220,44 @@ alias -l DLF.Win.Log {
   if (%log == 1) write %lfn $sbr($logstamp) $strip(%line)
 
   if (!$window(%win)) {
-    window $iif(%DLF.perconnect,-k0nw,-k0nwz) %win
+    var %switches = $iif(%DLF.perconnect,-k0nw,-k0nwz)
+    if (%type == Ads) %switches = %switches $+ l -t30
+    window %switches %win
     if (%type == Filter) var %t = Filtered
     elseif (%type == Ads) var %t = Server advertising
     elseif (%type == Server) var %t = Server response
     titlebar %win -=- %t messages from $iif(%DLF.perconnect,the $network network,all networks) -=- Right-click for options
-    if (%log) loadbuf $iif(%limit,4850) -p %win %lfn
+    if ((%log) && (%type != Ads)) loadbuf $iif(%limit,4850) -p %win %lfn
   }
 
-  if ((%limit == 1) && ($line(%win,0) >= 5000)) dline %win $+(1-,$calc($line(%win,0) - 4850))
-  if (%ts == 1) %line = $timestamp %line
+  if ((%limit == 1) && ($line(%win,0) >= 5000) && (%type != Ads)) dline %win $+(1-,$calc($line(%win,0) - 4850))
+  if (%type == Ads) %line = $gettok(%line,1-2,$asc($space)) $tab $+ $strip($gettok(%line,3-,$asc($space)))
+  if ((%ts == 1) && (%type != Ads)) %line = $timestamp %line
   if (%strip == 1) %line = $strip(%line)
-  if (%wrap == 1) aline -pi %col %win %line
-  else aline %col %win %line
+  if (%type == Ads) {
+    var %toks = $iif(%ts == 1,2-6,1-5)
+    var %srch = $gettok($strip(%line),%toks,$asc($space))
+    var %i = $line(%win,0)
+    while (%i) {
+      var %l = $gettok($strip($line(%win,%i)),%toks,$asc($space))
+      if (%l == %srch) {
+        rline %col %win %i %line
+        break
+      }
+      elseif (%l < %srch) {
+        inc %i
+        iline %col %win %i %line
+        break
+      }
+      dec %i
+    }
+    if (%i == 0) iline %col %win 1 %line
+    window -b %win
+  }
+  else {
+    if (%wrap == 1) aline -pi %col %win %line
+    else aline %col %win %line
+  }
   DLF.Watch.Log Filtered: To %win
 }
 
@@ -1238,7 +1318,7 @@ menu @dlF.Filter.* {
   -
 }
 
-menu @dlF.Server.*,@dlF.Ads.* {
+menu @dlF.Server.* {
   Search: DLF.Win.Search $menu $?="Enter search string"
   -
   $iif(%DLF.server.timestamp == 1,$style(1)) Timestamp: DLF.Options.ToggleOption server.timestamp
@@ -1251,7 +1331,17 @@ menu @dlF.Server.*,@dlF.Ads.* {
   Options: DLF.Options.Show
   Disable: {
     %DLF.server = 0
-    close -@ DLF.Server*.*
+    close -@ @DLF.Server*.*
+  }
+  -
+}
+
+menu @dlF.Ads.* {
+  Clear: clear
+  Options: DLF.Options.Show
+  Disable: {
+    %DLF.serverads = 0
+    close -@ @DLF.Ads*.*
   }
   -
 }
@@ -1339,7 +1429,7 @@ alias DLF.@find.OnlyPartial {
   var %win = $+(@dlF.@find.,$network)
   DLF.Chan.SetNickColour $2-3
   DLF.Win.Echo $1-
-  DLF.@find.Results $1-3 %list Found %found $+ , but displaying only %displayed $c(3,:: Double click here to get the server's full list)
+  DLF.@find.Results $1-3 %list Found %found $+ , but displaying only %displayed $c(14,:: Double click here to get the server's full list)
 }
 
 alias -l DLF.@find.Regex {
@@ -1355,14 +1445,30 @@ alias -l DLF.@find.Regex {
 
 alias -l DLF.@find.Results {
   if (($window($3)) && (!$line($3,0))) .window -c $3
-  var %msg = $5-
+  var %msg = $strip($4) $tab $+ $5-
   if (($strip($4) != $+(!,$3)) && ($strip($4) != $+(@,$3))) {
     if (%DLF.searchspam) DLF.Win.Filter $1-
     else %msg = %msg $c(4,0,!! Received from $nick !!)
   }
   var %win = $+(@dlF.@find.,$network)
-  if (!$window(%win)) window -slk0wn -t15 %win
-  aline -hn %win $strip($4) $tab $+ $5-
+  if (!$window(%win)) {
+    window -lk0wn -t15 %win
+    aline -hn 2 %win This window shows @find results as received individually from various servers.
+    aline -hn 1 %win You can select lines and copy and paste them into the channel to get files,
+    aline -hn 1 %win or double-click to have the file request sent for you.
+    aline -hn 1 %win $crlf
+  }
+  var %i = $line(%win,0)
+  var %smsg = $left(%msg,1) $+ $5-
+  while (%i) {
+    var %l = $line(%win,%i)
+    if (%l == $crlf) break
+    var %l = $left(%l,1) $+ $gettok(%l,2-,$asc($tab))
+    if (%l < %smsg) break
+    dec %i
+  }
+  inc %i
+  iline -hn $iif($left(%msg,1) == @,2,3) %win %i %msg
   window -b %win
   DLF.@find.TitleBar %win Right-click for options or double-click to download
   DLF.Halt @find result: Result for $strip($4) added to %win
@@ -1633,7 +1739,7 @@ dialog -l DLF.Options.GUI {
   check "Filter channel spam", 650, 7 89 154 8, tab 600
   check "Filter private spam", 655, 7 98 154 8, tab 600
   check "... and /ignore spammer for 1h (asks confirmation)", 660, 15 107 146 8, tab 600
-  check "Add request servers to DCC trust list", 665, 7 116 154 8, tab 600
+  check "Auto accept requested files", 665, 7 116 154 8, tab 600
   check "Don't accept any messages or files from users with whom you do not have a common channel", 670, 7 124 154 16, tab 600 multi
   check "... but accept DCC / query chats", 675, 15 140 146 8, tab 600
   check "Do not accept files from regular users (except mIRC trusted users)", 680, 7 148 154 16, tab 600 multi
@@ -2540,6 +2646,10 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.always 2find *
   DLF.hadd chantext.always Sign in to turn on 1-Click ordering.
   inc %matches $hget(DLF.chantext.always,0).item
+
+  if ($hget(DLF.chantext.dlf)) hfree DLF.chantext.dlf
+  DLF.hadd chantext.dlf $strip($DLF.logo) *
+  inc %matches $hget(DLF.chantext.dlf,0).item
 
   if ($hget(DLF.chanaction.away)) hfree DLF.chanaction.away
   DLF.hadd chanaction.away *asculta*
