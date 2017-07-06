@@ -65,31 +65,26 @@ dlFilter uses the following code from other people:
         Handle @find results from normal users rather than give error.
         Own file requests are tracked and matching DCC Sends accepted regardless of whether server is regular user or not.
         Added dynamic titlebar to show channel and / or dlF filtering statistics
+        Added Ops channel advertising option - an op can advertise dlFilter once every x minutes.
+        Add Ops private advertising option which version checks users as they join and if they are a mIRC user
+          reminds them to install or upgrade dlF.
 
       TODO
+        Send private adverts to users doing @find.
         Make Ads window an updating list of adverts rather than a scrolling filter
-        Make version check handle AdiIRC.
         Make download handle betas properly
         Convert "Regular user tried to" messages to filter messages (and limit showing warning messages if $me is not a regular user i.e. an op who can do something about it).
-        Add Ops advertising option - so an op can advertise dlFilter once every 5 minutes.
-        Add Ops direct advertising option which version checks users as they join and
-          reminds them to upgrade, or promotes dlF and sbC.
         Make FilterSearch dynamic i.e. new lines which match are added.
         Handle ps2 results to @find
-        Avoid failed file requests due to queue full
         Better icon file
         Implement toolbar functionality with right click menu
         Right click menu items for changing options base on line clicked
         Right click menu items for adding to custom filters
         More menu options equivalent to dialog options
         More menu options for adding custom filters
-        Somehow send us details of user adding custom filters for our own analysis (privacy issues?)
-        Use CTCP halt to stop DCC CHAT and SEND rather than convoluted ctcp/open processing
-        Rewrite anti-chat code
-        Separate CTCP event processing for DCC Chat, DCC Send and other ctcp messages.
-        Can we automate a. offering to cancel a file request before sending if the file already exists in the correct directory and is the right size, and to automate the overwrite or resume options if it is the wrong size?
+        Rework anti-chat code inc. using CTCP halt rather variable and next event
         Send to... menus - do they work?
-        Make it work on AdiIRC.
+        Make it work on AdiIRC and update version check handle AdiIRC.
 
   1.17  Update opening comments and add change log
         Use custom identifiers for creating bold, colour etc.
