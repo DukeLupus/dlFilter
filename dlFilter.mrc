@@ -39,7 +39,8 @@ dlFilter uses the following code from other people:
           All dialog option changes now take effect immediately
           Subsidiary check-boxes now enable / disable with parent
           New Channels tab using list rather than edit box with ability to select from list of joined channels
-          New About tab.
+          New Ops tab
+          New About tab
           Channels / custom filters list - double click to edit.
         Menu and events broken out into aliases
         Added extra options for windows for Server Ads and per connection
@@ -62,15 +63,17 @@ dlFilter uses the following code from other people:
         Added window description to title bar for all custom windows.
         @find windows per connection.
         Handle @find results from normal users rather than give error.
-        File requests are tracked and matching DCC Sends accepted regardless of whether server is regular user or not.
+        Own file requests are tracked and matching DCC Sends accepted regardless of whether server is regular user or not.
+        Added dynamic titlebar to show channel and / or dlF filtering statistics
 
       TODO
-        Add Ops tab which is shown only if user is (or was when last in a channel) an op
-          (Move op related options there.)
+        Make Ads window an updating list of adverts rather than a scrolling filter
+        Make version check handle AdiIRC.
+        Make download handle betas properly
+        Convert "Regular user tried to" messages to filter messages (and limit showing warning messages if $me is not a regular user i.e. an op who can do something about it).
         Add Ops advertising option - so an op can advertise dlFilter once every 5 minutes.
         Add Ops direct advertising option which version checks users as they join and
           reminds them to upgrade, or promotes dlF and sbC.
-        Maintain statistics about % messages filtered per channel and update titlebar on on a regular basis
         Make FilterSearch dynamic i.e. new lines which match are added.
         Handle ps2 results to @find
         Avoid failed file requests due to queue full
@@ -135,19 +138,23 @@ alias -l DLF.mIRCversion {
 ctcp ^*:VERSION:#: { DLF.Halt Halted: ctcp VERSION in any channel }
 ctcp ^*:VERSION:?: {
   ; dlFilter version response only to people who are in a common dlFilter channel
+  DLF.Win.Log Filter ctcp Private $nick $1-
   var %i = $comchan($nick,0)
   while (%i) {
     var %chan = $comchan($nick,%i)
     if ($DLF.Chan.IsDlfChan(%chan)) {
-      .ctcpreply $nick VERSION $c(1,9,$DLF.logo Version $DLF.SetVersion by DukeLupus & Sophist.) $+ $c(1,15,$space $+ Get it from $c(12,15,$u(https://github.com/SanderSade/dlFilter/releases)))
+      var %msg = $nick VERSION $c(1,9,$DLF.logo Version $DLF.SetVersion by DukeLupus & Sophist.) $+ $c(1,15,$space $+ Get it from $c(12,15,$u(https://github.com/SanderSade/dlFilter/releases)))
+      .ctcpreply %msg
+      DLF.Win.Log Filter ctcpsend Private $nick %msg
       break
     }
     dec %i
   }
+
   ; Other script VERSION responses only to people who are in a common channel or PM
   if ($comchan($nick,0)) return
-  if ($window($nick)) return
-  if ($window($+(=,$nick)) return
+  if ($query($nick)) return
+  if ($chat($nick,0)) return
   DLF.Halt Halted: ctcp VERSION in private from someone not in common dlF channel or chat
 }
 
@@ -184,12 +191,9 @@ alias -l DLF.LoadCheck {
   $1 $iif(%sbc,-rs2,-rs1) $qt($script)
 }
 
-on *:signal:DLF.Update.ReLoad: DLF.Initialise
+on *:signal:DLF.Initialise: { DLF.Initialise $1- }
 
 alias DLF.Initialise {
-  ; Clear titlebar because we don't
-
-
   ; Delete obsolete variables
   .unset %DLF.custom.selected
   .unset %DLF.newreleases
@@ -205,6 +209,7 @@ alias DLF.Initialise {
   DLF.Options.Initialise
   var %ver = $DLF.mIRCversion
   DLF.Groups.Events
+  DLF.Ops.AdvertsEnable
   if (%ver != 0) DLF.Error dlFilter requires %ver $+ +. dlFilter disabled until mIRC is updated.
 }
 
@@ -261,7 +266,7 @@ menu channel {
 ; Following is just in case groups get reset to default...
 ; Primarily for developers when e.g. script is reloaded on change by authors autoreload script
 #dlf_bootstrap on
-on *:text:*:*: DLF.Groups.Bootstrap
+on *:text:*:*: { DLF.Groups.Bootstrap }
 alias -l DLF.Groups.Bootstrap {
   if (%DLF.enabled != $null) DLF.Groups.Events
   .disable #dlf_bootstrap
@@ -276,28 +281,40 @@ alias -l DLF.Groups.Events {
 ;#dlf_events off
 #dlf_events on
 
+; Announce update when I join a filtered channel
+on me:join:%DLF.channels: { if ($DLF.Chan.IsChanEvent) DLF.Update.Announce }
+
 ; Channel user activity
-; join, art, quit, nick changes, kick
-on ^*:join:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.joins)) DLF.User.Channel Join $chan $nick $br($address) has joined $chan }
-on ^*:part:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.parts)) DLF.User.Channel Part $chan $nick $br($address) has left $chan }
+; join, part, quit, nick changes, kick
+on ^*:join:%DLF.channels: {
+  if ($DLF.Chan.IsChanEvent) {
+    ; Wait for 1 sec for user's modes to be applied to avoid checking ops
+    if ((%DLF.ops.advertpriv) && ($me isop $chan)) .timer 1 1 .signal DLF.ops.RequestVersion $nick
+    if (%DLF.joins) DLF.User.Channel Join $chan $nick $br($address) has joined $chan
+  }
+}
+on ^*:part:%DLF.channels: {
+
+  if ($DLF.Chan.IsChanEvent(%DLF.parts)) DLF.User.Channel Part $chan $nick $br($address) has left $chan
+}
 on ^*:kick:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.kicks)) DLF.User.Channel Kick $chan $knick $br($address($knick,5)) was kicked from $chan by $nick $br($1-) }
 on ^*:nick: { if ($DLF.Chan.IsUserEvent(%DLF.nicks)) DLF.User.NoChannel $newnick Nick $nick $br($address) is now known as $newnick }
 on ^*:quit: { if ($DLF.Chan.IsUserEvent(%DLF.quits)) DLF.User.NoChannel $nick Quit $nick $br($address) Quit $br($1-) }
 
-; Channel mode changes
+; User mode changes
 ; ban, unban, op, deop, voice, devoice etc.
-on ^*:ban:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Halt Halted: usermode ban in dlF channel }
-on ^*:unban:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Halt Halted: usermode unban in dlF channel }
-on ^*:op:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Halt Halted: usermode op in dlF channel }
-on ^*:deop:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Halt Halted: usermode deop in dlF channel }
-on ^*:voice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Halt Halted: usermode voice in dlF channel }
-on ^*:devoice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Halt Halted: usermode devoice in dlF channel }
-on ^*:serverop:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Halt Halted: usermode serverop in dlF channel }
-on ^*:serverdeop:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Halt Halted: usermode serverdeop in dlF channel }
-on ^*:servervoice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Halt Halted: usermode servervoice in dlF channel }
-on ^*:serverdevoice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Halt Halted: usermode severdevoice in dlF channel }
-on ^*:mode:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.chmode)) DLF.Halt Halted: chanmode in dlF channel }
-on ^*:servermode:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.chmode)) DLF.Halt Halted: serverchanmode in dlF channel }
+on ^*:ban:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Chan.Mode ban: $1- }
+on ^*:unban:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Chan.Mode unban: $1- }
+on ^*:op:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Chan.Mode op: $1- }
+on ^*:deop:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Chan.Mode deoop: $1- }
+on ^*:voice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Chan.Mode voice: $1- }
+on ^*:devoice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Chan.Mode devoice: $1- }
+on ^*:serverop:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Chan.Mode serverop: $1- }
+on ^*:serverdeop:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Chan.Mode serverdeop: $1- }
+on ^*:servervoice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Chan.Mode servervoice: $1- }
+on ^*:serverdevoice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.usrmode)) DLF.Chan.Mode serverdevoice: $1- }
+on ^*:mode:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.chmode)) DLF.Chan.Mode channel mode: $1- }
+on ^*:servermode:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.chmode)) DLF.Chan.Mode server mode: $1- }
 
 ; Trigger processing
 on *:input:%DLF.channels: {
@@ -324,23 +341,36 @@ on ^*:open:?:*: {
 }
 
 ; ctcp
-ctcp *:*ping*:%DLF.channels: { if ($DLF.Chan.IsChanEvent) DLF.Halt Halted: ping in dlF channel }
-ctcp *:*:%DLF.channels: { if ($DLF.Chan.IsChanEvent) DLF.Chan.ctcp $1- }
-ctcp ^*:DCC CHAT:?: { DLF.DccChat.Chat $1- }
-ctcp ^*:DCC SEND:?: { DLF.DccSend.Send $1- }
+ctcp *:ping *:%DLF.channels: { if ($DLF.Chan.IsChanEvent) DLF.Halt Halted: ping in dlF channel }
+ctcp *:DCC CHAT*:?: { DLF.DccChat.Chat $1- }
+ctcp *:DCC SEND*:?: { DLF.DccSend.Send $1- }
 ctcp *:*:?: { DLF.ctcp.Private $1- }
-on ^*:ctcpreply:*: { DLF.ctcp.Reply $1- }
+ctcp *:*:%DLF.channels: { if ($DLF.Chan.IsChanEvent) DLF.Chan.ctcp $1- }
+on *:ctcpreply:VERSION *: {
+  if (%DLF.ops.advertpriv) DLF.ops.VersionReply $1-
+  else DLF.ctcp.Reply $1-
+}
+on *:ctcpreply:*: { DLF.ctcp.Reply $1- }
 on ^*:open:=:*: { DLF.DccChat.Open $1- }
+
+; RPL_ISUPPORT 005 CNOTICE / CPRIVMSG to avoid 439 Target change too frequently message
+raw 005:*: { DLF.005.Check $1- }
+on *:disconnect: { DLF.005.Reset }
 
 ; Filter away messages
 raw 301:*: { DLF.Away.Filter $1- }
+
 ; Show Unknown Command messages in window that command was issued in
 raw 421:*: {
   echo -a $2-
   halt
 }
 
-on *:active:*: DLF.Stats.Active
+; Adjust titlebar on window change
+on *:active:*: { DLF.Stats.Active }
+
+on *:connect: { DLF.Update.Check }
+
 
 #dlf_events end
 
@@ -348,8 +378,9 @@ on *:active:*: DLF.Stats.Active
 ; Channel user activity
 ; join, part, kick
 alias -l DLF.User.Channel {
+  DLF.Watch.Called DLF.User.Channel
   if ($3 == $me) return
-  if (%DLF.showstatus == 1) echo -stnc $1 $iif($2 != $hashtag,$sqbr($2)) $star $3-
+  if (%DLF.showstatus == 1) echo -stnc $1 $iif($2 != $hashtag,$sbr($2)) $star $3-
   DLF.Win.Filter $1-
 }
 
@@ -365,6 +396,15 @@ alias -l DLF.User.NoChannel {
     }
   }
   DLF.User.Channel $2 $hashtag $3-
+}
+
+; Channel & User mode changes
+; ban, unban, op, deop, voice, devoice etc.
+; ban unban voice devoice etc.
+alias -l DLF.Chan.Mode {
+  DLF.Watch.Called DLF.Chan.Mode
+  if ($nick == $me) return
+  DLF.Win.Filter Mode $chan $nick sets $1-
 }
 
 ; Channel messages
@@ -403,7 +443,7 @@ alias -l DLF.Chan.IsChanEvent {
   if (%dlf == $false) return $false
   DLF.Stats.Count $chan Total
   if ($1 == 0) return $false
-  return %dlf
+  return $true
 }
 
 alias -l DLF.Chan.IsDlfChan {
@@ -428,6 +468,7 @@ alias -l DLF.Chan.Text {
   if ((%DLF.ads == 1) && ($hiswm(chantext.spam,%txt))) DLF.Win.Filter Normal $chan $nick $1-
   if ($hiswm(chantext.always,%txt)) DLF.Win.Filter Normal $chan $nick $1-
   if ((%DLF.requests == 1) && ($hiswm(chantext.cmds,%txt))) DLF.Win.Filter Normal $chan $nick $1-
+  if ((%DLF.requests == 1) && ($1 ison $chan) && (. isin $gettok($2-,-1,$asc($space)))) DLF.Win.Filter Normal $chan $nick $1-
   /*if (%DLF.chspam == 1) {
     ;no channel spam right now
   }
@@ -457,7 +498,7 @@ alias -l DLF.Chan.ctcp {
 
 alias -l DLF.Chan.SpamFilter {
   if ((%DLF.chspam.opnotify == 1) && ($me isop $1)) {
-    DLF.Warning $c(4,Channel spam detected:) $sqbr($1) $tag($2) $br($address($2,1)) -->> $c(4,$3-)
+    DLF.Warning $c(4,Channel spam detected:) $sbr($1) $tag($2) $br($address($2,1)) -->> $c(4,$3-)
   }
   DLF.Halt Halted: spam in dlF channel
 }
@@ -539,6 +580,7 @@ alias DLF.Stats.Titlebar {
   elseif (%name == $active) %toks = 2-
   elseif (@ $+ %name == $lactive) %toks = 2-
   elseif (@ $+ %name == $active) %toks = 2-
+  elseif ($lactive == $null) %toks = 2-
   %tb = $gettok(%tb,%toks,$asc($space))
 
   var %re = $+(/^(-=- )?,$replace($DLF.Stats.TitleText([0-9.]*),$space,\s+),/F)
@@ -577,11 +619,11 @@ alias -l DLF.Priv.Text {
     DLF.@find.OnlyPartial Normal Private $nick $1-
     if ($hiswm(find.header,%txt)) DLF.Win.Server Normal Private $nick $1-
     if ($hiswm(find.result,%txt)) DLF.@find.Results Normal Private $nick $1-
-    if ((*Omen* iswm $strip($1)) && ($left($strip($2),1) == $pling)) DLF.@find.Results Normal Private $nick $2-
+    if ((*Omen* iswm $strip($1)) && ($left($strip($2),1) == !)) DLF.@find.Results Normal Private $nick $2-
   }
   DLF.CustFilt.Check privtext Normal Private $nick $1-
   DLF.Priv.CommonChan $nick $1-
-  if ((%DLF.noregmsg == 1) && ($DLF.Priv.IsRegularUser($nick))) {
+  if ((%DLF.noregmsg == 1) && ($DLF.IsRegularUser($nick))) {
     DLF.Warning Regular user $nick $br($address($nick,0)) tried to: $1-
     if ($window($nick)) window -c $nick
     DLF.Halt Halted: private text from regular user
@@ -591,7 +633,7 @@ alias -l DLF.Priv.Text {
     var %trigger = $strip($1)
     var %nicklist = @ $+ $me
     var %nickfile = ! $+ $me
-    if ((%nicklist == %trigger) || (%nickfile == %trigger) || (%nickfile == $gettok($strip($1),1,$asc($hyphen)))) {
+    if ((%nicklist == %trigger) || (%nickfile == %trigger) || (%nickfile == $gettok($strip($1),1,$asc(-)))) {
       .msg $1 Please $u(do not request in private) $+ . All commands go to $u(channel).
       .msg $1 You may have to go to $c(2,mIRC options --->> Sounds --->> Requests) and uncheck $qt($c(3,Send '!nick file' as private message))
       if (($window($nick)) && ($line($nick,0) == 0)) .window -c $nick
@@ -615,7 +657,7 @@ alias -l DLF.Priv.Notice {
   DLF.CustFilt.Check privnotice Notice Private $nick $1-
   var %txt = $strip($1-)
   DLF.Priv.CommonChan $nick %txt
-  if ((%DLF.noregmsg == 1) && ($DLF.Priv.IsRegularUser($nick))) {
+  if ((%DLF.noregmsg == 1) && ($DLF.IsRegularUser($nick))) {
     DLF.Warning Regular user $nick $br($address) tried to send you a notice: $1-
     DLF.Halt Halted: private notice from regular user
   }
@@ -627,7 +669,7 @@ alias -l DLF.Priv.Action {
   DLF.Watch.Called DLF.Priv.Action
   DLF.CustFilt.Check privaction Action Private $nick $1-
   DLF.Priv.CommonChan $nick $1-
-  if ((%DLF.noregmsg == 1) && ($DLF.Priv.IsRegularUser($nick))) {
+  if ((%DLF.noregmsg == 1) && ($DLF.IsRegularUser($nick))) {
     DLF.Warning Regular user $nick $br($address) tried to send you an action: $1-
     .window -c $1
     .close -m $1
@@ -636,6 +678,7 @@ alias -l DLF.Priv.Action {
 }
 
 alias -l DLF.Priv.SpamFilter {
+  ; To-Do check all common chans for op
   if ((%DLF.privspam.opnotify == 1) && ($comchan($1,1).op)) {
     DLF.Warning Spam detected: $c(4,15,$tag($1) $br($address($1,1)) -->> $b($2-))
     echo $comchan($1,1) Private spam detected: $c(4,15,$tag($1) $br($address($1,1)) -->> $b($2-))
@@ -649,7 +692,7 @@ alias -l DLF.Priv.CommonChan {
     .unset %DLF.accepthis
     return
   }
-  if ($DLF.Priv.IsRegularUser($1) == $false) return
+  if ($DLF.IsRegularUser($1) == $false) return
   if (($comchan($1,0) == 0) && (%DLF.nocomchan == 1)) {
     if (($window($1)) && (!$line($1,0))) {
       DLF.Status $b($1) (no common channel) tried: $c(4,15,$2-)
@@ -662,7 +705,7 @@ alias -l DLF.Priv.CommonChan {
   }
 }
 
-alias -l DLF.Priv.IsRegularUser {
+alias -l DLF.IsRegularUser {
   if ($1 == $me) return $false
   if ($1 == ChanServ) return $false
   if ($1 == NickServ) return $false
@@ -691,7 +734,7 @@ alias -l DLF.ctcp.Private {
   }
   DLF.CustFilt.Check privctcp Notice Private $nick $1-
   if (%DLF.nocomchan == 1) DLF.Priv.CommonChan $nick $1-
-  if ((%DLF.noregmsg == 1) && ($DLF.Priv.IsRegularUser($nick)) && (DCC send !isin $1-)) {
+  if ((%DLF.noregmsg == 1) && ($DLF.IsRegularUser($nick)) && (DCC send !isin $1-)) {
     DLF.Warning Regular user $nick $br($address) tried to: $1-
     DLF.Halt Halted: private ctcp from regular user
   }
@@ -700,9 +743,9 @@ alias -l DLF.ctcp.Private {
 
 alias -l DLF.ctcp.Reply {
   DLF.Watch.Called DLF.ctcp.Reply
-  if ($hiswm(ctcp.reply,$1-)) DLF.Halt Halted:
+  if ($hiswm(ctcp.reply,$1-)) DLF.Win.Filter ctcpreply Private $nick $1-
   if (%DLF.nocomchan == 1) DLF.Priv.CommonChan $nick $1-
-  if ((%DLF.noregmsg == 1) && ($DLF.Priv.IsRegularUser($nick)) && (DCC send !isin $1-)) {
+  if ((%DLF.noregmsg == 1) && ($DLF.IsRegularUser($nick)) && (DCC send !isin $1-)) {
     DLF.Warning Regular user $nick ( $+ $address $+ ) tried to: $1-
     DLF.Halt Halted: private ctcp reply from regular user
   }
@@ -713,6 +756,174 @@ alias -l DLF.Away.Filter {
   DLF.Watch.Called DLF.Away.Filter
   if (%DLF.away == 1) DLF.Win.Filter Notice RawAway $2-
   DLF.Halt Halted: away message
+}
+
+; ========== Ops advertising functionality ==========
+
+alias -l DLF.Ops.AdvertsEnable {
+  if (%DLF.ops.advertchan == 1) .timerDLF.Adverts -o 0 300 .signal DLF.Ops.AdvertChan
+  else .timerDLF.Adverts off
+}
+
+on *:signal:DLF.Ops.AdvertChan: { DLF.Ops.AdvertChan $1- }
+alias -l DLF.Ops.AdvertChan {
+  var %cid = $cid
+  var %i = $scon(0)
+  while (%i) {
+    scid $scon(%i)
+    var %j = $chan(0)
+      while (%j) {
+        var %c = $chan(%j)
+        if ((($istok(%DLF.netchans,$+($network,%c),$asc($space))) || ($istok(%DLF.netchans,%c,$asc($space)))) $&
+        && ($me isop %c)) {
+          var %msg = $c(1,9,$DLF.logo Are the responses to your requests getting lost in the crowd? If you are using mIRC as your IRC client, then download dlFilter from $u($c(2,https://github.com/SanderSade/dlFilter/releases)) and make your time in %c less stressful.)
+          msg %c %msg
+          DLF.Win.Filter text %c $me %msg
+        }
+        dec %j
+      }
+    dec %i
+  }
+}
+
+on *:signal:DLF.ops.RequestVersion: { DLF.ops.RequestVersion $1- }
+alias -l DLF.ops.RequestVersion {
+  if ($1 == $me) return
+  if ($DLF.IsRegularUser($1) == $false) return
+  DLF.Watch.Called DLF.ops.RequestVersion
+  if (%DLF.ops.advertpriv == 0) return
+  var %idx = $+($network,@,$1)
+  if ($hfind(DLF.ops.verRequested,%idx)) DLF.Watch.Log dlF status already checked
+  elseif ($hfind(DLF.ops.mircUsers,%idx)) DLF.Watch.log SPOOKY: mircUsers without verRequested
+  elseif ($hfind(DLF.ops.dlfUsers,%idx)) DLF.Watch.log SPOOKY: dlfUsers without verRequested
+  elseif ($hfind(DLF.ops.sbcUsers,%idx)) DLF.Watch.log SPOOKY: sbcUsers without verRequested
+  else {
+    hadd -mu86400 DLF.ops.verRequested %idx $true
+    DLF.ctcp $1 VERSION
+    DLF.Win.Filter ctcpsend Private $1 VERSION
+  }
+}
+
+alias -l DLF.ops.VersionReply {
+  DLF.Watch.Called DLF.ops.VersionReply
+  var %idx = $+($network,@,$nick)
+  var %re = /(?:^|\s)(?:v|ver|version)\s*([0-9.]+)(?:\s|$)/F
+  var %mod = $strip($2)
+  var %regex = $regex(DLF.ops.VersionReply,$3-,%re)
+  if (%regex > 0) var %ver = $regml(DLF.ops.VersionReply,1)
+  else var %ver = ?
+  if ((%mod == $strip($DLF.Logo)) && (%ver isnum)) {
+    if (!$hfind(DLF.ops.dlfUsers,%idx)) {
+      hadd -mu86340 DLF.ops.dlfUsers %idx %ver
+      DLF.Watch.Log dlf version added
+    }
+    else DLF.Watch.Log dlf version already known
+  }
+  elseif (%mod == mIRC) {
+    if (!$hfind(DLF.ops.mircUsers,%idx)) {
+      hadd -mu86340 DLF.ops.mircUsers %idx %ver
+      ; Wait 1s for advertising to allow for any more version messages
+      .timer 1 1 .signal DLF.ops.advertchanDLF $nick
+      DLF.Watch.Log mirc version added
+    }
+    else DLF.Watch.Log mirc version already known
+  }
+  DLF.Win.Filter ctcpreply Private $nick $1-
+}
+
+on *:signal:DLF.ops.advertchanDLF: { DLF.ops.advertchanDLF $1- }
+alias -l DLF.ops.advertchanDLF {
+  echo -st DLF.ops.advertchanDLF $network $1-
+  DLF.Watch.Called DLF.ops.advertchanDLF
+  var %idx = $+($network,@,$1)
+  var %mircVer = $hget(DLF.ops.mircUsers,%idx)
+  var %dlfVer = $hget(DLF.ops.dlfUsers,%idx)
+  var %sbcVer = $hget(DLF.ops.sbcUsers,%idx)
+  if (%mircVer != $null) {
+    if (%mircVer >= %DLF.version.web.mirc) var %mircupgr = $null
+    else var %mircupgr = You will need to upgrade to mIRC version %DLF.version.web.mirc or higher to use it.
+    var %dl = from $u($c(2,https://github.com/SanderSade/dlFilter/releases)) $+ .
+    if (%dlfVer == $null) {
+      ; mIRC but no dlF
+      var %msg = I see you are running mIRC. Have you considered running dlFilter to hide everyone else's searches and file requests, and improve your @file requests ? %mircupgr You can download dlFilter %dl
+      DLf.Watch.Log Advertised dlFilter via notice.
+    }
+    elseif (%dlfVer < %DLF.version.web) {
+      if (%dlfVer < 1.17) var %downmeth = which you can download %dl
+      else var %downmeth = by clicking on the Update button in the dlFilter Options dialog.
+      var %msg = I see you are running dlFilter. This notice is to let you know that a newer version is available %downmeth %mircupgr
+      DLF.Watch.Log Advertised upgrade via notice.
+    }
+    %msg = $c(1,9,$DLF.logo %msg)
+    DLF.notice $1 %msg
+    DLF.Win.Filter notice Private $1 %msg
+  }
+}
+
+alias -l DLF.005.Check {
+  ; Capture CPRIVMSG/CNOTICE in 005 messages
+  var %v = $+(%,DLF.Ops005.,$network)
+  if ([ [ %v ] ] == $null) {
+    set -ez [ [ %v ] ] 10
+    set -e [ [ $DLF.005.Name ] ] 0
+  }
+  if ((CPRIVMSG isin $1-) || (CNOTICE isin $1-)) set -e [ [ $DLF.005.Name ] ]
+}
+
+alias -l DLF.005.Reset {
+  unset [ $DLF.005.Name ]
+  unset [ $+(%,DLF.Ops005.,$network) ]
+}
+
+alias -l DLF.005.hasCops {
+  var %v = $DLF.005.Name
+  if ($left($1,1) == $hashtag) return $false
+  return $iif(([ [ %v ] ] == $null) || ([ [ %v ] ] == 0),$false,$true)
+}
+
+alias -l DLF.005.Name { return $+(%,DLF.OpsNet.,$network) }
+
+alias -l DLF.IsOpCommon {
+  var %i = $comchan($1,0)
+  while (%i) {
+    if ($comchan($1,%i).op) return $comchan($1,%i)
+    dec %i
+  }
+  return $false
+}
+
+alias -l DLF.msg {
+  var %c = $DLF.IsOpCommon($1)
+  if (($DLF.005.hasCops($1)) && (%c)) CPRIVMSG %c $1-
+  else msg $1-
+}
+alias -l DLF.describe { DLF.ctcp $1 Action $2- }
+
+alias -l DLF.notice {
+  var %c = $DLF.IsOpCommon($1)
+  if (($DLF.005.hasCops($1)) && (%c)) CNOTICE %c $1-
+  else notice $1-
+}
+
+alias -l DLF.ctcp {
+  var %c = $DLF.IsOpCommon($1)
+  if (($DLF.005.hasCops($1)) && (%c)) CPRIVMSG %c $1 $DLF.ctcpEncode($upper($2) $3-)
+  else ctcp $1-
+}
+
+alias -l DLF.ctcpreply {
+  var %c = $DLF.IsOpCommon($1)
+  if (($DLF.005.hasCops($1)) && (%c)) CNOTICE %c $1 $DLF.ctcpEncode($2-)
+  else ctcpreply $1-
+}
+
+alias -l DLF.ctcpEncode {
+  var %s = $1-
+  var %s = $replace(%s,$chr(16),$+($chr(16),$chr(16)))
+  var %s = $replace($1-,$chr(0),$+($chr(16),$chr(48)))
+  var %s = $replace($1-,$chr(10),$+($chr(16),$chr(110)))
+  var %s = $replace($1-,$chr(13),$+($chr(16),$chr(114)))
+  return $+($chr(1),%s,$chr(1))
 }
 
 ; ========== DCC Send ==========
@@ -740,7 +951,7 @@ alias -l DLF.DccSend.Send {
     DLF.Watch.Log DCC Send accepted - trigger found
     return
   }
-  if (($DLF.Priv.IsRegularUser($nick)) && (%DLF.askregfile == 1)) {
+  if (($DLF.IsRegularUser($nick)) && (%DLF.askregfile == 1)) {
     ; Allow files from regular users if nickname is in mIRC DCC trust list
     if ($DLF.DccSend.IsTrusted($nick)) {
       DLF.DccSend.Receiving $3-
@@ -854,7 +1065,7 @@ alias -l DLF.CustFilt.Check {
 
 alias -l DLF.CustFilt.Add {
   var %type = $replace($1,$nbsp,$space)
-  %new = $regsubex($2-,$+(/[][!#$%&()/:;<=>.|,$comma,$lcurly,$rcurly,]+/g),$star)
+  var %new = $regsubex($2-,$+(/[][!#$%&()/:;<=>.|,$comma,$lcurly,$rcurly,]+/g),$star)
   %new = $regsubex(%new,/[*] *[*]+/g,$star)
   if (%new == *) return
   if (%type == Channel text) DLF.CustFilt.Set chantext $addtok(%DLF.custom.chantext,%new,$asc($comma))
@@ -953,9 +1164,10 @@ alias -l DLF.Win.Log {
   var %nc = $null
   if (%DLF.perconnect == 0) %nc = $network
   if ($3 != $hashtag) %nc = %bc $+ $3
-  if (%nc != $null) %nc = $sqbr(%nc)
+  if (%nc != $null) %nc = $sbr(%nc)
+  var %col = $colour($replace($2,ctcpsend,ctcp,ctcpreply,ctcp))
   var %line = %nc $DLF.Win.Format($2-)
-  if (%log == 1) write %lfn $sqbr($logstamp) $strip(%line)
+  if (%log == 1) write %lfn $sbr($logstamp) $strip(%line)
 
   if (!$window(%win)) {
     window $iif(%DLF.perconnect,-k0nw,-k0nwz) %win
@@ -969,8 +1181,8 @@ alias -l DLF.Win.Log {
   if ((%limit == 1) && ($line(%win,0) >= 5000)) dline %win $+(1-,$calc($line(%win,0) - 4850))
   if (%ts == 1) %line = $timestamp %line
   if (%strip == 1) %line = $strip(%line)
-  if (%wrap == 1) aline -pi $color($2) %win %line
-  else aline $color($2) %win %line
+  if (%wrap == 1) aline -pi %col %win %line
+  else aline %col %win %line
   DLF.Watch.Log Filtered: To %win
 }
 
@@ -981,14 +1193,17 @@ alias -l DLF.Win.Format {
   if ($1 == Normal) return $tag(%nick) $4-
   elseif ($1 == Notice) return $+(-,%nick,-) $4-
   elseif (($1 == ctcp) && ($4 == DCC)) return $4-
-  elseif ($1 == ctcp) return $sqbr($3 $+ $iif($2 != Private,: $+ $2) $4) $5-
+  elseif ($1 == ctcp) return $sbr($3 $+ $iif($2 != Private,: $+ $2) $4) $5-
+  elseif ($1 == ctcpreply) return $sbr($3 $+ $iif($2 != Private,: $+ $2) $4 reply) $5-
+  elseif ($1 == ctcpsend) return -> $sbr($3 $+ $iif($2 != Private,: $+ $2) $upper($4)) $5-
   else return * $3-
 }
 
 alias -l DLF.Win.Echo {
+  var %col = $colour($replace($1,ctcpsend,ctcp,ctcpreply,ctcp))
   var %line = $DLF.Win.Format($1-)
   if ($2 != Private) {
-    echo $colour($1) -t $2 %line
+    echo %col -t $2 %line
     DLF.Watch.Log Echoed: To $2 $+ : %line
   }
   else {
@@ -997,14 +1212,14 @@ alias -l DLF.Win.Echo {
     while (%i) {
       var %chan = $comchan($3,%i)
       if ($DLF.Chan.IsDlfChan(%chan)) {
-        echo $colour($1) -t %chan Private: %line
+        echo %col -t %chan Private: %line
         %sent = $addtok(%sent,%chan,$asc($comma))
       }
       dec %i
     }
     if (%sent != $null) DLF.Watch.Log Echoed: To common channels %sent
     else {
-      echo $colour($1) -at Private: %line
+      echo %col -at Private: %line
       DLF.Watch.Log Echoed: To active channel $active
     }
   }
@@ -1061,15 +1276,15 @@ on *:input:@dlF.*Search.*: DLF.Win.Search $target $1-
 
 alias -l DLF.Win.Search {
   if ($2 == $null) return
-  var %wf = $gettok($1,2,$asc($period))
+  var %wf = $gettok($1,2,$asc(.))
   if ($right(%wf,6) != Search) %ws = $+(%wf,Search)
   else {
     %ws = %wf
     %wf = $left(%wf,-6)
   }
-  var %wf = $puttok($1,%wf,2,$asc($period))
-  var %ws = $puttok($1,%ws,2,$asc($period))
-  window $iif($gettok($1,-1,$asc($period)) == All,-eabk0z,-eabk0) %ws
+  var %wf = $puttok($1,%wf,2,$asc(.))
+  var %ws = $puttok($1,%ws,2,$asc(.))
+  window $iif($gettok($1,-1,$asc(.)) == All,-eabk0z,-eabk0) %ws
   var %sstring = $+($star,$2-,$star)
   titlebar %ws -=- Searching for %sstring in %wf
   filter -wwcbzph4 %wf %ws %sstring
@@ -1115,7 +1330,7 @@ alias DLF.@find.IsResponse {
 
 alias DLF.@find.OnlyPartial {
   var %txt = $strip($4-)
-  if ($left(%txt,1) == $pling) return
+  if ($left(%txt,1) == !) return
   var %re = $hfind(DLF.find.headregex,%txt,1,R).item
   if (%re == $null) return
 
@@ -1146,7 +1361,7 @@ alias -l DLF.@find.Regex {
 alias -l DLF.@find.Results {
   if (($window($3)) && (!$line($3,0))) .window -c $3
   var %msg = $5-
-  if (($strip($4) != $+($pling,$3)) && ($strip($4) != $+(@,$3))) {
+  if (($strip($4) != $+(!,$3)) && ($strip($4) != $+(@,$3))) {
     if (%DLF.searchspam) DLF.Win.Filter $1-
     else %msg = %msg $c(4,0,!! Received from $nick !!)
   }
@@ -1169,7 +1384,7 @@ alias -l DLF.@find.Get {
   var %line = $replace($line($active,$1),$tab,$space)
   var %trig = $gettok(%line,1,$asc($space))
   var %type = $left(%trig,1)
-  if (%type !isin $+($pling,@)) return
+  if (%type !isin !@) return
   var %nick = $right(%trig,-1)
   if (%type == @) var %fn = $null
   else var %fn = $DLF.GetFileName($gettok(%line,2-,$asc($space)))
@@ -1262,7 +1477,7 @@ alias -l DLF.@find.SendTovPowerGet {
 alias -l DLF.@find.SaveResults {
   var %fn = $sfile($sysdir(downloads),Save @find results as a text file,Save)
   if (!%fn) return
-  %fn = $qt($gettok(%fn,$+(1-,$calc($numtok(%fn,$asc($period)) - 1)),$asc($period)) $+ .txt)
+  %fn = $qt($gettok(%fn,$+(1-,$calc($numtok(%fn,$asc(.)) - 1)),$asc(.)) $+ .txt)
   savebuf $active %fn
 }
 
@@ -1271,19 +1486,19 @@ alias -l DLF.GetFileName {
 
   ; common (OmenServe) response has filename followed by e.g. ::INFO::
   ; and colons are not allowable characters in file names
-  var %fn = $gettok($replace($strip($1-),$nbsp,$space),1,$asc($colon))
+  var %fn = $gettok($replace($strip($1-),$nbsp,$space),1,$asc(:))
 
   ; look for known types
-  var %dots = $numtok(%fn,$asc($period))
+  var %dots = $numtok(%fn,$asc(.))
   var %i = 2
   while (%i <= %dots) {
-    var %ft = $gettok($gettok(%fn,%i,$asc($period)),1,$asc($space))
-    if ($istok(%exts,%ft,$asc($space))) return $+($gettok(%fn,$+(1-,$calc(%i - 1)),$asc($period)),.,%ft)
+    var %ft = $gettok($gettok(%fn,%i,$asc(.)),1,$asc($space))
+    if ($istok(%exts,%ft,$asc($space))) return $+($gettok(%fn,$+(1-,$calc(%i - 1)),$asc(.)),.,%ft)
     inc %i
   }
 
   ; Not a known filetype - so try filename = up to first period and then to next space
-  if (%dots >= 2) return $+($gettok(%fn,1,$asc($period)),.,$gettok($gettok(%fn,2,$asc($period)),1,$asc($space)))
+  if (%dots >= 2) return $+($gettok(%fn,1,$asc(.)),.,$gettok($gettok(%fn,2,$asc(.)),1,$asc($space)))
 
   ; No period - leave as-is
   return %fn
@@ -1357,7 +1572,7 @@ alias -l DLF.oNotice.Close {
 alias -l DLF.oNotice.Log {
   if (%DLF.o.log == 1) {
     var %log = %DLF.oNotice.LogFile($1)
-    write %log $sqbr($logstamp) $2-
+    write %log $sbr($logstamp) $2-
   }
 }
 
@@ -1403,12 +1618,12 @@ dialog -l DLF.Options.GUI {
   check "Filter requests to you in PM (@yournick, !yournick)", 435, 7 77 154 8, tab 400
   check "Separate filter windows per connection", 440, 7 86 154 8, tab 400
   box " Filter user events ", 450, 4 98 160 83, tab 400
-  check "Joins ...", 455, 7 107 154 8, tab 400
-  check "Parts ...", 460, 7 116 154 8, tab 400
-  check "Quits ...", 465, 7 125 154 8, tab 400
-  check "Nick changes ...", 470, 7 134 154 8, tab 400
-  check "Kicks ...", 475, 7 143 154 8, tab 400
-  check "... but show these in Status window", 480, 61 143 100 8, tab 400
+  check "Joins ...", 455, 7 107 54 8, tab 400
+  check "Parts ...", 460, 7 116 54 8, tab 400
+  check "Quits ...", 465, 7 125 54 8, tab 400
+  check "Nick changes ...", 470, 7 134 54 8, tab 400
+  check "Kicks ...", 475, 7 143 54 8, tab 400
+  check "... but show these in Status window", 480, 67 143 100 8, tab 400
   check "Away and thank-you messages", 485, 7 152 154 8, tab 400
   check "User mode changes", 490, 7 161 154 8, tab 400
   check "Colour uncoloured fileservers in nickname list", 495, 7 170 154 8, tab 400
@@ -1430,7 +1645,7 @@ dialog -l DLF.Options.GUI {
   check "... block only potentially dangerous filetypes", 685, 15 164 146 8, tab 600
   check "Do not accept private messages from regular users", 690, 7 173 154 8, tab 600
   ; tab Ops
-  text "These options are only enabled if you are an op on a selected channel.", 705, 4 25 160 16, tab 700 multi
+  text "These options are only enabled if you are an op on a filtered channel.", 705, 4 25 160 16, tab 700 multi
   box " Spam notifications ", 710, 4 38 160 29, tab 700
   check "On channel spam, oNotify if you are an op", 715, 7 47 154 8, tab 700
   check "On private spam, oNotify if you are op in a common channel", 720, 7 56 154 8, tab 700
@@ -1483,7 +1698,7 @@ on *:dialog:DLF.Options.GUI:sclick:520: url -a https://github.com/SanderSade/dlF
 ; Download update button
 on *:dialog:DLF.Options.GUI:sclick:530: DLF.Options.DownloadUpdate
 ; Handle all other checkbox clicks and save
-; Should go last so that explicit click events for specific fields take precedence
+; Should go last so that sclick for specific fields take precedence
 ;on *:dialog:DLF.Options.GUI:sclick:10,40,540,410-495,455-490,425-640,650-690,810: DLF.Options.ClickOption
 on *:dialog:DLF.Options.GUI:sclick:1-999: DLF.Options.ClickOption
 
@@ -1545,9 +1760,9 @@ alias -l DLF.Options.Initialise {
   ; Ops tab
   DLF.Options.InitOption chspam.opnotify 0
   DLF.Options.InitOption privspam.opnotify 0
-  DLF.Options.InitOption ops.advertise 0
-  DLF.Options.InitOption ops.advertise.period 5
-  DLF.Options.InitOption ops.upgradeavail 0
+  DLF.Options.InitOption ops.advertchan 0
+  DLF.Options.InitOption ops.advertchan.period 5
+  DLF.Options.InitOption ops.advertpriv 0
 
   ; Custom tab
   DLF.Options.InitOption custom.enabled 1
@@ -1635,9 +1850,9 @@ alias -l DLF.Options.Init {
   if (%DLF.noregmsg == 1) did -c DLF.Options.GUI 690
   if (%DLF.chspam.opnotify == 1) did -c DLF.Options.GUI 715
   if (%DLF.privspam.opnotify == 1) did -c DLF.Options.GUI 720
-  if (%DLF.ops.advertise == 1) did -c DLF.Options.GUI 750
-  did -ra DLF.Options.GUI 755 %DLF.ops.advertise.period
-  if (%DLF.ops.upgradeavail == 1) did -c DLF.Options.GUI 770
+  if (%DLF.ops.advertchan == 1) did -c DLF.Options.GUI 750
+  did -ra DLF.Options.GUI 755 %DLF.ops.advertchan.period
+  if (%DLF.ops.advertpriv == 1) did -c DLF.Options.GUI 770
   if (%DLF.custom.enabled == 1) did -c DLF.Options.GUI 810
   DLF.Options.InitChannelList
   DLF.Options.InitCustomList
@@ -1668,8 +1883,8 @@ alias -l DLF.Options.Save {
   DLF.Chan.Set %DLF.netchans
   %DLF.showfiltered = $did(40).state
   %DLF.enabled = $did(10).state
-  %DLF.betas = $did(540).state
   DLF.Groups.Events
+  %DLF.betas = $did(540).state
   %DLF.ads = $did(410).state
   %DLF.serverads = $did(415).state
   %DLF.requests = $did(420).state
@@ -1702,9 +1917,10 @@ alias -l DLF.Options.Save {
   %DLF.noregmsg = $did(690).state
   %DLF.chspam.opnotify = $did(715).state
   %DLF.privspam.opnotify = $did(720).state
-  %DLF.ops.advertise = $did(750).state
-  %DLF.ops.advertise.period = $did(755)
-  %DLF.ops.upgradeavail = $did(770).state
+  %DLF.ops.advertchan = $did(750).state
+  %DLF.ops.advertchan.period = $did(755)
+  %DLF.ops.advertpriv = $did(770).state
+  DLF.Ops.AdvertsEnable
   %DLF.o.enabled = $did(640).state
   %DLF.custom.enabled = $did(810).state
   DLF.Options.SetLinkedFields
@@ -1716,10 +1932,6 @@ alias DLF.Options.OpsTab {
 }
 
 alias -l DLF.Options.IsOp {
-  ;if (%DLF.chspam.opnotify == 1) return $true
-  ;if (%DLF.privspam.opnotify == 1) return $true
-  ;if (%DLF.ops.advertise == 1) return $true
-  ;if (%DLF.ops.userupgrade == 1) return $true
   var %cid = $cid
   var %i = $Scon(0)
   while (%i) {
@@ -1963,8 +2175,6 @@ alias -l DLF.Options.Error {
 }
 
 ; ========== Check version for updates ==========
-on *:connect: DLF.Update.Check
-
 ; Check once per week for normal releases and once per day if user is wanting betas
 alias -l DLF.Update.Check {
   var %days = $calc($int(($ctime - %DLF.LastUpdateCheck) / 60 / 60 / 24))
@@ -1982,10 +2192,10 @@ on *:sockread:DLF.Socket.Update: {
   var %line, %mark = $sock($sockname).mark
   var %state = $gettok(%mark,1,$asc($space))
   if (%state != Body) DLF.Socket.Error Cannot process response: Still processing %state
-  %DLF.version.web =
-  %DLF.version.web.mirc =
-  %DLF.version.beta =
-  %DLF.version.beta.mirc =
+  unset %DLF.version.web
+  unset %DLF.version.web.mirc
+  unset %DLF.version.beta
+  unset %DLF.version.beta.mirc
   while ($true) {
     sockread %line
     if ($sockerr > 0) DLF.Socket.SockErr sockread:Body
@@ -2067,7 +2277,8 @@ alias -l DLF.Update.DownloadAvailable {
 }
 
 ; Announce new version whenever user joins an enabled channel.
-on me:*:join:%DLF.channels: {
+alias -l DLF.Update.Announce {
+  DLF.Watch.Called DLF.Update.Announce
   if (%DLF.version.web) {
     if ((%DLF.betas) $&
       && (%DLF.version.beta) $&
@@ -2124,7 +2335,7 @@ on *:sockclose:DLF.Socket.Download: {
   %DLF.version = %DLF.version.web
   DLF.Options.Status New version of dlFilter downloaded and installed
   if (%oldsaved) DLF.Status Old version of dlFilter.mrc saved as %oldscript in case you need to revert
-  signal DLF.Update.Reload
+  signal DLF.Initialise
   .reload -rs1 $script
 }
 
@@ -2606,18 +2817,12 @@ alias -l max {
 alias -l tab returnex $chr(9)
 alias -l space returnex $chr(32)
 alias -l nbsp return $chr(160)
-alias -l pling return $chr(33)
 alias -l hashtag returnex $chr(35)
 alias -l dollar return $chr(36)
-alias -l amp return $chr(38)
 alias -l lbr return $chr(40)
 alias -l rbr return $chr(41)
 alias -l star return $chr(42)
 alias -l comma return $chr(44)
-alias -l hyphen return $chr(45)
-alias -l period return $chr(46)
-alias -l colon return $chr(58)
-alias -l semicolon return $chr(59)
 alias -l lt return $chr(60)
 alias -l eq return $chr(61)
 alias -l gt return $chr(62)
@@ -2626,7 +2831,7 @@ alias -l rsquare return $chr(93)
 alias -l underscore return $chr(95)
 alias -l lcurly return $chr(123)
 alias -l rcurly return $chr(125)
-alias -l sqbr return $+($lsquare,$1-,$rsquare)
+alias -l sbr return $+($lsquare,$1-,$rsquare)
 alias -l br return $+($lbr,$1-,$rbr)
 alias -l tag return $+($lt,$1-,$gt)
 
@@ -2685,14 +2890,14 @@ alias -l DLF.Socket.Open {
   var %protocol = $regml(DLF.Socket.Get,1)
   var %hostport = $regml(DLF.Socket.Get,2)
   var %path = $regml(DLF.Socket.Get,3)
-  var %host = $gettok(%hostport,1,$asc($colon))
-  var %port = $gettok(%hostport,2,$asc($colon))
+  var %host = $gettok(%hostport,1,$asc(:))
+  var %port = $gettok(%hostport,2,$asc(:))
 
   if (%protocol == $null) %protocol = http
   if (%path == $null) %path = /
   if (%port == $null) %port = $iif(%protocol == https,443,80)
   if (%port == 443) %protocol = https
-  %hostport = $+(%host,$colon,$port)
+  %hostport = $+(%host,:,$port)
 
   if ($sock(%socket)) sockclose %socket
   sockopen $iif(%protocol == https,-e) %socket %host %port
@@ -2751,11 +2956,11 @@ alias -l DLF.Socket.Headers {
     elseif (%state == Redirect) {
       ; No Location header ?
       if ($len(%line) == 0) DLF.Socket.Error $sockname redirect failed: no redirect URL in headers
-      var %header = $gettok(%line,1,$asc($colon))
+      var %header = $gettok(%line,1,$asc(:))
       if (%header == Location) {
         var %sockname = $sockname
         sockclose $sockname
-        DLF.Socket.Open %sockname $gettok(%line,2-,$asc($colon)) $gettok(%mark,4-,$asc($space))
+        DLF.Socket.Open %sockname $gettok(%line,2-,$asc(:)) $gettok(%mark,4-,$asc($space))
         halt
       }
     }
@@ -2857,7 +3062,7 @@ alias DLF.Watch.Filter {
   ; In practice this means returning $null iff it is a channel message and
   var %text = $1-
   tokenize $asc($space)) $1-
-  if ($left($2,1) == $colon) {
+  if ($left($2,1) == :) {
     var %user = $right($2,-1)
     tokenize $asc($space)) $1 $3-
   }
@@ -2910,7 +3115,6 @@ alias DLF.mIRCini {
   if ($3 == $null) return %ini
   return $gettok(%ini,$3,$asc($comma))
 }
-
 
 ; ========== DLF.Debug ==========
 ; Run this with //DLF.Debug only if you are asked to
