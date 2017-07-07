@@ -76,10 +76,17 @@ dlFilter uses the following code from other people:
           Version checks users as they join and if they are a mIRC user reminds them to install or upgrade dlF.
           Send advert to users doing @join.
 
-      TODO
+      TODO 1.18
+        Option for auto-retry
+        Option to convert underscores in received file names to spaces.
+        Auto-accept @+user response files if they are .txt or .txt.zip
+        Advertising for sbClient for @search + option.
+        Rework anti-chat code inc. using CTCP halt rather variable and next event
+        Convert "Regular user tried to" messages to more appropriate messages (and limit showing warning messages if $me is not a regular user i.e. an op who can do something about it).
         Check mIRC security settings not too lax
         Make download handle betas properly
-        Convert "Regular user tried to" messages to filter messages (and limit showing warning messages if $me is not a regular user i.e. an op who can do something about it).
+
+      TODO Future
         Make FilterSearch dynamic i.e. new lines which match are added.
         Handle ps2 results to @find
         Better icon file
@@ -88,7 +95,6 @@ dlFilter uses the following code from other people:
         Right click menu items for adding to custom filters
         More menu options equivalent to dialog options
         More menu options for adding custom filters
-        Rework anti-chat code inc. using CTCP halt rather variable and next event
         Send to... menus - do they work?
         Make it work on AdiIRC and update version check handle AdiIRC.
 
@@ -550,17 +556,9 @@ alias DLF.Chan.GetMsgNick {
 alias -l DLF.Chan.pNick return $nick($1,$2).pnick
 
 ; Titlebar Name & Stats
-alias -l DLF.Stats.Count {
-  hinc -m DLF.stats $+($network,$1,|,$2)
-}
-
-alias -l DLF.Stats.Get {
-  return $hget(DLF.stats,$+($network,$1,|,$2))
-}
-
-alias -l DLF.Stats.TitleText {
-  return $+(dlFilter efficiency:,$space,$1,%)
-}
+alias -l DLF.Stats.Count { if ($1 != Private) hinc -m DLF.stats $+($network,$1,|,$2) }
+alias -l DLF.Stats.Get { return $hget(DLF.stats,$+($network,$1,|,$2)) }
+alias -l DLF.Stats.TitleText { return $+(dlFilter efficiency:,$space,$1,%) }
 
 alias -l DLF.Stats.Active {
   ; titlebar = window -=- existing text -=- dlF stats
@@ -971,15 +969,25 @@ alias DLF.DccSend.SendNotice {
   var %req = $DLF.DccSend.GetRequest($3-)
   if (%req == $null) return
   var %chan = $gettok(%req,2,$asc(|))
-  if ($DLF.DccSend.IsFile($3-) != $null) DLF.Win.Server Notice %chan $nick $1-
+  if ($DLF.DccSend.IsRequest($3-) != $null) DLF.Win.Server Notice %chan $nick $1-
 }
 
 alias -l DLF.DccSend.Send {
   DLF.Watch.Called DLF.DccSend.Send
-  ;if ($chr(8238) isin $filename) DLF.Halt Halted: DCC Send refused - filename contains malicious unicode U+8238
-  if ($DLF.DccSend.IsFile($3-)) {
+  if ($chr(8238) isin $filename) DLF.Halt Halted: DCC Send refused - filename contains malicious unicode U+8238
+  if ($DLF.DccSend.IsRequest($3-)) {
+    if ((%DLF.servertrust == 1) && (!$DLF.DccSend.IsTrusted($nick))) {
+      ; Temporarily add DCC trust
+      var %desc = $nick
+      var %addr = $address
+      if (%addr == $null) %addr = $nick
+      else %desc = %desc ( $+ %addr $+ )
+
+      [ $+(.timerDlfRemoveTrust,%addr) ] 1 1 .signal DLF.DccSend.RemoveTrust %addr %desc
+      DLF.DccSend.AddTrust %addr %desc
+    }
     DLF.DccSend.Receiving $3-
-    DLF.Watch.Log DCC Send accepted - trigger found
+    DLF.Watch.Log DCC Send accepted - user requested this file from this server
     return
   }
   if (($DLF.IsRegularUser($nick)) && (%DLF.askregfile == 1)) {
@@ -1056,24 +1064,12 @@ alias -l DLF.DccSend.IsTrigger {
   return $false
 }
 
-alias -l DLF.DccSend.IsFile {
+alias -l DLF.DccSend.IsRequest {
   var %req = $DLF.DccSend.GetRequest($1-)
   if (%req == $null) return $false
   var %trig = $gettok(%req,3,$asc(|))
   if ($right($gettok(%req,3,$asc(|)),-1) != $nick) return $false
   DLF.Watch.Log File request found: %trig $1-
-
-  if (%DLF.servertrust == 0) return $true
-  if (%DLF.DccSend.IsTrusted($nick)) return $true
-
-  ; Temporarily add DCC trust
-  var %desc = $nick
-  var %addr = $address($nick,5)
-  if (%addr == $null) %addr = $nick
-  else %desc = %desc ( $+ %addr $+ )
-
-  [ $+(.timerDlfRemoveTrust,%addr) ] 1 1 .signal DLF.DccSend.RemoveTrust %addr %desc
-  DLF.DccSend.AddTrust %addr %desc
   return $true
 }
 
@@ -1171,21 +1167,10 @@ alias -l DLF.Win.Server {
   halt
 }
 
-alias -l DLF.Win.Ads {
-  DLF.Win.Log Ads $1-
-  halt
-}
-
 alias -l DLF.Win.Log {
   if (($window($4)) && ($event == open)) .window -c $4
   var %type = $1
-  if ($1 == Filter) {
-    DLF.Stats.Count $3 Filter
-    if (%DLF.showfiltered == 0) {
-      DLF.Watch.Log Dropped: Options set to not show filters
-      return
-    }
-  }
+  if ($1 == Filter) DLF.Stats.Count $3 Filter
   elseif ($1 == Server) {
     DLF.Chan.SetNickColour $3-4
     if (%DLF.server == 0) {
@@ -1193,73 +1178,94 @@ alias -l DLF.Win.Log {
       return
     }
   }
-  elseif ($1 == Ads) {
-    DLF.Stats.Count $3 Filter
-    DLF.Chan.SetNickColour $3-4
-    if (%DLF.serverads == 0) %type = Filter
-  }
   else DLF.Error DLF.Win.Log: Invalid window name: $1
-  var %vars = $iif(%type == Server,DLF.server.,DLF.filtered.)
+  var %log   = $iif(%type == Server,%DLF.server.log,%DLF.filtered.log)
+  var %limit = $iif(%type == Server,%DLF.server.limit,%DLF.filtered.limit)
+  var %ts    = $iif(%type == Server,%DLF.server.timestamp,%DLF.filtered.timestamp)
+  var %strip = $iif(%type == Server,%DLF.server.strip,%DLF.filtered.strip)
+  var %wrap  = $iif(%type == Server,%DLF.server.wrap,%DLF.filtered.wrap)
 
-  var %win = $+(@dlF.,%type,.,$iif(%DLF.perconnect,$network,All))
-  var %lfn = $mklogfn($iif(%type == Ads,$replace(%win,.Ads.,.Filter.),%win))
-  if (%DLF.perconnect == 0) %lfn = $nopath(%lfn)
-  %lfn = $qt($+($logdir,%lfn))
-  var %log   = [ [ $+(%,%vars,log) ] ]
-  var %limit = [ [ $+(%,%vars,limit) ] ]
-  var %ts    = [ [ $+(%,%vars,timestamp) ] ]
-  var %strip = [ [ $+(%,%vars,strip) ] ]
-  var %wrap  = [ [ $+(%,%vars,wrap) ] ]
-
-  var %nc = $null
-  if (%DLF.perconnect == 0) %nc = $network
-  if ($3 != $hashtag) %nc = %bc $+ $3
-  if (%nc != $null) %nc = $sbr(%nc)
-  var %col = $colour($replace($2,ctcpsend,ctcp,ctcpreply,ctcp))
-  var %line = %nc $DLF.Win.Format($2-)
+  var %line = $DLF.Win.LineFormat($2-)
+  var %col = $DLF.Win.Colour($2)
   if (%log == 1) write %lfn $sbr($logstamp) $strip(%line)
+  if ((%type = Filter) && (%DLF.showfiltered == 0)) {
+      DLF.Watch.Log Dropped: Options set to not show filters
+      return
+    }
 
-  if (!$window(%win)) {
-    var %switches = $iif(%DLF.perconnect,-k0nw,-k0nwz)
-    if (%type == Ads) %switches = %switches $+ l -t30
-    window %switches %win
-    if (%type == Filter) var %t = Filtered
-    elseif (%type == Ads) var %t = Server advertising
-    elseif (%type == Server) var %t = Server response
-    titlebar %win -=- %t messages from $iif(%DLF.perconnect,the $network network,all networks) -=- Right-click for options
-    if ((%log) && (%type != Ads)) loadbuf $iif(%limit,4850) -p %win %lfn
-  }
+  if (%type == Filter) var %tb = Filtered
+  elseif (%type == Server) var %tb = Server response
+  var %win = $DLF.Win.WinOpen(%type,-k0nw,%log,%limit,%tb $DLF.Win.TbMsg)
 
   if ((%limit == 1) && ($line(%win,0) >= 5000) && (%type != Ads)) dline %win $+(1-,$calc($line(%win,0) - 4850))
-  if (%type == Ads) %line = $gettok(%line,1-2,$asc($space)) $tab $+ $strip($gettok(%line,3-,$asc($space)))
-  if ((%ts == 1) && (%type != Ads)) %line = $timestamp %line
+  if (%ts == 1) %line = $timestamp %line
   if (%strip == 1) %line = $strip(%line)
-  if (%type == Ads) {
-    var %toks = $iif(%ts == 1,2-6,1-5)
-    var %srch = $gettok($strip(%line),%toks,$asc($space))
-    var %i = $line(%win,0)
-    while (%i) {
-      var %l = $gettok($strip($line(%win,%i)),%toks,$asc($space))
-      if (%l == %srch) {
-        rline %col %win %i %line
-        break
-      }
-      elseif (%l < %srch) {
-        inc %i
-        iline %col %win %i %line
-        break
-      }
-      dec %i
-    }
-    if (%i == 0) iline %col %win 1 %line
-    window -b %win
-  }
-  else {
-    if (%wrap == 1) aline -pi %col %win %line
-    else aline %col %win %line
-  }
+  if (%wrap == 1) aline -pi %col %win %line
+  else aline %col %win %line
   DLF.Watch.Log Filtered: To %win
 }
+
+alias -l DLF.Win.Ads {
+  DLF.Chan.SetNickColour $2-3
+  if (%DLF.serverads == 1) DLF.Win.AdsList $1-
+  DLF.Win.Filter $1-
+}
+
+alias -l DLF.Win.AdsList {
+  var %tb = Server advertising $DLF.Win.TbMsg
+  var %win = $DLF.Win.WinOpen(Ads,-k0nwl -t30,0,0,%tb)
+  var %i = $line(%win,0)
+  var %line = $DLF.Win.LineFormat($1-)
+  %line = $gettok(%line,1-2,$asc($space)) $tab $+ $gettok($replace($strip($gettok(%line,3-,$asc($space))),$chr(149),$null,$chr(144),$null),1-,$asc($space))
+  var %srch = $gettok($strip(%line),1-7,$asc($space))
+  while (%i) {
+    var %l = $gettok($strip($line(%win,%i)),1-7,$asc($space))
+    if (%l == %srch) {
+      rline %col %win %i %line
+      break
+    }
+    elseif (%l < %srch) {
+      inc %i
+      iline %col %win %i %line
+      break
+    }
+    dec %i
+  }
+  if (%i == 0) iline %col %win 1 %line
+  window -b %win
+}
+
+alias -l DLF.Win.TbMsg return messages from $iif(%DLF.perconnect,the $network network,all networks) -=- Right-click for options
+alias -l DLF.Win.WinName return $+(@dlF.,$1,.,$iif(%DLF.perconnect,$network,All))
+alias -l DLF.Win.LogName {
+  var %lfn = $mklogfn($1)
+  if (%DLF.perconnect == 0) %lfn = $nopath(%lfn)
+  return $qt($+($logdir,%lfn))
+}
+
+; %winname = $DLF.Win.WinOpen(type,switches,log,limit,title)
+alias -l DLF.Win.WinOpen {
+  var %win = $DLF.Win.WinName($1)
+  if ($window(%win)) return %win
+  var %lfn = $DLF.Win.LogName(%win)
+  var %switches = $2
+  if (%DLF.perconnect == 0) %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ z,1,$asc($space))
+  window %switches %win
+  if ($3) loadbuf $iif($4,4850) -p %win %lfn
+  if ($5- != $null) titlebar %win -=- $5-
+  return %win
+}
+
+alias -l DLF.Win.LineFormat {
+  tokenize $asc($space) $1-
+  var %nc = $null
+  if (%DLF.perconnect == 0) %nc = $network
+  if (($left($2,1) == $hashtag) && ($2 != Private)) %nc = %nc $+ $2
+  if (%nc != $null) %nc = $sbr(%nc)
+  return %nc $DLF.Win.Format($1-)
+}
+
+alias -l DLF.Win.Colour return $color($replace($1,ctcpsend,ctcp,ctcpreply,ctcp))
 
 alias -l DLF.Win.Format {
   tokenize $asc($space) $1-
@@ -1275,11 +1281,11 @@ alias -l DLF.Win.Format {
 }
 
 alias -l DLF.Win.Echo {
-  var %col = $colour($replace($1,ctcpsend,ctcp,ctcpreply,ctcp))
   var %line = $DLF.Win.Format($1-)
+  var %col = $DLF.Win.Colour($1)
   if ($2 != Private) {
     echo %col -t $2 %line
-    DLF.Watch.Log Echoed: To $2 $+ : %line
+    DLF.Watch.Log Echoed: To $2
   }
   else {
     var %sent = $null
@@ -1337,6 +1343,8 @@ menu @dlF.Server.* {
 }
 
 menu @dlF.Ads.* {
+  dclick: DLF.@ads.Get $1
+  -
   Clear: clear
   Options: DLF.Options.Show
   Disable: {
@@ -1358,6 +1366,16 @@ menu @dlF.*Search.* {
 }
 
 on *:input:@dlF.*Search.*: DLF.Win.Search $target $1-
+
+alias -l DLF.@ads.Get {
+  var %re = /\s(@\S*)\s/F
+  if ($regex(DLF.@ads.Get,$line($active,$1),%re) > 0) {
+    var %t = $regml(DLF.@ads.Get,1)
+    var %c = $comchan($right(%t,-1),1)
+    ; Use editbox not msg so other scripts (like sbClient) get On Input event
+    DLF.chan.editsend %c %t
+  }
+}
 
 alias -l DLF.Win.Search {
   if ($2 == $null) return
@@ -1454,8 +1472,8 @@ alias -l DLF.@find.Results {
   if (!$window(%win)) {
     window -lk0wn -t15 %win
     aline -hn 2 %win This window shows @find results as received individually from various servers.
-    aline -hn 1 %win You can select lines and copy and paste them into the channel to get files,
-    aline -hn 1 %win or double-click to have the file request sent for you.
+    aline -hni 1 %win You can select lines and copy and paste them into the channel to get files,
+    aline -hni 1 %win or double-click to have the file request sent for you.
     aline -hn 1 %win $crlf
   }
   var %i = $line(%win,0)
@@ -1635,7 +1653,7 @@ alias -l DLF.oNotice.Channel {
   if ($gettok(%omsg,1,$asc($space)) != /me) %omsg = $color(text) %win $tag($nick) %omsg
   else %omsg = $color(action) %win $star $nick $gettok(%omsg,2-,$asc($space))
   aline -ph %omsg
-  ;if (%DLF.o.timestamp == 1) var %omsg = $timestamp %omsg
+  if (%DLF.o.timestamp == 1) var %omsg = $timestamp %omsg
   DLF.oNotice.Log %win $gettok(%omsg,2-,$asc($space))
   DLF.Halt Halted: oNotice sent to %win
 }
@@ -1647,7 +1665,6 @@ alias -l DLF.oNotice.Open {
     window $+(-eg1k1l12mSw,$iif($1 == 0,n)) %win
     var %log = $DLF.oNotice.LogFile(%chatwin)
     if ((%DLF.o.log == 1) && ($exists(%log))) .loadbuf -r %win %log
-    timestamp $iif(%DLF.o.timestamp,on,off) %win
   }
   return %win
 }
@@ -1711,8 +1728,8 @@ dialog -l DLF.Options.GUI {
   check "Check for &beta versions", 540, 7 173 136 8, tab 200
   ; tab Main
   box " General ", 405, 4 23 160 74, tab 400
-  check "Filter adverts and announcements", 410, 7 32 154 8, tab 400
-  check "... but filter to separate window", 415, 15 41 125 8, tab 400
+  check "Show adverts and announcements in a separate window", 415, 7 32 154 8, tab 400
+  check "Filter adverts and announcements", 410, 7 41 154 8, tab 400
   check "Filter other users Search / File requests", 420, 7 50 154 8, tab 400
   check "Filter responses to my requests to separate window", 425, 7 59 154 8, tab 400
   check "Filter Channel mode changes", 430, 7 68 154 8, tab 400
@@ -2632,6 +2649,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.spam *YAY* Another brave soldier in the war to educate the masses*Onward Comrades*
   DLF.hadd chantext.spam *[Away]*SysReset*
   DLF.hadd chantext.spam *[F][U][N]*
+  DLF.hadd chantext.spam Request * —I-n-v-i-s-i-o-n—
   inc %matches $hget(DLF.chantext.spam,0).item
 
   if ($hget(DLF.chantext.always)) hfree DLF.chantext.always
