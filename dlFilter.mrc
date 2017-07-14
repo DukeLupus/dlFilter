@@ -1,5 +1,5 @@
 /*
-DLFILTER -=- Firewall/anti-spam for file sharing channels.
+DLFILTER -=- Firewall & anti-spam for file sharing channels.
 Authors: DukeLupus and Sophist
 
 Annoyed by advertising messages from the various file serving bots? Fed up with endless channel messages from other users searching for and requesting files? Are the responses to your own requests getting lost in the crowd?
@@ -79,6 +79,9 @@ dlFilter uses the following code from other people:
         Lines in @find / Ads windows change colour as servers join/part the channel.
         "Regular user tried to" warning messages sent to appropriate channels
         Resend requests if server rejoins the channel (in case it has been restarted and request was lost).
+        Block channel-wide ctcp requests for VERSION, FINGER, TIME & PING.
+          (Channel-wide ctcp requests are not sensible, and could be for hacking purposes.)
+        Added option to block private Finger requests which are not commonly used and couldleakpersonal information.
 
       TODO 1.18
         Rework anti-chat code inc. using CTCP halt rather variable and next event
@@ -86,6 +89,7 @@ dlFilter uses the following code from other people:
         Implement toolbar functionality with right click menu
         Send to... menus - do they work?
         Fix titlebar going wrong after file get.
+        Fix Dialig sizing after option removal.
 
       TODO Future
         Check mIRC security settings not too lax
@@ -143,8 +147,12 @@ alias -l DLF.mIRCversion {
   return mIRC 7.44
 }
 
-ctcp ^*:VERSION:#: { DLF.Halt Halted: ctcp VERSION in any channel }
-ctcp ^*:VERSION:?: {
+ctcp ^*:FINGER*:?: { if (%DLF.nofingers) DLF.Halt Halted: ctcp FINGER blocked }
+ctcp ^*:FINGER*:#: { DLF.ctcp.ChanHalt Halted: ctcp FINGER in any channel }
+ctcp ^*:TIME*:#: { DLF.ctcp.ChanHalt Halted: ctcp TIME in any channel }
+ctcp ^*:PING*:#: { DLF.ctcp.ChanHalt Halted: ctcp PING in any channel }
+ctcp ^*:VERSION*:#: { DLF.ctcp.ChanHalt Halted: ctcp VERSION in any channel }
+ctcp ^*:VERSION*:?: {
   ; dlFilter version response only to people who are in a common dlFilter channel
   DLF.Win.Log Filter ctcp Private $nick $1-
   var %i = $comchan($nick,0)
@@ -427,7 +435,7 @@ alias -l DLF.Chan.Mode {
   DLF.Win.Filter Mode $chan $nick sets $1-
 }
 
-; ========== Channel messages ==========
+; ===== Channel messages =====
 alias -l DLF.Chan.AddRemove {
   if (!$DLF.Chan.IsDlfChan($chan,$false)) DLF.Chan.Add $chan $network
   else DLF.Chan.Remove $chan $network
@@ -605,7 +613,7 @@ alias DLF.Chan.GetMsgNick {
 
 alias -l DLF.Chan.pNick return $nick($1,$2).pnick
 
-; ========== Titlebar Name & Stats ==========
+; ===== Titlebar Name & Stats =====
 alias -l DLF.Stats.Count { if (($1 != Private) && ($1 != $hashtag)) hinc -m DLF.stats $+($network,$1,|,$2) }
 alias -l DLF.Stats.Get { return $hget(DLF.stats,$+($network,$1,|,$2)) }
 alias -l DLF.Stats.TitleText { return $+(dlFilter efficiency:,$space,$1,%) }
@@ -707,7 +715,7 @@ alias -l func {
   return $(%p,2)
 }
 
-; ========== Private messages ==========
+; ===== Private messages =====
 alias -l DLF.Priv.Text {
   DLF.Watch.Called DLF.Priv.Text
   ; if ((%DLF.nocomchan.dcc == 1) && (%DLF.accepthis == $target)) return
@@ -816,6 +824,7 @@ alias -l DLF.IsRegularUser {
 
 alias -l DLF.DccChat.Chat echo -st DLF.DccChat.Chat called: $1-
 
+; ===== ctcp messages =====
 alias -l DLF.ctcp.Private {
   DLF.Watch.Called DLF.ctcp.Private
   if ((%DLF.nocomchan.dcc == 1) && ($1-2 === DCC CHAT)) {
@@ -834,6 +843,13 @@ alias -l DLF.ctcp.Reply {
   if ((%DLF.noregmsg == 1) && ($DLF.IsRegularUser($nick))) DLF.Win.Warning ctcpreply $1-
 }
 
+alias -l DLF.ctcp.ChanHalt {
+  DLF.Stats.Count $chan Total
+  DLF.Stats.Count $chan Filter
+  DLF.Halt $1-
+}
+
+; ===== away responses =====
 alias -l DLF.Away.Filter {
   DLF.Watch.Called DLF.Away.Filter
   if (%DLF.away == 1) DLF.Win.Filter Notice RawAway $2-
@@ -2083,8 +2099,8 @@ dialog -l DLF.Options.GUI {
   check "Display dlFilter channel efficiency in title bar", 635, 7 59 154 8, tab 600
   check "Retry incomplete file requests", 638, 7 68 154 8, tab 600
   check "Filter oNotices to separate @#window (OpsTalk)", 640, 7 77 154 8, tab 600
-  box " Spam and security ", 645, 4 89 160 113, tab 600
-  check "Check mIRC settings are secure at mIRC start", 648, 7 98 154 8, tab 600
+  box " Spam and security ", 645, 4 89 160 122, tab 600
+  check "Check mIRC settings are secure (future enhancement)", 648, 7 98 154 8, tab 600 disable
   check "Filter channel spam", 650, 7 107 154 8, tab 600
   check "Filter private spam", 655, 7 116 154 8, tab 600
   check "... and /ignore spammer for 1h (asks confirmation)", 660, 15 125 146 8, tab 600
@@ -2094,6 +2110,7 @@ dialog -l DLF.Options.GUI {
   check "Do not accept files from regular users (except mIRC trusted users)", 680, 7 166 154 16, tab 600 multi
   check "... block only potentially dangerous filetypes", 685, 15 182 146 8, tab 600
   check "Do not accept private messages from regular users", 690, 7 191 154 8, tab 600
+  check "Block Finger requests (which share personal information)", 695, 7 200 154 8, tab 600
   ; tab Ops
   text "These options are only enabled if you are an op on a filtered channel.", 705, 4 25 160 16, tab 700 multi
   box " Spam notifications ", 710, 4 38 160 29, tab 700
@@ -2210,6 +2227,7 @@ alias -l DLF.Options.Initialise {
   DLF.Options.InitOption askregfile 1
   DLF.Options.InitOption askregfile.type 0
   DLF.Options.InitOption noregmsg 0
+  DLF.Options.InitOption nofingers 1
 
   ; Ops tab
   DLF.Options.InitOption chspam.opnotify 0
@@ -2304,6 +2322,7 @@ alias -l DLF.Options.Init {
   else %DLF.askregfile.type = 0
   if (%DLF.askregfile.type == 1) did -c DLF.Options.GUI 685
   if (%DLF.noregmsg == 1) did -c DLF.Options.GUI 690
+  if (%DLF.nofingers == 1) did -c DLF.Options.GUI 695
   if (%DLF.chspam.opnotify == 1) did -c DLF.Options.GUI 715
   if (%DLF.privspam.opnotify == 1) did -c DLF.Options.GUI 720
   if (%DLF.ops.advertchan == 1) did -c DLF.Options.GUI 750
@@ -2373,6 +2392,7 @@ alias -l DLF.Options.Save {
   %DLF.askregfile.type = $did(685).state
   if (%DLF.askregfile.type == 1) %DLF.askregfile = 1
   %DLF.noregmsg = $did(690).state
+  %DLF.nofingers = $did(695).state
   %DLF.chspam.opnotify = $did(715).state
   %DLF.privspam.opnotify = $did(720).state
   %DLF.ops.advertchan = $did(750).state
