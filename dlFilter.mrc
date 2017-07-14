@@ -78,6 +78,7 @@ dlFilter uses the following code from other people:
         @find results from ps2 are treated as server responses and no longer give regular user warnings
         Lines in @find / Ads windows change colour as servers join/part the channel.
         "Regular user tried to" warning messages sent to appropriate channels
+        Resend requests if server rejoins the channel (in case it has been restarted and request was lost).
 
       TODO 1.18
         Rework anti-chat code inc. using CTCP halt rather variable and next event
@@ -298,6 +299,7 @@ on me:*:join:%DLF.channels: { if ($DLF.Chan.IsDlfChan($chan)) DLF.Update.Announc
 ; join, part, quit, nick changes, kick
 on ^*:join:%DLF.channels: {
   if ($DLF.Chan.IsChanEvent) {
+    DLF.DccSend.Rejoin
     DLF.Win.Join
     ; Wait for 1 sec for user's modes to be applied to avoid checking ops
     if ((%DLF.ops.advertpriv) && ($me isop $chan)) .timer 1 1 .signal DLF.ops.RequestVersion $nick
@@ -338,7 +340,7 @@ on ^*:servermode:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.chmode)) DLF.Ch
 on *:input:%DLF.channels: {
   if ($DLF.Chan.IsDlfChan($chan)) {
     if (($1 == @find) || ($1 == @locator)) DLF.@find.Request $1-
-    if ($left($1,1) isin !@) DLF.DccSend.Request $1-
+    if ($left($1,1) isin !) DLF.DccSend.Request $1-
   }
 }
 
@@ -853,13 +855,15 @@ alias -l DLF.Ops.Advert@find {
   elseif ((!$hfind(DLF.ops.advert@find,%idx)) $&
     && ($hfind(DLF.ops.mirc@find,%idx)) $&
     && (!$hfind(DLF.ops.dlfVersion,%idx))) {
-    hadd -mu86400 DLF.ops.advert@find %idx $true
+    hadd -mz DLF.ops.advert@find %idx $DLF.RequestPeriod
     %msg = $c(1,9,$DLF.logo Make @find easier to use by installing the dlFilter mIRC script which collects the results together into a single window. Download it from $u($c(2,https://github.com/SanderSade/dlFilter/releases)) $+ .)
     DLF.notice $nick %msg
     DLF.Win.Log Filter text $chan $nick $1-
     DLF.Win.Filter notice $chan $nick %msg
   }
 }
+
+alias -l DLF.RequestPeriod return 86400
 
 on *:signal:DLF.Ops.AdvertChan: { DLF.Ops.AdvertChan $1- }
 alias -l DLF.Ops.AdvertChan {
@@ -899,7 +903,7 @@ alias -l DLF.ops.RequestVersion {
   elseif ($hfind(DLF.ops.dlfUsers,%idx)) DLF.Watch.log SPOOKY: dlfUsers without verRequested
   elseif ($hfind(DLF.ops.sbcUsers,%idx)) DLF.Watch.log SPOOKY: sbcUsers without verRequested
   else {
-    hadd -mu86400 DLF.ops.verRequested %idx $true
+    hadd -mz DLF.ops.verRequested %idx $$DLF.RequestPeriod
     DLF.ctcp $1 VERSION
     DLF.Win.Filter ctcpsend Private $1 VERSION
   }
@@ -1048,7 +1052,7 @@ alias -l DLF.ctcpEncode {
 
 ; ========== DCC Send ==========
 
-alias DLF.DccSend.Request {
+alias -l DLF.DccSend.Request {
   DLF.Watch.Called DLF.DccSend.Request : $1-
   var %trig = $strip($1)
   var %fn = $replace($strip($2-),$tab $+ $space,$space,$tab,$null)
@@ -1058,11 +1062,31 @@ alias DLF.DccSend.Request {
   if ($space isin %fn) var %spc = 1
   else %spc = 0
   var %file = $replace($strip($2-),$space,_)
-  hadd -mz DLF.dccsend.requests $+($network,|,$chan,|,%trig,|,%file,|,%und $+ %spc) 1800
-  DLF.Watch.Log Request recorded: $strip($1-)
+  hadd -mz DLF.dccsend.requests $+($network,|,$chan,|,%trig,|,%file,|,%und $+ %spc) $DLF.RequestPeriod
+  DLF.Watch.Log Request recorded: %trig %fn
+}
+
+alias -l DLF.DccSend.Rejoin {
+  var %i = $hget(DLF.dccsend.requests,0).item
+  while (%i) {
+    var %item = $hget(DLF.dccsend.requests,%i).item
+    dec %i
+    var %net = $gettok(%item,1,$asc(|))
+    if (%net != $network) continue
+    var %chan = $gettok(%item,2,$asc(|))
+    if (%chan != $chan) continue
+    var %trig = $gettok(%item,3,$asc(|))
+    if (%trig != ! $+ $nick) continue
+    var %file = $gettok(%item,4,$asc(|))
+    var %uncspc = $gettok(%item,5,$asc(|))
+    if (%uncspc == 01) %file = $replace(%file,_,$space)
+    DLF.chan.editsend %chan %trig %fn
+    DLF.Watch.Log $nick rejoined $chan: Request resent: %trig %fn
+  }
 }
 
 alias DLF.DccSend.List {
+  echo -a $crlf
   echo -a dlFilter: Current file requests:
   echo -a --------------------------------
   var %i = $hget(DLF.dccsend.requests,0).item
@@ -1083,7 +1107,7 @@ alias DLF.DccSend.List {
   %i = $numtok(%list,$asc(|))
   while (%i) {
     %item = $gettok(%list,%i,$asc(|))
-    echo -a $asctime($calc($ctime - 1800 + $gettok(%item,1,$asc($space))),$timestampfmt) $gettok(%item,2-,$asc($space))
+    echo -a $asctime($calc($ctime - $DLF.RequestPeriod + $gettok(%item,1,$asc($space))),$timestampfmt) $gettok(%item,2-,$asc($space))
     dec %i
   }
 }
@@ -1146,7 +1170,8 @@ alias -l DLF.DccSend.Receiving {
   var %req = $DLF.DccSend.GetRequest($1-)
   if (%req == $null) return
   var %chan = $gettok(%req,2,$asc(|))
-  DLF.Win.Log Server ctcp %chan $nick DCC Get of $nopath($1-) from $nick starting
+  var %secs = $calc($DLF.RequestPeriod - $hget(DLF.dccsend.requests,%req))
+  DLF.Win.Log Server ctcp %chan $nick DCC Get of $nopath($1-) from $nick starting $br(waited $duration(%secs,3))
 }
 
 alias -l DLF.DccSend.FileRcvd {
@@ -1156,7 +1181,8 @@ alias -l DLF.DccSend.FileRcvd {
   if (%req == $null) return
   .hdel -s DLF.dccsend.requests %req
   var %chan = $gettok(%req,2,$asc(|))
-  DLF.Win.Log Server ctcp %chan $nick DCC Get of %fn from $nick complete $br($duration(%dur,3) $bytes($calc($get(-1).rcvd / $get(-1).secs)).suf $+ /Sec)
+  var %dur = $get(-1).secs
+  DLF.Win.Log Server ctcp %chan $nick DCC Get of %fn from $nick complete $br($duration(%dur,3) $bytes($calc($get(-1).rcvd / %dur)).suf $+ /Sec)
   ; Rename if server has changed spaces to underscore and original request had spaces but no underscores
   ; In authors experience this is the case most times.
   var %undspc = $gettok(%req,5,$asc(|))
@@ -1219,7 +1245,7 @@ alias -l DLF.DccSend.FileFailed {
 alias -l DLF.DccSend.GetRequest {
   tokenize $asc($space) $strip($1-)
   var %file = $replace($noqt($DLF.GetFileName($1-)),$space,_)
-  return $hfind(DLF.dccsend.requests,$+($network,|#*|!,$nick,|,%file),1,w).item
+  return $hfind(DLF.dccsend.requests,$+($network,|#*|!,$nick,|,%file,|*),1,w).item
 }
 
 alias -l DLF.DccSend.IsTrigger {
@@ -3077,9 +3103,9 @@ alias -l DLF.CreateHashTables {
   DLF.hadd privtext.server *Request Denied*Reason: *DragonServe*
   DLF.hadd privtext.server *Sorry for cancelling this send*OmeNServE*
   DLF.hadd privtext.server *Sorry, I'm too busy to send my list right now, please try later*
-  DLF.hadd privtext.server *you already have*in my queue*has NOT been added to my queue*
-  DLF.hadd privtext.server *You already have*in my queue*Type @*-help for more info*
-  DLF.hadd privtext.server *You already have*requests in my queue*is not queued*
+  DLF.hadd privtext.server After * min(s) in my * queue, * is *
+  DLF.hadd privtext.server You already have * in my queue*
+  DLF.hadd privtext.server You have * files in my * queue*
   DLF.hadd privtext.server I have successfully sent you*OS*
   DLF.hadd privtext.server Lo Siento, no te puedo enviar mi lista ahora, intenta despues*
   DLF.hadd privtext.server Lo siento, pero estoy creando una nueva lista ahora*
