@@ -89,7 +89,6 @@ dlFilter uses the following code from other people:
         Implement toolbar functionality with right click menu
         Send to... menus - do they work?
         Fix titlebar going wrong after file get.
-        Fix Dialig sizing after option removal.
 
       TODO Future
         Check mIRC security settings not too lax
@@ -147,34 +146,57 @@ alias -l DLF.mIRCversion {
   return mIRC 7.44
 }
 
-ctcp ^*:FINGER*:?: { if (%DLF.nofingers) DLF.Halt Halted: ctcp FINGER blocked }
-ctcp ^*:FINGER*:#: { DLF.ctcp.ChanHalt Halted: ctcp FINGER in any channel }
-ctcp ^*:TIME*:#: { DLF.ctcp.ChanHalt Halted: ctcp TIME in any channel }
-ctcp ^*:PING*:#: { DLF.ctcp.ChanHalt Halted: ctcp PING in any channel }
-ctcp ^*:VERSION*:#: { DLF.ctcp.ChanHalt Halted: ctcp VERSION in any channel }
-ctcp ^*:VERSION*:?: {
-  ; dlFilter version response only to people who are in a common dlFilter channel
+ctcp ^*:FINGER*:#: { DLF.ctcp.ChanBlock $1- }
+ctcp ^*:TIME*:#: { DLF.ctcp.ChanBlock $1- }
+ctcp ^*:PING*:#: { DLF.ctcp.ChanBlock $1- }
+ctcp ^*:VERSION*:#: {
+  if (($nick isop $chan) && ($DLF.Chan.IsDlfChan(%chan))) DLF.ctcpVersionReply $chan
+  else DLF.ctcp.ChanBlock $1-
+}
+
+alias -l DLF.ctcp.ChanBlock {
+  if ($nick isop $chan) return
+  DLF.Win.Echo Warning $chan $nick Channel ctcp $2 from $nick blocked by dlFilter
+  if ($DLF.Chan.IsDlfChan($chan) {
+    DLF.Stats.Count $chan Total
+    DLF.Win.Log Filter ctcp $chan $nick $1-
+  }
+  DLF.Halt Channel $1-2 blocked
+}
+
+ctcp ^*:FINGER*:?: { DLF.ctcp.PrivBlock $1- }
+ctcp ^*:TIME*:?: { DLF.ctcp.ChanBlock $1- }
+ctcp ^*:PING*:?: { DLF.ctcp.ChanBlock $1- }
+ctcp ^*:VERSION*:?: { DLF.ctcp.PrivBlock $1- }
+
+alias -l DLF.ctcp.PrivBlock {
+  ; dlFilter ctcp response only to people who are in a common dlFilter channel
   DLF.Win.Log Filter ctcp Private $nick $1-
   var %i = $comchan($nick,0)
   while (%i) {
     var %chan = $comchan($nick,%i)
-    if ($DLF.Chan.IsDlfChan(%chan)) {
-      DLF.ctcpVersionReply
+    if (%chan) {
+      if (($2 == VERSION) && ($DLF.Chan.IsDlfChan(%chan))) DLF.ctcpVersionReply Private
+      elseif (($2 == FINGER) && (%DLF.nofingers)) {
+        DLF.Win.Echo Warning Private $nick ctcp finger blocked
+        DLF.Win.Echo ctcp Private $nick $1-
+        DLF.Halt Halted: ctcp finger blocked
+      }
       return
     }
     dec %i
   }
   if (($query($nick)) || ($chat($nick,0)) {
-    DLF.ctcpVersionReply
+    if ($2 == VERSION) DLF.ctcpVersionReply Private
     return
   }
-  DLF.Halt Halted: ctcp VERSION in private from someone not in common dlF channel or chat
+  DLF.Halt Halted: Private ctcp $2 from $nick with no common dlF channel or chat
 }
 
 alias -l DLF.ctcpVersionReply {
   var %msg = $nick VERSION $c(1,9,$DLF.logo Version $DLF.SetVersion by DukeLupus & Sophist.) $+ $c(1,15,$space $+ Get it from $c(12,15,$u(https://github.com/SanderSade/dlFilter/releases)))
   .ctcpreply %msg
-  DLF.Win.Log Filter ctcpsend Private $nick %msg
+  DLF.Win.Log Filter ctcpsend $1 $nick %msg
 }
 
 ; ==================== Initialisation / Termination ====================
@@ -298,7 +320,7 @@ alias -l DLF.Groups.Events {
   else .disable #dlf_events
 }
 
-#dlf_events off
+#dlf_events on
 
 ; Announce update when I join a filtered channel
 on me:*:join:%DLF.channels: { if ($DLF.Chan.IsDlfChan($chan)) DLF.Update.Announce }
@@ -632,8 +654,12 @@ alias -l DLF.Stats.Active {
   else DLF.Stats.Titlebar
 }
 
+alias DLF.Stats.Close {
+  echo -s Target $target WID $window($target).wid
+}
+
 alias DLF.Stats.Titlebar {
-  var %tb = $DLF.Stats.TitlebarClean
+  var %tb = $DLF.Stats.TitlebarClean($lactivewid)
   var %re = $+(/^(-=- )?,$replace($DLF.Stats.TitleText([0-9.]*),$space,\s+),/F)
   ; Can't use $1- directly in $regsubex because it uses these internally
   var %txt = $1-
@@ -654,7 +680,10 @@ alias DLF.Stats.TitlebarClean {
   var %tb = $titlebar
   var %name = $gettok(%tb,1,$asc($space))
   var %toks = 1-
-  var %ltype = $gettok($DLF.Stats.WindowName($lactivewid),1,$asc($space))
+  var %lwin = $DLF.Stats.WindowName($1)
+  echo -s tbname %name lactive $lactive win %lwin
+  ;scon 1 echo -s tbname %name lactive $lactive win %lwin
+  var %ltype = $gettok(%lwin,1,$asc($space))
   if ((%ltype == chan) && (%name == $lactive)) %toks = 2-
   elseif ((%ltype == window) && ((%name == $lactive) || (@ $+ %name == $lactive))) %toks = 2-
   elseif ((%ltype == query) && (%name == $lactive)) %toks = 2-
@@ -841,12 +870,6 @@ alias -l DLF.ctcp.Reply {
   if ($hiswm(ctcp.reply,$1-)) DLF.Win.Filter ctcpreply Private $nick $1-
   if (%DLF.nocomchan == 1) DLF.Priv.CommonChan $nick $1-
   if ((%DLF.noregmsg == 1) && ($DLF.IsRegularUser($nick))) DLF.Win.Warning ctcpreply $1-
-}
-
-alias -l DLF.ctcp.ChanHalt {
-  DLF.Stats.Count $chan Total
-  DLF.Stats.Count $chan Filter
-  DLF.Halt $1-
 }
 
 ; ===== away responses =====
@@ -1249,7 +1272,7 @@ alias -l DLF.DccSend.FileFailed {
   var %trig = $gettok(%req,3,$asc(|))
   var %undspc = $gettok(%req,5,$asc(|))
   ; Recover original filename if server has changed spaces to underscore and original request had spaces but no underscores
-  if ((%undspc == 01) && (_ in %fn)) var %fn = $replace(%fn,_,$space)
+  if ((%undspc == 01) && (_ isin %fn)) var %fn = $replace(%fn,_,$space)
   if (((%undspc = 11) && ($space !in %fn)) || (%DLF.serverretry == 0)) {
     DLF.Win.Log Server ctcp %chan $nick DCC Get of %fn from $nick incomplete $br($duration(%dur,3) $bytes($calc($get(-1).rcvd / $get(-1).secs)).suf $+ /Sec)
     return
