@@ -150,7 +150,7 @@ ctcp ^*:FINGER*:#: { DLF.ctcp.ChanBlock $1- }
 ctcp ^*:TIME*:#: { DLF.ctcp.ChanBlock $1- }
 ctcp ^*:PING*:#: { DLF.ctcp.ChanBlock $1- }
 ctcp ^*:VERSION*:#: {
-  if (($nick isop $chan) && ($DLF.Chan.IsDlfChan(%chan))) DLF.ctcpVersionReply $chan
+  if (($nick isop $chan) && ($DLF.Chan.IsDlfChan($chan))) DLF.ctcpVersionReply $chan
   else DLF.ctcp.ChanBlock $1-
 }
 
