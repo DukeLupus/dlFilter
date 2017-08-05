@@ -286,8 +286,7 @@ menu menubar {
 
 menu channel {
   -
-  ;$iif($me !isop $chan, $style(2)) Send oNotice: DLF.oNotice.Open
-  Send oNotice: DLF.oNotice.Open
+  $iif($me !isop $chan, $style(2)) Send oNotice: DLF.oNotice.Open
   -
   dlFilter
   ..$iif($DLF.Chan.IsDlfChan($chan,$false),Remove this channel from,Add this channel to) filtering: DLF.Chan.AddRemove
@@ -377,11 +376,11 @@ on ^*:join:%DLF.channels: {
 on ^*:part:%DLF.channels: {
   if ($DLF.Chan.IsChanEvent) {
     DLF.Win.Part
-    if (%DLF.filter.parts) DLF.User.Channel $chan $iif($shortjoinsparts,Parts:) $nick $br($address) $iif(!$shortjoinsparts,has left $chan)
+    if (%DLF.filter.parts) DLF.User.Channel $chan $iif($shortjoinsparts,Parts:) $nick $br($address) $iif(!$shortjoinsparts,has left $chan) $iif($1-,$br($1-))
   }
 }
 
-on ^*:kick:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.kicks)) DLF.User.Channel Kick $chan $knick $br($address($knick,5)) was kicked from $chan by $nick $br($1-) }
+on ^*:kick:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.kicks)) DLF.User.Channel $chan $knick $iif(!$shortjoinsparts,$br($address($knick,5))) was kicked $iif(!$shortjoinsparts,from $chan ) by $nick $br($1-) }
 
 on ^*:nick: {
   DLF.Win.NickChg
@@ -496,9 +495,9 @@ alias -l DLF.Groups.Events {
 ; join, part, kick
 alias -l DLF.User.Channel {
   DLF.Watch.Called DLF.User.Channel
-  if ($2 == $me) return
+  if ($nick == $me) return
   if (%DLF.showstatus == 1) echo -stnc $event $star $2-
-  DLF.Win.Log Filter $event $1-
+  DLF.Win.Log Filter $event $1 $nick $2-
   halt
 }
 
@@ -561,7 +560,7 @@ alias -l DLF.Chan.Set {
 ; Check if channel is set whether it is network#channel or just #channel
 alias -l DLF.Chan.IsChanEvent {
   if ($DLF.Chan.IsDlfChan($chan) == $false) return $false
-  if ($nick == $me) return $false
+  ;if ($nick == $me) return $false
   DLF.Stats.Count $chan Total
   if ($1 == 0) return $false
   return $true
@@ -1217,6 +1216,7 @@ alias -l DLF.DccSend.Receiving {
   if (%req == $null) return
   var %chan = $gettok(%req,2,$asc(|))
   var %origfn = $decode($gettok(%req,5,$asc(|)))
+  if (%origfn == $null) %origfn = $1-
   var %secs = $calc($DLF.RequestPeriod - $hget(DLF.dccsend.requests,%req))
   DLF.Win.Log Server ctcp %chan $nick DCC Get of %origfn from $nick starting $br(waited $duration(%secs,3))
 }
@@ -1509,9 +1509,10 @@ alias -l DLF.Win.AdsShow {
   else var %tabs = -t25,45
   var %win = $DLF.Win.WinOpen(Ads,-k0nwl %tabs,0,0,%tb)
   if ($line(%win,0) == 0) {
-    aline -hn 2 %win This window shows server adverts describing how many files they have and how to get a list of their files.
-    aline -hn 2 %win However you will probably find it easier to use "@find search words" or "@search search words" to locate files you want.
-    aline -hni 1 %win You can double-click to have the request for the list of files sent for you.
+    aline -hn 2 %win This window shows adverts from servers describing how many files they have and how to get a list of their files.
+    aline -hn 2 %win However you will probably find it easier to use "@search search words" (or "@find search words") to locate files you want.
+    aline -hn 2 %win If you use @search, consider installing the sbClient script to make processing @search results easier.
+    aline -hn 4 %win You can double-click to have the request for the list of files sent for you.
     aline -hn 1 %win $crlf
   }
   var %line = $DLF.Win.LineFormat($event $chan $nick $replace($strip($1-),$tab,$null,$+($space,$space),$space))
@@ -1547,7 +1548,7 @@ alias -l DLF.Win.AdsShow {
 alias -l DLF.Win.AdsGet {
   var %line = $strip($line($active,$1))
   if (list of !isin %line) return
-  var %re = /[[]([^]]+)[]]\s+<[&@%+]*([^>]+?)>.*?\W(@\S+)\s+(?:(?:for\s+my)|(?:to\s+get\s+the)\s+list\s+of\s+)/Fi
+  var %re = /[[]([^]]+)[]]\s+<[&@%+]*([^>]+?)>.*?\W(@\S+)\s+/Fi
   if ($regex(DLF.Win.AdsGet,%line,%re) > 0) {
     var %chan = $regml(DLF.Win.AdsGet,1)
     var %nick = $regml(DLF.Win.AdsGet,2)
@@ -1558,7 +1559,7 @@ alias -l DLF.Win.AdsGet {
       %chan = $hashtag $+ $gettok(%chan,2,$asc($hashtag))
     }
     else var %net = $network
-    if ((%net) && (%chan) && (%nick) && (%trig) && ($left(%trig,5) != @find) && ($left(%trig,7) != @search)) {
+    if ((%net) && (%chan) && (%nick) && (%trig)) {
       var %cid = $cid
       var %i = $scon(0)
       while (%i) {
@@ -1694,7 +1695,7 @@ alias -l DLF.Win.Format {
   elseif ($1 == ctcpsend) return -> $sbr($3 $+ $iif($2 != Private,: $+ $2) $upper($4)) $5-
   elseif ($1 == warning) return $c(1,9,$DLF.logo Warning: $4-)
   elseif ($1 == blocked) return $c(1,9,$DLF.logo Blocked: $4-)
-  else return * $3-
+  else return * $4-
 }
 
 alias -l DLF.Win.Echo {
@@ -2056,22 +2057,23 @@ alias -l DLF.oNotice.Channel {
 }
 
 alias -l DLF.oNotice.Open {
+  if ($me !isop $chan) return
   var %win = @ $+ $chan
   if (!$window(%win)) {
     DLF.oNotice.Log %win ----- Session started -----
     window $+(-eg1k1l12mSw,$iif($1 == 0,n)) %win
-    var %log = $DLF.oNotice.LogFile(%chatwin)
-    if ((%DLF.win-onotice.log == 1) && ($exists(%log))) .loadbuf -r %win %log
+    var %log = $DLF.oNotice.LogFile(%win)
+    if ((%DLF.win-onotice.log == 1) && ($isfile(%log))) .loadbuf -r %win %log
   }
   return %win
 }
 
 alias -l DLF.oNotice.Input {
   if (($left($1,1) == /) && ($ctrlenter == $false) && ($1 != /me)) return
-  if (($1 != /me) || ($ctrlenter == $true)) var %omsg = $color(Normal) $active $tag($me) $1-
-  else var %omsg = $color(action) $active $star $me $2-
+  if (($1 != /me) || ($ctrlenter == $true)) var %omsg = $iif($prefixown == 1,$tag($me) $+ $space) $+ $1-
+  else var %omsg = $star $me $2-
   if (%DLF.win-onotice.timestamp == 1) var %omsg = $timestamp %omsg
-  aline -p %iif(%DLF.win-onotice.timestamp,$timestamp ) $+ %omsg
+  aline -p $iif($1 != /me,$color(Normal),$color(Action)) $active %omsg
   aline -nl $color(nicklist) $active $me
   window -S $active
   var %ochan = $replace($active,@,$null)
@@ -3113,7 +3115,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *File Servers Online*Trigger*Accessed*Served*
   DLF.hadd chantext.ads *Files In List*slots open*Queued*Next Send*
   DLF.hadd chantext.ads *Files*free Slots*Queued*Speed*Served*
-  DLF.hadd chantext.ads *For my list of * files type *
+  DLF.hadd chantext.ads *For my list of * files type*
   DLF.hadd chantext.ads *Type*@* for my list*
   DLF.hadd chantext.ads *Type*@* to get my list*
   DLF.hadd chantext.ads *FTP service*FTP*port*bookz*
@@ -3568,12 +3570,22 @@ alias -l DLF.GetFileName {
   ; and colons are not allowable characters in file names
   var %txt = $gettok($replace($strip($1-),$nbsp,$space,$tab $+ $space,$space,$tab,$null),1,$asc(:))
   var %n = $numtok(%txt,$asc($space))
-  ; delete ip address suffix to ensure last period is beginning of file extension
-  if ($+($lbr,*.*.*.*,$rbr) iswm $gettok(%txt,%n,$asc($space))) %txt = $deltok(%txt,%n,$asc($space))
+  ; delete trailing info: CRC(*) or (*)
+  while ($numtok(%txt,$asc($space))) {
+    var %last = $gettok(%txt,-1,$asc($space))
+    if (($+($lbr,*,$rbr) iswm %last) $&
+     || ($+(CRC,$lbr,*,$rbr) iswm %last)) %txt = $deltok(%txt,-1,$asc($space))
+    else break
+  }
   var %dots = $numtok(%txt,$asc(.))
-  var %name = $gettok(%txt,$+(1-,$calc(%dots - 1)),$asc(.))
-  var %type = $gettok($gettok(%txt,%dots,$asc(.)),1,$asc($space))
-  if (%type) return $+(%name,.,%type)
+  while (%dots) {
+    var %type = $gettok($gettok(%txt,%dots,$asc(.)),1,$asc($space))
+    if (%type isalnum) {
+      var %name = $gettok(%txt,$+(1-,$calc(%dots - 1)),$asc(.))
+      return $+(%name,.,%type)
+    }
+    dec %dots
+  }
   return $null
 }
 
