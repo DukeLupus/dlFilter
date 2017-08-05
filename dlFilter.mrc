@@ -93,8 +93,6 @@ dlFilter uses the following code from other people:
         Added option to accept private messages from user with a query window open.
 
       TODO 1.18
-        Make short joins and parts support comprehensive
-        DLF.Status/Warning only used for DLF updates etc. not for reporting blocked messages
         Make download handle betas properly
         Implement toolbar functionality with right click menu
         Send to... menus - do they work?
@@ -172,7 +170,7 @@ on *:load: {
   set -u1 %DLF.JustLoaded 1
   DLF.Initialise
   DLF.Options.Show
-  DLF.Status Loading complete.
+  DLF.StatusAll Loading complete.
   return
 
   :error
@@ -239,8 +237,8 @@ alias DLF.Initialise {
 
   if ($script(onotice.mrc)) .unload -rs onotice.mrc
   if ($script(onotice.txt)) .unload -rs onotice.txt
-  DLF.Status $iif(%DLF.JustLoaded,Loading,Starting) $c(4,version $DLF.SetVersion) by DukeLupus & Sophist.
-  DLF.Status Please check dlFilter homepage $br($c(12,9,$u(https://github.com/SanderSade/dlFilter/issues))) for help.
+  DLF.StatusAll $iif(%DLF.JustLoaded,Loading,Starting) $c(4,version $DLF.SetVersion) by DukeLupus & Sophist.
+  DLF.StatusAll Please check dlFilter homepage $br($c(12,9,$u(https://github.com/SanderSade/dlFilter/issues))) for help.
   ;DLF.CreateGif
   hfree -w DLF.*
   DLF.CreateHashTables
@@ -254,12 +252,12 @@ alias DLF.Initialise {
 on *:unload: {
   DLF.Watch.Unload
   var %keepvars = $?!="Do you want to keep your dlFilter configuration?"
-  DLF.Status Unloading $c(4,9,version $DLF.SetVersion) by DukeLupus & Sophist.
+  DLF.StatusAll Unloading $c(4,9,version $DLF.SetVersion) by DukeLupus & Sophist.
   if (%keepvars == $false) {
-    DLF.Status Unsetting variables..
+    DLF.StatusAll Unsetting variables..
     .unset %DLF.*
   }
-  DLF.Status Closing open dlFilter windows
+  DLF.StatusAll Closing open dlFilter windows
   if ($dialog(DLF.Options.GUI)) .dialog -x DLF.Options.GUI DLF.Options.GUI
   close -a@ @dlF.Filter.*
   close -a@ @dlF.FilterSearch.*
@@ -268,10 +266,10 @@ on *:unload: {
   close -a@ @dlF.@find.*
   close -a@ @dlF.Ads.*
   close -a@ @#*
-  DLF.Status Unloading complete.
-  DLF.Status $space
-  DLF.Status To reload run /load -rs1 $qt($script)
-  DLF.Status $space
+  DLF.StatusAll Unloading complete.
+  DLF.StatusAll $space
+  DLF.StatusAll To reload run /load -rs1 $qt($script)
+  DLF.StatusAll $space
 }
 
 ; ========== Main popup menus ==========
@@ -292,7 +290,7 @@ menu channel {
   ..$iif($DLF.Chan.IsDlfChan($chan,$false),Remove this channel from,Add this channel to) filtering: DLF.Chan.AddRemove
   ..$iif(%DLF.netchans == $hashtag, $style(3)) Set filtering to all channels: {
     DLF.Chan.Set $hashtag
-    DLF.Status $c(6,Channels set to $c(4,$hashtag))
+    DLF.StatusAll $c(6,Channels set to $c(4,$hashtag))
   }
   ..-
   ..$iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Options.ToggleShowFilter
@@ -327,22 +325,23 @@ ctcp ^*:VERSION*:?: { DLF.ctcpBlock.Priv $1- }
 
 alias -l DLF.ctcpBlock.Priv {
   DLF.Win.Log Filter ctcp Private $nick $1-
-  var %i = $comchan($nick,0)
+  var %comchan = $comchan($nick,0)
   ; Block finger requests
   if (($1 == FINGER) && (%DLF.nofingers == 1)) {
-    while (%i) {
+    while (%comchan) {
       DLF.Win.Echo Blocked $comchan($nick,%i) $nick ctcp finger
-      dec %i
+      dec %comchan
     }
     DLF.Status Blocked: ctcp finger from $nick
     DLF.Halt Halted: ctcp finger blocked
   }
-  ; dlFilter ctcp response only to people who are in a common channel on in chat
-  if (($query($nick)) || ($chat($nick,0) || (%i)) {
+  ; dlFilter ctcp response only to people who are in a common channel or in chat
+  if (($query($nick)) || ($chat($nick,0) || (%comchan > 0)) {
     if ($1 == VERSION) DLF.ctcpVersion.Reply Private
     return
   }
-  DLF.Halt Halted: Private ctcp $1 from $nick with no common dlF channel or chat
+  DLF.Watch.Log Blocked: ctcp $1 from $nick with no common dlF channel or chat
+  DLF.Win.Filter $1-
 }
 
 alias -l DLF.ctcpVersion.Reply {
@@ -531,7 +530,7 @@ alias -l DLF.Chan.AddRemove {
   if (!$DLF.Chan.IsDlfChan($chan,$false)) DLF.Chan.Add $chan $network
   else DLF.Chan.Remove $chan $network
   if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 6 1 %DLF.netchans
-  DLF.Status $c(6,Channels set to $c(4,%DLF.netchans))
+  DLF.StatusAll $c(6,Channels set to $c(4,%DLF.netchans))
 }
 
 alias -l DLF.Chan.Add {
@@ -882,8 +881,8 @@ alias -l DLF.Priv.Request {
 alias -l DLF.Priv.SpamFilter {
   if (%DLF.opwarning.spampriv == 0) return
   var %i = $comchan($nick,0)
-  DLF.Status Spam from user $iif(%i,in common channel(s):,not in common channel:) $c(4,15,$tag($nick) $br($address($nick,5)) -> $b($1-))
   if (%DLF.spam.addignore == 1) [ $+(.timerDLFSpamIgnore,$DLF.TimerAddress) ] 1 0 .signal DLF.Priv.SpamIgnore $nick $1-
+  DLF.Win.Log Filter Blocked Private $nick Spam from user $iif(%i,in common channel(s):,not in common channel:) $c(4,15,$tag($nick) $br($address($nick,5)) -> $b($1-))
   DLF.Win.Filter $1-
 }
 
@@ -1206,8 +1205,8 @@ alias -l DLF.DccSend.Send {
 
 alias -l DLF.DccSend.Block {
   dcc reject
-  DLF.Status DCC Send from $nick $br($address) because $1- $+ : $filename
-  DLF.Watch.Log dcc send from $nick blocked - $1-
+  DLF.Watch.Log Blocked: dcc send from $nick - $1-
+  DLF.Status Blocked: DCC Send from $nick $br($address) because $1- $+ : $filename
   DLF.Win.Log Filter Blocked Private $nick DCC Send from $nick $br($address) because $1- $+ :
   DLF.Win.Filter DCC SEND $filename
 }
@@ -1370,8 +1369,8 @@ alias -l DLF.DccChat.ChatNotice {
 alias -l DLF.DccChat.Chat {
   DLF.Watch.Called DLF.DccChat.Chat
   if ((%DLF.private.nocomchan == 1) && ($comchan($nick,0) == 0)) {
-    DLF.Watch.Log DCC CHAT blocked: No common channel
-    DLF.Status DCC CHAT from $nick blocked: No common channel
+    DLF.Watch.Log Blocked: DCC CHAT from $nick - No common channel
+    DLF.Status Blocked: DCC CHAT from $nick - No common channel
     DLF.Win.Log Filter Blocked Private $nick DCC Chat because user is not in a common channel:
     DLF.Win.Filter $1-
   }
@@ -2253,7 +2252,7 @@ alias -l DLF.Options.Initialise {
   ; Channels tab
   if (%DLF.netchans == $null) {
     DLF.Chan.Set $hashtag
-    DLF.Status Channels set to $c(4,all) $+ .
+    DLF.StatusAll Channels set to $c(4,all) $+ .
   }
   else DLF.Chan.Set %DLF.netchans
 
@@ -2348,7 +2347,7 @@ alias -l DLF.Options.ToggleOption {
   var %newval = $iif([ [ %var ] ],0,1)
   [ [ %var ] ] = %newval
   if (($2 != $null) && ($dialog(DLF.Options.GUI))) did $iif(%newval,-c,-u) DLF.Options.GUI $2
-  DLF.Status Option $1 $iif(%newval,set,cleared)
+  DLF.StatusAll Option $1 $iif(%newval,set,cleared)
 }
 
 alias -l DLF.Options.Init {
@@ -2731,7 +2730,7 @@ alias -l DLF.Options.DownloadUpdate {
 
 alias -l DLF.Options.Status {
   if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 160 1 $1-
-  DLF.Status $1-
+  DLF.StatusAll $1-
 }
 
 alias -l DLF.Options.Error {
@@ -2897,7 +2896,7 @@ on *:sockclose:DLF.Socket.Download: {
   .rename %newscript $script
   %DLF.version = %DLF.version.web
   DLF.Options.Status New version of dlFilter downloaded and installed
-  if (%oldsaved) DLF.Status Old version of dlFilter.mrc saved as %oldscript in case you need to revert
+  if (%oldsaved) DLF.StatusAll Old version of dlFilter.mrc saved as %oldscript in case you need to revert
   signal DLF.Initialise
   .reload -rs1 $script
 }
@@ -3496,19 +3495,27 @@ alias -l DLF.CreateHashTables {
   DLF.hadd find.result : !*
   inc %matches $hget(DLF.find.result,0).item
 
-  DLF.Status Added %matches wildcard templates
+  DLF.StatusAll Added %matches wildcard templates
 }
 
 ; ========== Status and error messages ==========
 alias -l DLF.logo return $rev([dlFilter])
-alias -l DLF.Status echo -tsf $c(1,9,$DLF.logo $1-)
-alias -l DLF.Warning echo -tasf $c(1,9,$DLF.logo Warning: $1-)
-alias -l DLF.Error {
-  %i = $scon(0)
+alias -l DLF.StatusAll {
+  var %cid = $cid, %i = $scon(0)
   while (%i) {
-    scid $scon(%i) echo -tas $c(1,9,$DLF.logo $c(4,$b(Error:)) $1-)
+    scid $scon(%i) DLF.Status %i
     dec %i
   }
+  scid %cid
+}
+alias -l DLF.Status echo -tsf $c(1,9,$DLF.logo $1-)
+alias -l DLF.Warning {
+  echo -taf $c(1,9,$DLF.logo Warning: $1-)
+  DLF.StatusAll Warning: $1-
+}
+alias -l DLF.Error {
+  echo -tabf $c(1,9,$DLF.logo $c(4,$b(Error:)) $1-)
+  DLF.StatusAll $c(4,$b(Error:)) $1-
   halt
 }
 
@@ -3692,18 +3699,18 @@ alias -l DLF.CreateBinaryFile {
   ; Check if file exists and is identical to avoid rewriting it every time
   if ($isfile($2-)) {
     if ($sha256($1,1) == $sha256($2-,2)) {
-      DLF.Status Checked: $2-
+      DLF.StatusAll Checked file: $2-
       return
     }
   }
   if ($isfile($2-)) {
     .remove $qt($2-)
-    DLF.Status Updating: $2-
+    DLF.StatusAll Updating file: $2-
   }
-  else DLF.Status Creating: $2-
+  else DLF.StatusAll Creating file: $2-
   if ($exists($2-)) DLF.Error Cannot remove existing $2-
   bwrite -a $qt($2-) -1 -1 $1
-  DLF.Status Created: $2-
+  DLF.StatusAll Created file: $2-
 }
 
 alias DLF.GenerateBinaryFile {
