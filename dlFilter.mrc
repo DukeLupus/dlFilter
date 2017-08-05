@@ -1125,7 +1125,7 @@ alias -l DLF.DccSend.IsRequest {
   if (($left(%trig,1) == !) && ($right(%trig,-1) != $nick)) return $false
   if ($left(%trig,1) == @) {
     if (($right(%trig,-1) != $nick) && ($right($gettok(%trig,1,$asc(-)),-1) != $nick)) return $false
-    if ($left(%fn,$len($nick)) != $nick) return $false
+    if ($nick !isin %fn) return $false
     if ($gettok(%fn,-1,$asc(.)) !isin txt zip rar) return $false
   }
   DLF.Watch.Log File request found: %trig $1-
@@ -1177,7 +1177,7 @@ alias -l DLF.DccSend.SendNotice {
 
 alias -l DLF.DccSend.Send {
   DLF.Watch.Called DLF.DccSend.Send
-  %fn = $DLF.GetFilename($3-)
+  var %fn = $DLF.GetFilename($3-)
   if ($chr(8238) isin %fn) {
     DLF.Win.Echo Blocked Private $nick DCC Send - filename contains malicious unicode U+8238
     DLF.Halt Blocked: DCC Send - filename contains malicious unicode U+8238
@@ -1208,7 +1208,7 @@ alias -l DLF.DccSend.Block {
   dcc reject
   DLF.Watch.Log dcc send from $nick blocked - $1-
   DLF.Win.Log Filter Blocked Private $nick DCC Send from $nick $br($address) because $1- $+ :
-  DLF.Win.Filter $2-
+  DLF.Win.Filter DCC SEND $filename
 }
 
 alias -l DLF.DccSend.Receiving {
@@ -1218,17 +1218,17 @@ alias -l DLF.DccSend.Receiving {
   var %origfn = $decode($gettok(%req,5,$asc(|)))
   if (%origfn == $null) %origfn = $1-
   var %secs = $calc($DLF.RequestPeriod - $hget(DLF.dccsend.requests,%req))
-  DLF.Win.Log Server ctcp %chan $nick DCC Get of %origfn from $nick starting $br(waited $duration(%secs,3))
+  DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick starting $br(waited $duration(%secs,3))
 }
 
 alias -l DLF.DccSend.Taskbar {
-  if ($gettok($titlebar,1-2,$asc($space)) == Get $get(-1)) titlebar $gettok($titlebar,3-,$asc($space))
+  ;if ($gettok($titlebar,1-2,$asc($space)) == Get $get(-1)) titlebar $gettok($titlebar,3-,$asc($space))
 }
 
 alias -l DLF.DccSend.FileRcvd {
   DLF.DccSend.Taskbar
   var %fn = $nopath($filename)
-  DLF.Watch.Called DLF.DccSend.FileRcvd : %fn
+  DLF.Watch.Called DLF.DccSend.FileRcvd: %fn
   var %req = $DLF.DccSend.GetRequest(%fn)
   if (%req == $null) return
   .hdel -s DLF.dccsend.requests %req
@@ -1236,13 +1236,17 @@ alias -l DLF.DccSend.FileRcvd {
   var %dur = $get(-1).secs
   var %trig = $gettok(%req,3,$asc(|))
   var %origfn = $decode($gettok(%req,5,$asc(|)))
+  if (%origfn == $null) %origfn = %fn
   var %hash = $encode(%trig %origfn)
   if ($hget(DLF.dccsend.retries,%hash)) .hdel DLF.dccsend.retries %hash
-  DLF.Win.Log Server ctcp %chan $nick DCC Get of %origfn from $nick complete $br($duration(%dur,3) $bytes($calc($get(-1).rcvd / %dur)).suf $+ /Sec)
+  DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick complete $br($duration(%dur,3) $bytes($calc($get(-1).rcvd / %dur)).suf $+ /Sec)
   ; Some servers change spaces to underscores
   ; But we cannot rename if Options / DCC / Folders / Command is set
   ; because it would run after this using the wrong filename
-  if ((%fn != %origfn) && ($DLF.DccSend.IsNotGetCommand(%fn))) rename $filename $qt($+($noqt($nofile($filename)),%origfn))
+  if ((%origfn != $null) $&
+   && (%fn != %origfn) $&
+   && ($DLF.DccSend.IsNotGetCommand(%fn))) $&
+    rename $filename $qt($+($noqt($nofile($filename)),%origfn))
 }
 
 ; Check that there is no mIRC Options / DCC / Folders / Command for the file
@@ -1275,7 +1279,7 @@ alias -l DLF.DccSend.GetFailed {
   .hdel -s DLF.dccsend.requests %req
   var %chan = $gettok(%req,2,$asc(|))
   var %trig = $gettok(%req,3,$asc(|))
-  var %origfn = $decode($gettok(%req,5,$asc(|)))
+  if (%origfn == $null) %origfn = %fn
   var %hash = $encode(%trig %origfn)
   var %retry = %DLF.serverretry
   if (%retry) {
@@ -1293,7 +1297,7 @@ alias -l DLF.DccSend.GetFailed {
     }
   }
   DLF.Win.Log Server ctcp %chan $nick DCC Get of %origfn from $nick incomplete $br($duration(%dur,3) $bytes($calc($get(-1).rcvd / $get(-1).secs)).suf $+ /Sec) $iif(%retry,- $c(3,retrying))
-  if (%retry) DLF.Chan.EditSend %chan %trig %origfn
+  if (%retry) DLF.Chan.EditSend %chan %trig $decode($gettok(%req,5,$asc(|)))
 }
 
 alias -l DLF.DccSend.TrustAdd {
@@ -1509,11 +1513,11 @@ alias -l DLF.Win.AdsShow {
   else var %tabs = -t25,45
   var %win = $DLF.Win.WinOpen(Ads,-k0nwl %tabs,0,0,%tb)
   if ($line(%win,0) == 0) {
-    aline -hn 2 %win This window shows adverts from servers describing how many files they have and how to get a list of their files.
-    aline -hn 2 %win However you will probably find it easier to use "@search search words" (or "@find search words") to locate files you want.
-    aline -hn 2 %win If you use @search, consider installing the sbClient script to make processing @search results easier.
-    aline -hn 4 %win You can double-click to have the request for the list of files sent for you.
-    aline -hn 1 %win $crlf
+    aline -n 2 %win This window shows adverts from servers describing how many files they have and how to get a list of their files.
+    aline -n 2 %win However you will probably find it easier to use "@search search words" (or "@find search words") to locate files you want.
+    aline -n 2 %win If you use @search, consider installing the sbClient script to make processing @search results easier.
+    aline -n 4 %win You can double-click to have the request for the list of files sent for you.
+    aline -n 1 %win $crlf
   }
   var %line = $DLF.Win.LineFormat($event $chan $nick $replace($strip($1-),$tab,$null,$+($space,$space),$space))
   %line = $gettok(%line,1-2,$asc($space)) $replace($gettok(%line,3-,$asc($space)),$&
@@ -1837,7 +1841,7 @@ alias -l DLF.@find.Response {
   if ($DLF.@find.IsResponse) {
     var %txt = $strip($1-)
     DLF.@find.OnlyPartial $1-
-    if ($hiswm(find.header,%txt)) DLF.Win.Server $1-
+    if ($hiswm(find.header,%txt)) DLF.Win.Filter $1-
     if ($hiswm(find.result,%txt)) DLF.@find.Results $1-
     if ((*Omen* iswm $strip($1)) && ($left($strip($2),1) == !)) DLF.@find.Results $2-
   }
@@ -1857,9 +1861,6 @@ alias -l DLF.@find.OnlyPartial {
   var %displayed = $gettok(%r,3,$asc(:))
   var %search = $gettok(%r,4,$asc(:))
   if (%found == %displayed) return
-  if ((%DLF.searchspam) && (%list != $+(!,$nick)) && (%list != $+(@,$nick))) {
-    return
-  }
   DLF.Chan.SetNickColour
   DLF.Win.Echo $event Private $nick $1-
   DLF.@find.Results %list $iif(%search,For $qt(%search) found,Found) %found $+ , but displaying only %displayed $c(14,:: Double click here to get the server's full list)
@@ -1894,11 +1895,7 @@ alias -l DLF.@find.Results {
   }
   var %msg = %trig $tab $+ %rest
   if ((%trig != $+(!,$nick)) && (%trig != $+(@,$nick))) {
-    if (%DLF.searchspam) {
-      DLF.Watch.Log @find: Spam - trigger %trig does not match $nick
-      DLF.Win.Filter $1-
-    }
-    else %msg = %msg $c(4,0,:: Received from $nick ::)
+    %msg = %msg $c(4,0,:: Received from $nick ::)
   }
   var %win = $+(@dlF.@find.,$network)
   if (!$window(%win)) {
@@ -2107,39 +2104,36 @@ alias -l DLF.oNotice.LogFile return $+($logdir,$mklogfn($1))
 ; Other / Confirm / Command that may run a script
 
 
-
-
-
 ; ============================== DLF Options ==============================
 alias DLF.Options.Show dialog $iif($dialog(DLF.Options.GUI),-v,-md) DLF.Options.GUI DLF.Options.GUI
 alias DLF.Options.Toggle dialog $iif($dialog(DLF.Options.GUI),-c,-md) DLF.Options.GUI DLF.Options.GUI
 
 dialog -l DLF.Options.GUI {
   title dlFilter v $+ $DLF.SetVersion
-  size -1 -1 168 236
+  size -1 -1 168 227
   option dbu notheme
   text "", 20, 67 2 98 7, right hide
   check "&Enable/disable dlFilter", 10, 2 2 62 8
-  tab "Channels", 100, 1 9 166 211
+  tab "Channels", 100, 1 9 166 202
   tab "Filters", 300
   tab "Other", 500
   tab "Ops", 700
   tab "Custom", 800
   tab "About", 900
-  button "Close", 30, 2 223 67 11, ok default flat
-  check "Show/hide filtered lines", 40, 74 223 92 11, push
+  button "Close", 30, 2 214 67 11, ok default flat
+  check "Show/hide filtered lines", 40, 74 214 92 11, push
   ; tab Channels
   text "List the channels you want dlFilter to operate on. Use # by itself to make dlFilter work on all networks and channels.",105, 5 25 160 12, tab 100 multi
   text "Channel to add (select dropdown / type #chan or net#chan):", 110, 5 40 160 7, tab 100
   combo 120, 4 48 160 6, tab 100 drop edit
   button "Add", 130, 5 61 76 11, tab 100 flat disable
   button "Remove", 135, 86 61 76 11, tab 100 flat disable
-  list 140, 4 74 160 101, tab 100 vsbar size sort extsel
-  box " Update ", 150, 4 176 160 41, tab 100
-  text "Checking for dlFilter updates...", 160, 7 184 135 8, tab 100
-  button "dlFilter website", 170, 7 193 74 11, tab 100 flat
-  button "Update dlFilter", 180, 86 193 74 11, tab 100 flat disable
-  check "Check for &beta versions", 190, 7 207 136 6, tab 100
+  list 140, 4 74 160 92, tab 100 vsbar size sort extsel
+  box " Update ", 150, 4 167 160 41, tab 100
+  text "Checking for dlFilter updates...", 160, 7 175 135 8, tab 100
+  button "dlFilter website", 170, 7 184 74 11, tab 100 flat
+  button "Update dlFilter", 180, 86 184 74 11, tab 100 flat disable
+  check "Check for &beta versions", 190, 7 198 136 6, tab 100
   ; tab Filters
   box " General ", 305, 4 23 160 100, tab 300
   check "Filter other users Search / File requests", 310, 7 32 155 6, tab 300
@@ -2162,27 +2156,26 @@ dialog -l DLF.Options.GUI {
   check "Away and thank-you messages", 385, 7 178 155 6, tab 300
   check "User mode changes", 390, 7 187 155 6, tab 300
   ; Tab Other
-  box " Extra functions ", 505, 4 23 160 55, tab 500
+  box " Extra functions ", 505, 4 23 160 46, tab 500
   check "Collect @find/@locator results into a single window", 510, 7 32 155 6, tab 500
-  check "... and check trigger matches server nickname", 515, 15 41 146 6, tab 500
-  check "Display window name in title bar", 520, 7 50 155 6, tab 500
-  check "Display dlFilter channel efficiency in title bar", 525, 7 59 155 6, tab 500
-  check "Colour uncoloured fileservers in nickname list", 530, 7 68 155 6, tab 500
-  box " File requests ", 535, 4 79 160 73, tab 500
-  check "Auto accept files you have specifically requested", 540, 7 88 155 6, tab 500
-  check "Block ALL files you have NOT specifically requested. Or:", 545, 7 97 155 6, tab 500
-  check "Block potentially dangerous filetypes", 550, 15 106 146 6, tab 500
-  check "Block files from users not in a common channel", 555, 15 115 146 6, tab 500
-  check "Block files from users not in your mIRC DCC trust list", 560, 15 124 146 6, tab 500
-  check "Block files from regular users", 565, 15 133 146 6, tab 500
-  check "Retry incomplete file requests (up to 3 times)", 570, 7 142 155 6, tab 500
-  box " mIRC-wide ", 605, 4 153 160 64, tab 500
-  check "Check mIRC settings are secure (future enhancement)", 610, 7 162 155 6, tab 500 disable
-  check "Allow private messages from users with open query window", 615, 7 171 155 6, tab 500
-  check "Block private messages from users not in a common channel", 620, 7 180 155 6, tab 500
-  check "Block private messages from regular users", 625, 7 189 155 6, tab 500
-  check "Block channel CTCP requests unless from an op", 655, 7 198 155 6, tab 500
-  check "Block IRC Finger requests (which share personal information)", 660, 7 207 155 6, tab 500
+  check "Display window name in title bar", 520, 7 41 155 6, tab 500
+  check "Display dlFilter channel efficiency in title bar", 525, 7 50 155 6, tab 500
+  check "Colour uncoloured fileservers in nickname list", 530, 7 59 155 6, tab 500
+  box " File requests ", 535, 4 70 160 73, tab 500
+  check "Auto accept files you have specifically requested", 540, 7 79 155 6, tab 500
+  check "Block ALL files you have NOT specifically requested. Or:", 545, 7 88 155 6, tab 500
+  check "Block potentially dangerous filetypes", 550, 15 97 146 6, tab 500
+  check "Block files from users not in a common channel", 555, 15 106 146 6, tab 500
+  check "Block files from users not in your mIRC DCC trust list", 560, 15 115 146 6, tab 500
+  check "Block files from regular users", 565, 15 124 146 6, tab 500
+  check "Retry incomplete file requests (up to 3 times)", 570, 7 133 155 6, tab 500
+  box " mIRC-wide ", 605, 4 144 160 64, tab 500
+  check "Check mIRC settings are secure (future enhancement)", 610, 7 153 155 6, tab 500 disable
+  check "Allow private messages from users with open query window", 615, 7 162 155 6, tab 500
+  check "Block private messages from users not in a common channel", 620, 7 171 155 6, tab 500
+  check "Block private messages from regular users", 625, 7 180 155 6, tab 500
+  check "Block channel CTCP requests unless from an op", 655, 7 189 155 6, tab 500
+  check "Block IRC Finger requests (which share personal information)", 660, 7 198 155 6, tab 500
   ; tab Ops
   text "These options are only enabled if you are an op on a filtered channel.", 705, 4 25 160 12, tab 700 multi
   box " Channel Ops ", 710, 4 38 160 38, tab 700
@@ -2201,14 +2194,13 @@ dialog -l DLF.Options.GUI {
   edit "", 840, 4 37 160 10, tab 800 autohs
   button "Add", 850, 5 51 76 11, tab 800 flat disable
   button "Remove", 860, 86 51 76 11, tab 800 flat disable
-  list 870, 4 64 160 154, tab 800 hsbar vsbar size sort extsel
+  list 870, 4 64 160 145, tab 800 hsbar vsbar size sort extsel
   ; tab About
-  edit "", 920, 3 25 162 193, multi read vsbar tab 900
+  edit "", 920, 3 25 162 184, multi read vsbar tab 900
 }
 
 alias -l DLF.Options.SetLinkedFields {
   DLF.Options.LinkedFields 335 340
-  DLF.Options.LinkedFields 510 515
   DLF.Options.LinkedFields -545 550 555 560 565
 }
 
@@ -2292,7 +2284,6 @@ alias -l DLF.Options.Initialise {
   ; Other tab
   ; Other tab Extra Functions box
   DLF.Options.InitOption searchresults 1
-  DLF.Options.InitOption searchspam 1
   DLF.Options.InitOption titlebar.name 1
   DLF.Options.InitOption titlebar.stats 1
   DLF.Options.InitOption colornicks 1
@@ -2392,7 +2383,6 @@ alias -l DLF.Options.Init {
   if (%DLF.filter.aways == 1) did -c DLF.Options.GUI 385
   if (%DLF.filter.modesuser == 1) did -c DLF.Options.GUI 390
   if (%DLF.searchresults == 1) did -c DLF.Options.GUI 510
-  if (%DLF.searchspam == 1) did -c DLF.Options.GUI 515
   if (%DLF.titlebar.name == 1) did -c DLF.Options.GUI 520
   if (%DLF.titlebar.stats == 1) did -c DLF.Options.GUI 525
   if (%DLF.colornicks == 1) did -c DLF.Options.GUI 530
@@ -2462,7 +2452,6 @@ alias -l DLF.Options.Save {
   %DLF.filter.aways = $did(385).state
   %DLF.filter.modesuser = $did(390).state
   %DLF.searchresults = $did(510).state
-  %DLF.searchspam = $did(515).state
   %DLF.titlebar.name = $did(520).state
   %DLF.titlebar.stats = $did(525).state
   %DLF.colornicks = $did(530).state
@@ -3574,9 +3563,11 @@ alias -l DLF.GetFileName {
   while ($numtok(%txt,$asc($space))) {
     var %last = $gettok(%txt,-1,$asc($space))
     if (($+($lbr,*,$rbr) iswm %last) $&
-     || ($+(CRC,$lbr,*,$rbr) iswm %last)) %txt = $deltok(%txt,-1,$asc($space))
+     || ($+(CRC,$lbr,*,$rbr) iswm %last) $&
+     || (%last isnum)) %txt = $deltok(%txt,-1,$asc($space))
     else break
   }
+  %txt = $noqt(%txt)
   var %dots = $numtok(%txt,$asc(.))
   while (%dots) {
     var %type = $gettok($gettok(%txt,%dots,$asc(.)),1,$asc($space))
