@@ -785,10 +785,10 @@ alias -l DLF.Stats.TitlebarClean {
   elseif ((%ltype == query) && (%name == $2)) %toks = 2-
   elseif ((%ltype == get) && (%name == Get)) %toks = 3-
   elseif ((%ltype == send) && (%name == Send)) %toks = 3-
-  elseif ((%ltype == chat) && (%name == $2)) %toks = 3-
+  elseif ((%ltype == chat) && ($+(=,%name) == $2)) %toks = 3-
   elseif ((%ltype == fserve) && (%name == $2)) %toks = 3-
   elseif ((%ltype == status) && (%name == Status)) %toks = 3-
-  elseif ((%ltype == message) && (%name == Message)) %toks = 3-
+  elseif ((%ltype == messages) && (%name == Messages)) %toks = 3-
   return $gettok(%tb,%toks,$asc($space))
 }
 
@@ -1206,6 +1206,7 @@ alias -l DLF.DccSend.Send {
 
 alias -l DLF.DccSend.Block {
   dcc reject
+  DLF.Status DCC Send from $nick $br($address) because $1- $+ : $filename
   DLF.Watch.Log dcc send from $nick blocked - $1-
   DLF.Win.Log Filter Blocked Private $nick DCC Send from $nick $br($address) because $1- $+ :
   DLF.Win.Filter DCC SEND $filename
