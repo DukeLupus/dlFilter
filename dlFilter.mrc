@@ -760,9 +760,10 @@ alias -l DLF.Stats.Titlebar {
   var %re = $+(/(-=- )?,$replace($DLF.Stats.TitleText([0-9.]+),$space,\s+),/F)
   ; Can't use $1- directly in $regsubex because it uses these internally
   var %txt = $1-
-  if ($regex(DLF.Stats.Titlebar,%tb,%re) > 0) %tb = $regsubex(DLF.Stats.Titlebar,%tb,%re,$iif(%DLF.titlebar.stats == 1,$+(\1,%txt),$null))
-  elseif (%DLF.titlebar.stats == 1) %tb = %tb -=- %txt
-  if ($gettok(%tb,1,$asc($space)) == -=-) %tb = $gettok(%tb,2-,$asc($space))
+  if ($regex(DLF.Stats.Titlebar,%tb,%re) > 0) %tb = $regsubex(DLF.Stats.Titlebar,%tb,%re,$null)
+  if (%DLF.titlebar.stats == 1) %tb = %tb -=- %txt
+  while ($gettok(%tb,1,$asc($space)) == -=-) %tb = $deltok(%tb,1,$asc($space))
+  while ($gettok(%tb,-1,$asc($space)) == -=-) %tb = $deltok(%tb,-1,$asc($space))
   if (%DLF.titlebar.name == 1) {
     if (%tb != $null) %tb = -=- %tb
     var %win = $DLF.Stats.WindowType($activewid)
