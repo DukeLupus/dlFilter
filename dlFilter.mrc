@@ -792,7 +792,10 @@ alias -l DLF.Stats.TitlebarClean {
   return $gettok(%tb,%toks,$asc($space))
 }
 
-alias -l DLF.Stats.Remove { titlebar $DLF.Stats.TitlebarClean($activewid,$active) }
+alias -l DLF.Stats.Remove {
+  echo -s closing window $active $activewid
+  titlebar $DLF.Stats.TitlebarClean($activewid,$active)
+}
 
 alias -l DLF.Stats.WindowType {
   var %types = Chan.Window.Query.Get.Send.Chat.Fserve
@@ -946,6 +949,7 @@ alias -l DLF.Priv.RegularUser {
   if (%DLF.private.regular != 1) return
   if (!$DLF.IsRegularUser($nick)) return
   var %type = $lower($replace($1,-,$space))
+  if (%type == normal) %type = message
   DLF.Watch.Log Blocked: Private %type from regular user
   DLF.Status Blocked: Private %type from regular user $nick $br($address)
   DLF.Win.Log Filter Blocked Private $nick Private %type from regular user $nick $br($address) $+ :
@@ -1706,7 +1710,7 @@ alias -l DLF.Win.Format {
 alias -l DLF.Win.Echo {
   var %line = $DLF.Win.Format($1-)
   var %col = $DLF.Win.Colour($1)
-  if ($2 != Private) {
+  if ($2 !isin Private @find) {
     echo %col -t $2 %line
     DLF.Watch.Log Echoed: To $2
   }
@@ -1716,7 +1720,7 @@ alias -l DLF.Win.Echo {
     while (%i) {
       var %chan = $comchan($3,%i)
       if ($DLF.Chan.IsDlfChan(%chan)) {
-        echo %col -t %chan Private: %line
+        echo %col -t %chan $2 $+ : %line
         %sent = $addtok(%sent,%chan,$asc($comma))
       }
       dec %i
@@ -1823,14 +1827,15 @@ alias -l DLF.@find.Request {
 }
 
 alias -l DLF.@find.IsResponse {
-  if (%DLF.searchresults == 0) return $false
   var %net = $network $+ #*
   var %n = $hfind(DLF.@find.requests,%net,0,w).item
   while (%n) {
     var %netchan = $hfind(DLF.@find.requests,%net,%n,w).item
+    var %net = $gettok(%netchan,1,$asc($hashtag))
+    if (%net == $null) %net = $network
     var %chan = $hashtag $+ $gettok(%netchan,2,$asc($hashtag))
-    if ($nick ison %chan) {
-      DLF.Watch.Log @find.IsResponse: %netchan
+    if ((%net == $network) && ($nick ison %chan)) {
+      DLF.Watch.Log @find.IsResponse: %chan
       return $true
     }
     dec %n
@@ -1842,9 +1847,31 @@ alias -l DLF.@find.Response {
   if ($DLF.@find.IsResponse) {
     var %txt = $strip($1-)
     DLF.@find.OnlyPartial $1-
-    if ($hiswm(find.header,%txt)) DLF.Win.Filter $1-
-    if ($hiswm(find.result,%txt)) DLF.@find.Results $1-
-    if ((*Omen* iswm $strip($1)) && ($left($strip($2),1) == !)) DLF.@find.Results $2-
+    if ($hiswm(find.header,%txt)) {
+      if (%DLF.searchresults == 1) DLF.Win.Log Filter $event @find $nick $1-
+      else DLF.Win.Log Server $event @find $nick $1-
+      halt
+    }
+    if ($hiswm(find.fileserv,%txt)) {
+      DLF.Win.Log Server $event @find $nick $1-
+      halt
+    }
+    if ($hiswm(find.result,%txt)) {
+      if (%DLF.searchresults == 1) {
+        DLF.Win.Log Filter $event @find $nick $1-
+        DLF.@find.Results $1-
+      }
+      else DLF.Win.Log Server $event @find $nick $1-
+      halt
+    }
+    if ((*Omen* iswm $strip($1)) && ($left($strip($2),1) == !)) {
+      if (%DLF.searchresults == 1) {
+        DLF.Win.Log Filter $event @find $nick $1-
+        DLF.@find.Results $2-
+      }
+      else DLF.Win.Log Server $event @find $nick $2-
+      halt
+    }
   }
 }
 
@@ -1863,9 +1890,8 @@ alias -l DLF.@find.OnlyPartial {
   var %search = $gettok(%r,4,$asc(:))
   if (%found == %displayed) return
   DLF.Chan.SetNickColour
-  DLF.Win.Echo $event Private $nick $1-
-  DLF.@find.Results %list $iif(%search,For $qt(%search) found,Found) %found $+ , but displaying only %displayed $c(14,:: Double click here to get the server's full list)
-  DLF.Watch.Log @find: Partial results summary added
+  if (%DLF.searchresults == 0) DLF.Win.Log Server $event @find $nick $1-
+  else DLF.@find.Results %list $iif(%search,For $qt(%search) found,Found) %found $+ , but displaying only %displayed $c(14,:: Double click here to get the server's full list)
 }
 
 alias -l DLF.@find.Regex {
@@ -1901,17 +1927,21 @@ alias -l DLF.@find.Results {
   var %win = $+(@dlF.@find.,$network)
   if (!$window(%win)) {
     window -lk0wn -t15 %win
-    aline -hn 2 %win This window shows @find results as received individually from various servers.
-    aline -hni 1 %win You can select lines and copy and paste them into the channel to get files,
-    aline -hni 1 %win or double-click to have the file request sent for you.
-    aline -hn 1 %win $crlf
+    aline -n 2 %win This window shows @find results as received individually from various servers.
+    aline -n 1 %win You can select lines and copy and paste them into the channel to get files,
+    aline -n 1 %win or double-click to have the file request sent for you.
+    aline -n 1 %win $crlf
   }
   var %i = $line(%win,0)
-  var %smsg = $left(%msg,1) $+ $gettok(%msg,2-,$asc($tab))
+  var %smsg = $left(%msg,1)
+  if (%smsg == !) %smsg = %smsg $+ $gettok(%msg,2-,$asc($tab))
+  elseif (%smsg == @) %smsg = %msg
+  else return
   while (%i) {
     var %l = $line(%win,%i)
     if (%l == $crlf) break
-    var %l = $left(%l,1) $+ $gettok(%l,2-,$asc($tab))
+    if ($left(%l,1) == !) %l = $left(%l,1) $+ $gettok(%l,2-,$asc($tab))
+    if (%l == %smsg) DLF.Halt @find result: Result for %trig added to %win
     if (%l < %smsg) break
     dec %i
   }
@@ -1923,7 +1953,13 @@ alias -l DLF.@find.Results {
 }
 
 alias -l DLF.@find.TitleBar {
-  titlebar $1 -=- $line($1,0) @find results from $network so far $iif($2-,-=- $2-)
+  var %i = $line($1,0)
+  while (%i) {
+    if ($line($1,%i) = $crlf) break
+    dec %i
+  }
+  var %i = $calc($line($1,0) - %i)
+  titlebar $1 -=- %i @find results from $network so far $iif($2-,-=- $2-)
 }
 
 alias -l DLF.@find.Get {
@@ -3475,20 +3511,23 @@ alias -l DLF.CreateHashTables {
   DLF.hadd find.header *Total*files found*
   DLF.hadd find.header Found * matching files. Using: Findbot *
   DLF.hadd find.header No match found for*
-  ; ps special responses
-  DLF.hadd find.header *@find·* Searching For..::*::..
-  DLF.hadd find.header *found at least * matches·* on my fserve: *·File Server Online·* Trigger..::/ctcp *
-  DLF.hadd find.header [*] Matches found in [*] Trigger..::/ctcp *
-  DLF.hadd find.header *: (* *.*B)
   inc %matches $hget(DLF.find.header,0).item
+
+  ; ps fileserv special responses
+  if ($hget(DLF.find.fileserv)) hfree DLF.find.fileserv
+  DLF.hadd find.fileserv *@find·* Searching For..::*::..
+  DLF.hadd find.fileserv *found * matches* on my fserve*
+  DLF.hadd find.fileserv [*] Matches found in [*] Trigger..::/ctcp *
+  DLF.hadd find.fileserv *: (* *.*B)
+  inc %matches $hget(DLF.find.fileserv,0).item
 
   if ($hget(DLF.find.headregex)) hfree DLF.find.headregex
   hmake DLF.find.headregex 10
-  hadd DLF.find.headregex ^\s*From\s+list\s+(@\S+)\s+found\s+([0-9]+),\s+displaying\s+([0-9]+):$ 1 2 3
-  hadd DLF.find.headregex ^\s*Resultlimit\s+by\W+([0-9]+)\s+reached\.\s+Download\s+my\s+list\s+for\s+more,\s+by\s+typing\s+(@\S+) 2 1 1
-  hadd DLF.find.headregex ^\s*Search\s+Result\W+More\s+than\s+([0-9]+)\s+Matches\s+For\s+(.*?)\s+Get\s+My\s+List\s+Of\s+[0-9,]+\s+Files\s+By\s+Typing\s+(@\S+)\s+In\s+The\s+Channel\s+Or\s+Refine\s+Your\s+Search.\s+Sending\s+first\s+([0-9]+)\s+Results\W+OmenServe 3 1 4 2
-  hadd DLF.find.headregex ^\s*Search\s+Result\W+([0-9]+)\s+Matches\s+For\s+(.*?)\s+Get\s+My\s+List\s+Of\s+[0-9,]+\s+Files\s+By\s+Typing\s+(@\S+)\s+In\s+The\s+Channel\s+Or\s+Refine\s+Your\s+Search.\s+Sending\s+first\s+([0-9]+)\s+Results\W+OmenServe 3 1 4 2
-  hadd DLF.find.headregex ^\s*Search\s+Result\s+\+\s+More\s+than\s+([0-9]+)\s+Matches\s+For\s+(.*?)\s+\+\s+Get\s+My\s+List\s+Of\s+[0-9,]+\s+Files\s+By\s+Typing\s+(@\S+)\s+In\s+The\s+Channel\s+Or\s+Refine\s+Your\s+Search\.\s+Sending\s+first\s+([0-9]+)\s+Results 3 1 4 2
+  hadd DLF.find.headregex ^\s*From\s+list\s+(@\S+)\s+found\s+([0-9,]+),\s+displaying\s+([0-9]+):$ 1 2 3
+  hadd DLF.find.headregex ^\s*Resultlimit\s+by\W+([0-9,]+)\s+reached\.\s+Download\s+my\s+list\s+for\s+more,\s+by\s+typing\s+(@\S+) 2 1 1
+  hadd DLF.find.headregex ^\s*Search\s+Result\W+More\s+than\s+([0-9,]+)\s+Matches\s+For\s+(.*?)\W+Get\s+My\s+List\s+Of\s+[0-9\54]+\s+Files\s+By\s+Typing\s+(@\S+)\s+In\s+The\s+Channel\s+Or\s+Refine\s+Your\s+Search.\s+Sending\s+first\s+([0-9\54]+)\s+Results\W+OmenServe 3 1 4 2
+  hadd DLF.find.headregex ^\s*Search\s+Result\W+([0-9\54]+)\s+Matches\s+For\s+(.*?)\s+Get\s+My\s+List\s+Of\s+[0-9\54]+\s+Files\s+By\s+Typing\s+(@\S+)\s+In\s+The\s+Channel\s+Or\s+Refine\s+Your\s+Search.\s+Sending\s+first\s+([0-9\54]+)\s+Results\W+OmenServe 3 1 4 2
+  hadd DLF.find.headregex ^\s*Search\s+Result\s+\+\s+More\s+than\s+([0-9\54]+)\s+Matches\s+For\s+(.*?)\s+\+\s+Get\s+My\s+List\s+Of\s+[0-9\54]+\s+Files\s+By\s+Typing\s+(@\S+)\s+In\s+The\s+Channel\s+Or\s+Refine\s+Your\s+Search\.\s+Sending\s+first\s+([0-9\54]+)\s+Results 3 1 4 2
   inc %matches $hget(DLF.find.headregex,0).item
 
   if ($hget(DLF.find.result)) hfree DLF.find.result
@@ -3504,7 +3543,7 @@ alias -l DLF.logo return $rev([dlFilter])
 alias -l DLF.StatusAll {
   var %cid = $cid, %i = $scon(0)
   while (%i) {
-    scid $scon(%i) DLF.Status %i
+    scid $scon(%i) DLF.Status $1-
     dec %i
   }
   scid %cid
