@@ -350,10 +350,7 @@ alias -l DLF.ctcpVersion.Reply {
   DLF.Win.Log Filter ctcpsend $1 $nick %msg
 }
 
-on *:close:@#*: {
-  DLF.Stats.Remove
-  DLF.oNotice.Close $target
-}
+on *:close:@#*: { DLF.oNotice.Close $target }
 
 #dlf_events on
 
@@ -468,7 +465,6 @@ raw 421:*: {
 
 ; Adjust titlebar on window change
 on *:active:*: { DLF.Stats.Active }
-on *:close:*: { DLF.Stats.Remove }
 on *:connect: { DLF.Update.Check }
 
 #dlf_events end
@@ -484,7 +480,7 @@ alias -l DLF.Groups.Bootstrap {
 #dlf_bootstrap end
 
 alias -l DLF.Groups.Events {
-  DLF.Stats.Remove
+  DLF.Stats.Titlebar
   if (%DLF.enabled) .enable #dlf_events
   else .disable #dlf_events
 }
@@ -754,81 +750,21 @@ alias -l DLF.Stats.Active {
     var %percent = $calc(%filter / %total * 100)
     if (%percent < 99) %percent = $round(%percent,1)
     elseif ((%percent < 100) && ($regex(DLF.Stats.Display,%percent,/([0-9]*\.9*[0-8])/) > 0)) %percent = $regml(DLF.Stats.Display,1)
-    DLF.Stats.Titlebar $DLF.Stats.TitleText(%percent)
+    DLF.Stats.Titlebar $active $DLF.Stats.TitleText(%percent)
   }
   else DLF.Stats.Titlebar
 }
 
 alias -l DLF.Stats.Titlebar {
-  var %tb = $DLF.Stats.TitlebarClean($lactivewid,$lactive)
-  var %re = $+(/(-=- )?,$replace($DLF.Stats.TitleText([0-9.]+),$space,\s+),/F)
+  var %tb = $titlebar
+  var %re = $+(/(-=-\s+)?(#\S*\s+)?,$replace($DLF.Stats.TitleText([0-9.]+),$space,\s+),/F)
   ; Can't use $1- directly in $regsubex because it uses these internally
   var %txt = $1-
   if ($regex(DLF.Stats.Titlebar,%tb,%re) > 0) %tb = $regsubex(DLF.Stats.Titlebar,%tb,%re,$null)
   if (%DLF.titlebar.stats == 1) %tb = %tb -=- %txt
   while ($gettok(%tb,1,$asc($space)) == -=-) %tb = $deltok(%tb,1,$asc($space))
   while ($gettok(%tb,-1,$asc($space)) == -=-) %tb = $deltok(%tb,-1,$asc($space))
-  if (%DLF.titlebar.name == 1) {
-    if (%tb != $null) %tb = -=- %tb
-    var %win = $DLF.Stats.WindowType($activewid)
-    if ($gettok(%win,1,$asc($space)) isin chan query window chat) %win = $gettok(%win,2,$asc($space))
-    if ($left(%win,1) == @) %win = $right(%win,-1)
-    %tb = %win %tb
-  }
   titlebar %tb
-}
-
-alias -l DLF.Stats.TitlebarClean {
-  var %tb = $titlebar
-  var %name = $gettok(%tb,1,$asc($space))
-  var %toks = 1-
-  var %lwin = $DLF.Stats.WindowType($1)
-  var %ltype = $gettok(%lwin,1,$asc($space))
-  if ((%ltype == chan) && (%name == $2)) %toks = 2-
-  elseif ((%ltype == window) && ((%name == $2) || (@ $+ %name == $2))) %toks = 2-
-  elseif ((%ltype == query) && (%name == $2)) %toks = 2-
-  elseif ((%ltype == get) && (%name == Get)) %toks = 3-
-  elseif ((%ltype == send) && (%name == Send)) %toks = 3-
-  elseif ((%ltype == chat) && ($+(=,%name) == $2)) %toks = 3-
-  elseif ((%ltype == fserve) && (%name == $2)) %toks = 3-
-  elseif ((%ltype == status) && (%name == Status)) %toks = 3-
-  elseif ((%ltype == messages) && (%name == Messages)) %toks = 3-
-  return $gettok(%tb,%toks,$asc($space))
-}
-
-alias -l DLF.Stats.Remove titlebar $DLF.Stats.TitlebarClean($activewid,$active)
-
-alias -l DLF.Stats.WindowType {
-  var %types = Chan.Window.Query.Get.Send.Chat.Fserve
-  var %cid = $cid
-  var %i = $scon(0)
-  while (%i) {
-    scid $scon(%i)
-    var %j = $numtok(%types,$asc(.))
-    while (%j) {
-      var %type = $gettok(%types,%j,$asc(.))
-      var %k = $func(%type,0)
-      while (%k) {
-        if ($func(%type,%k).wid == $1) {
-          var %name = $func(%type,%k)
-          scid %cid
-          return %type %name
-        }
-        dec %k
-      }
-      dec %j
-    }
-    if ($window(Status Window).wid == $1) {
-      scid %cid
-      return Status $network
-    }
-    elseif ($window(Message Window).wid == $1) {
-      scid %cid
-      return Messages $network
-    }
-    dec %i
-  }
-  scid %cid
 }
 
 ; ===== Private messages =====
@@ -2148,30 +2084,30 @@ alias DLF.Options.Toggle dialog $iif($dialog(DLF.Options.GUI),-c,-md) DLF.Option
 
 dialog -l DLF.Options.GUI {
   title dlFilter v $+ $DLF.SetVersion
-  size -1 -1 168 227
+  size -1 -1 168 218
   option dbu notheme
   text "", 20, 67 2 98 7, right hide
   check "&Enable/disable dlFilter", 10, 2 2 62 8
-  tab "Channels", 100, 1 9 166 202
+  tab "Channels", 100, 1 9 166 193
   tab "Filters", 300
   tab "Other", 500
   tab "Ops", 700
   tab "Custom", 800
   tab "About", 900
-  button "Close", 30, 2 214 67 11, ok default flat
-  check "Show/hide filtered lines", 40, 74 214 92 11, push
+  button "Close", 30, 2 205 67 11, ok default flat
+  check "Show/hide filtered lines", 40, 74 205 92 11, push
   ; tab Channels
   text "List the channels you want dlFilter to operate on. Use # by itself to make dlFilter work on all networks and channels.",105, 5 25 160 12, tab 100 multi
   text "Channel to add (select dropdown / type #chan or net#chan):", 110, 5 40 160 7, tab 100
   combo 120, 4 48 160 6, tab 100 drop edit
   button "Add", 130, 5 61 76 11, tab 100 flat disable
   button "Remove", 135, 86 61 76 11, tab 100 flat disable
-  list 140, 4 74 160 92, tab 100 vsbar size sort extsel
-  box " Update ", 150, 4 167 160 41, tab 100
-  text "Checking for dlFilter updates...", 160, 7 175 135 8, tab 100
-  button "dlFilter website", 170, 7 184 74 11, tab 100 flat
-  button "Update dlFilter", 180, 86 184 74 11, tab 100 flat disable
-  check "Check for &beta versions", 190, 7 198 136 6, tab 100
+  list 140, 4 74 160 83, tab 100 vsbar size sort extsel
+  box " Update ", 150, 4 158 160 41, tab 100
+  text "Checking for dlFilter updates...", 160, 7 166 135 8, tab 100
+  button "dlFilter website", 170, 7 175 74 11, tab 100 flat
+  button "Update dlFilter", 180, 86 175 74 11, tab 100 flat disable
+  check "Check for &beta versions", 190, 7 189 136 6, tab 100
   ; tab Filters
   box " General ", 305, 4 23 160 100, tab 300
   check "Filter other users Search / File requests", 310, 7 32 155 6, tab 300
@@ -2184,36 +2120,35 @@ dialog -l DLF.Options.GUI {
   check "Filter responses to my requests to separate window", 345, 7 95 155 6, tab 300
   check "Filter requests to you in PM (@yournick, !yournick)", 350, 7 104 155 6, tab 300
   check "Separate dlF windows per connection", 355, 7 113 155 6, tab 300
-  box " Filter user events ", 365, 4 124 160 73, tab 300
-  check "Joins ...", 370, 7 133 54 6, tab 300
-  check "Parts ...", 372, 7 142 54 6, tab 300
-  check "Quits ...", 374, 7 151 54 6, tab 300
-  check "Nick changes ...", 376, 7 160 54 6, tab 300
-  check "Kicks ...", 378, 7 169 54 6, tab 300
-  check "... but show these in Status window", 380, 66 169 96 6, tab 300
-  check "Away and thank-you messages", 385, 7 178 155 6, tab 300
-  check "User mode changes", 390, 7 187 155 6, tab 300
+  box " Filter user events ", 365, 4 124 160 75, tab 300
+  check "Joins ...", 370, 7 134 54 6, tab 300
+  check "Parts ...", 372, 7 143 54 6, tab 300
+  check "Quits ...", 374, 7 152 54 6, tab 300
+  check "Nick changes ...", 376, 7 161 54 6, tab 300
+  check "Kicks ...", 378, 7 170 54 6, tab 300
+  check "... but show these in Status window", 380, 66 170 96 6, tab 300
+  check "Away and thank-you messages", 385, 7 179 155 6, tab 300
+  check "User mode changes", 390, 7 188 155 6, tab 300
   ; Tab Other
-  box " Extra functions ", 505, 4 23 160 46, tab 500
+  box " Extra functions ", 505, 4 23 160 37, tab 500
   check "Collect @find/@locator results into a single window", 510, 7 32 155 6, tab 500
-  check "Display window name in title bar", 520, 7 41 155 6, tab 500
-  check "Display dlFilter channel efficiency in title bar", 525, 7 50 155 6, tab 500
-  check "Colour uncoloured fileservers in nickname list", 530, 7 59 155 6, tab 500
-  box " File requests ", 535, 4 70 160 73, tab 500
-  check "Auto accept files you have specifically requested", 540, 7 79 155 6, tab 500
-  check "Block ALL files you have NOT specifically requested. Or:", 545, 7 88 155 6, tab 500
-  check "Block potentially dangerous filetypes", 550, 15 97 146 6, tab 500
-  check "Block files from users not in a common channel", 555, 15 106 146 6, tab 500
-  check "Block files from users not in your mIRC DCC trust list", 560, 15 115 146 6, tab 500
-  check "Block files from regular users", 565, 15 124 146 6, tab 500
-  check "Retry incomplete file requests (up to 3 times)", 570, 7 133 155 6, tab 500
-  box " mIRC-wide ", 605, 4 144 160 64, tab 500
-  check "Check mIRC settings are secure (future enhancement)", 610, 7 153 155 6, tab 500 disable
-  check "Allow private messages from users with open query window", 615, 7 162 155 6, tab 500
-  check "Block private messages from users not in a common channel", 620, 7 171 155 6, tab 500
-  check "Block private messages from regular users", 625, 7 180 155 6, tab 500
-  check "Block channel CTCP requests unless from an op", 655, 7 189 155 6, tab 500
-  check "Block IRC Finger requests (which share personal information)", 660, 7 198 155 6, tab 500
+  check "Display dlFilter channel efficiency in title bar", 525, 7 41 155 6, tab 500
+  check "Colour uncoloured fileservers in nickname list", 530, 7 50 155 6, tab 500
+  box " File requests ", 535, 4 61 160 73, tab 500
+  check "Auto accept files you have specifically requested", 540, 7 70 155 6, tab 500
+  check "Block ALL files you have NOT specifically requested. Or:", 545, 7 79 155 6, tab 500
+  check "Block potentially dangerous filetypes", 550, 15 88 146 6, tab 500
+  check "Block files from users not in a common channel", 555, 15 97 146 6, tab 500
+  check "Block files from users not in your mIRC DCC trust list", 560, 15 106 146 6, tab 500
+  check "Block files from regular users", 565, 15 115 146 6, tab 500
+  check "Retry incomplete file requests (up to 3 times)", 570, 7 124 155 6, tab 500
+  box " mIRC-wide ", 605, 4 135 160 64, tab 500
+  check "Check mIRC settings are secure (future enhancement)", 610, 7 144 155 6, tab 500 disable
+  check "Allow private messages from users with open query window", 615, 7 153 155 6, tab 500
+  check "Block private messages from users not in a common channel", 620, 7 162 155 6, tab 500
+  check "Block private messages from regular users", 625, 7 171 155 6, tab 500
+  check "Block channel CTCP requests unless from an op", 655, 7 180 155 6, tab 500
+  check "Block IRC Finger requests (which share personal information)", 660, 7 189 155 6, tab 500
   ; tab Ops
   text "These options are only enabled if you are an op on a filtered channel.", 705, 4 25 160 12, tab 700 multi
   box " Channel Ops ", 710, 4 38 160 38, tab 700
@@ -2232,9 +2167,9 @@ dialog -l DLF.Options.GUI {
   edit "", 840, 4 37 160 10, tab 800 autohs
   button "Add", 850, 5 51 76 11, tab 800 flat disable
   button "Remove", 860, 86 51 76 11, tab 800 flat disable
-  list 870, 4 64 160 145, tab 800 hsbar vsbar size sort extsel
+  list 870, 4 64 160 135, tab 800 hsbar vsbar size sort extsel
   ; tab About
-  edit "", 920, 3 25 162 184, multi read vsbar tab 900
+  edit "", 920, 3 25 162 175, multi read vsbar tab 900
 }
 
 alias -l DLF.Options.SetLinkedFields {
@@ -2258,7 +2193,7 @@ on *:dialog:DLF.Options.GUI:dclick:140: DLF.Options.EditChannel
 ; Per-Server options clicked
 on *:dialog:DLF.Options.GUI:sclick:355: DLF.Options.PerConnection
 ; Titlebar options clicked
-on *:dialog:DLF.Options.GUI:sclick:520,525: DLF.Options.Titlebar
+on *:dialog:DLF.Options.GUI:sclick:525: DLF.Options.Titlebar
 ; Select custom message type
 on *:dialog:DLF.Options.GUI:sclick:830: DLF.Options.SetCustomType
 ; Enable / disable Add custom message button
@@ -2322,7 +2257,6 @@ alias -l DLF.Options.Initialise {
   ; Other tab
   ; Other tab Extra Functions box
   DLF.Options.InitOption searchresults 1
-  DLF.Options.InitOption titlebar.name 1
   DLF.Options.InitOption titlebar.stats 1
   DLF.Options.InitOption colornicks 1
   ; Other tab File requests box
@@ -2421,7 +2355,6 @@ alias -l DLF.Options.Init {
   if (%DLF.filter.aways == 1) did -c DLF.Options.GUI 385
   if (%DLF.filter.modesuser == 1) did -c DLF.Options.GUI 390
   if (%DLF.searchresults == 1) did -c DLF.Options.GUI 510
-  if (%DLF.titlebar.name == 1) did -c DLF.Options.GUI 520
   if (%DLF.titlebar.stats == 1) did -c DLF.Options.GUI 525
   if (%DLF.colornicks == 1) did -c DLF.Options.GUI 530
   if (%DLF.dccsend.autoaccept == 1) did -c DLF.Options.GUI 540
@@ -2490,7 +2423,6 @@ alias -l DLF.Options.Save {
   %DLF.filter.aways = $did(385).state
   %DLF.filter.modesuser = $did(390).state
   %DLF.searchresults = $did(510).state
-  %DLF.titlebar.name = $did(520).state
   %DLF.titlebar.stats = $did(525).state
   %DLF.colornicks = $did(530).state
   %DLF.dccsend.autoaccept = $did(540).state
