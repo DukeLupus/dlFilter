@@ -503,16 +503,20 @@ alias -l DLF.User.Channel {
 ; Non-channel user activity
 ; nick changes, quit
 alias -l DLF.User.NoChannel {
+  DLF.Watch.Called DLF.User.NoChannel
   if (%DLF.netchans != #) {
-    var %i = $comchan($1,0)
+    var %i = $comchan($1,0), %dlf = $false
     while (%i) {
       var %chan = $comchan($1,%i)
       if ($DLF.Chan.IsDlfChan(%chan) == $false) echo -tc $event %chan $star $2-
-      else DLF.Stats.Count %chan Total
+      else {
+        DLF.Stats.Count %chan Total
+        %dlf = $true
+      }
       dec %i
     }
   }
-  DLF.User.Channel $hashtag $2-
+  if (%dlf) DLF.User.Channel $hashtag $2-
 }
 
 ; Channel & User mode changes
@@ -792,10 +796,7 @@ alias -l DLF.Stats.TitlebarClean {
   return $gettok(%tb,%toks,$asc($space))
 }
 
-alias -l DLF.Stats.Remove {
-  echo -s closing window $active $activewid
-  titlebar $DLF.Stats.TitlebarClean($activewid,$active)
-}
+alias -l DLF.Stats.Remove titlebar $DLF.Stats.TitlebarClean($activewid,$active)
 
 alias -l DLF.Stats.WindowType {
   var %types = Chan.Window.Query.Get.Send.Chat.Fserve
