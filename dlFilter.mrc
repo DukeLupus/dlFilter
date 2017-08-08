@@ -35,6 +35,18 @@ dlFilter uses the following code from other people:
 */
 
 /* CHANGE LOG
+
+  Ideas for possible future enhancements
+        Implement toolbar functionality with right click menu
+        Check mIRC security settings not too lax
+        Manage filetype ignore list like trust list i.e. temp add for requested filetypes.
+        Advertising for sbClient for @search + option (await sbClient remediation).
+        Make FilterSearch dynamic i.e. new lines which match are added.
+        Better icon file
+        Right click channel line menu-items for adding to custom filter (if possible since not a list window)
+        More menu options equivalent to dialog options
+        Make it work on AdiIRC and update version check handle AdiIRC.
+
   1.18  Further code cleanup
         Self-update improvements
           Option to update to beta versions
@@ -91,21 +103,6 @@ dlFilter uses the following code from other people:
         DCC Send/Get functionality now acts like firewall - with blocking rules.
         Move ignore spammer functionality to timer because error on $input because it can't run in event
         Added option to accept private messages from user with a query window open.
-
-      TODO 1.18
-        Make download handle betas properly
-        Send to... menus - do they work?
-
-      TODO Future
-        Implement toolbar functionality with right click menu
-        Check mIRC security settings not too lax
-        Manage filetype ignore list like trust list i.e. temp add for requested filetypes.
-        Advertising for sbClient for @search + option (await sbClient remediation).
-        Make FilterSearch dynamic i.e. new lines which match are added.
-        Better icon file
-        Right click channel line menu-items for adding to custom filter (if possible since not a list window)
-        More menu options equivalent to dialog options
-        Make it work on AdiIRC and update version check handle AdiIRC.
 
   1.17  Update opening comments and add change log
         Use custom identifiers for creating bold, colour etc.
@@ -2833,7 +2830,9 @@ alias -l DLF.Download.Run {
   var %newscript = $qt($script $+ .new)
   if ($isfile(%newscript)) .remove %newscript
   if ($exists(%newscript)) DLF.Socket.Error Unable to delete old temporary download file.
-  DLF.Socket.Get Download https://raw.githubusercontent.com/SanderSade/dlFilter/dlFilter-v118/dlFilter.mrc
+  var %branch = master
+  if ((%DLF.update.betas == 1) && (%DLF.version.beta > %DLF.version.web)) %branch = beta
+  DLF.Socket.Get Download $+(https:,//raw.githubusercontent.com/SanderSade/dlFilter/,%branch,/dlFilter.mrc)
 }
 
 on *:sockread:DLF.Socket.Download: {
