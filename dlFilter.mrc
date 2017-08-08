@@ -73,7 +73,7 @@ dlFilter uses the following code from other people:
         @find windows per connection.
         Handle @find results from normal users rather than give error.
         Own file requests are tracked and matching DCC Sends not halted regardless of whether server is regular user or not.
-        Added dynamic titlebar to show channel and / or dlF filtering statistics
+        Added dynamic titlebar to show channel dlF filtering statistics
         Added Ops channel advertising option - an op can advertise dlFilter once every x minutes.
         Add Ops private advertising option which:
           Version checks users as they join and if they are a mIRC user reminds them to install or upgrade dlF.
@@ -94,10 +94,10 @@ dlFilter uses the following code from other people:
 
       TODO 1.18
         Make download handle betas properly
-        Implement toolbar functionality with right click menu
         Send to... menus - do they work?
 
       TODO Future
+        Implement toolbar functionality with right click menu
         Check mIRC security settings not too lax
         Manage filetype ignore list like trust list i.e. temp add for requested filetypes.
         Advertising for sbClient for @search + option (await sbClient remediation).
