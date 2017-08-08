@@ -1453,7 +1453,7 @@ alias -l DLF.Win.AdsShow {
   else var %tabs = -t25,45
   var %win = $DLF.Win.WinOpen(Ads,-k0nwl %tabs,0,0,%tb)
   if ($line(%win,0) == 0) {
-    aline -n 2 %win This window shows adverts from servers describing how many files they have and how to get a list of their files.
+    aline -n 6 %win This window shows adverts from servers describing how many files they have and how to get a list of their files.
     aline -n 2 %win However you will probably find it easier to use "@search search words" (or "@find search words") to locate files you want.
     aline -n 2 %win If you use @search, consider installing the sbClient script to make processing @search results easier.
     aline -n 4 %win You can double-click to have the request for the list of files sent for you.
@@ -1522,7 +1522,7 @@ alias -l DLF.Win.AdsGet {
 
 menu @dlF.Ads.* {
   dclick: DLF.Win.AdsGet $1
-  Get list of files from selected servers: {
+  $iif($sline($active,0) == $null,$style(2)) Get list of files from selected servers: {
     var %i = $sline($active,0)
     while (%i) {
       DLF.Win.AdsGet $sline($active,%i).ln
@@ -1738,7 +1738,7 @@ alias -l DLF.Win.Search {
 ; ========== @find ==========
 menu @dlF.@find.* {
   dclick: DLF.@find.Get $1
-  Get selected files: {
+  $iif($sline($active,0) == $null,$style(2)) Get selected files: {
     var %i = $sline($active,0)
     while (%i) {
       DLF.@find.Get $sline($active,%i).ln
@@ -1862,9 +1862,11 @@ alias -l DLF.@find.Results {
   var %win = $+(@dlF.@find.,$network)
   if (!$window(%win)) {
     window -lk0wn -t15 %win
-    aline -n 2 %win This window shows @find results as received individually from various servers.
-    aline -n 1 %win You can select lines and copy and paste them into the channel to get files,
-    aline -n 1 %win or double-click to have the file request sent for you.
+    aline -n 6 %win This window shows @find results as received individually from various servers.
+    aline -n 2 %win In the future you might want to use @search instead of @find as it is quicker and more efficicent.
+    aline -n 2 %win If you use @search, consider installing the sbClient script to make processing @search results easier.
+    aline -n 4 %win You can select lines and copy and paste them into the channel to get files,
+    aline -n 4 %win or double-click to have the file request sent for you.
     aline -n 1 %win $crlf
   }
   var %i = $line(%win,0)
