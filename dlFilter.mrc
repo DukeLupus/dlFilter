@@ -389,18 +389,18 @@ on ^*:quit: {
 
 ; User mode changes
 ; ban, unban, op, deop, voice, devoice etc.
-on ^*:ban:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser)) DLF.Chan.Mode ban: $1- }
-on ^*:unban:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser)) DLF.Chan.Mode unban: $1- }
-on ^*:op:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser)) DLF.Chan.Mode op: $1- }
-on ^*:deop:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser)) DLF.Chan.Mode deoop: $1- }
-on ^*:voice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser)) DLF.Chan.Mode voice: $1- }
-on ^*:devoice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser)) DLF.Chan.Mode devoice: $1- }
-on ^*:serverop:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser)) DLF.Chan.Mode serverop: $1- }
-on ^*:serverdeop:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser)) DLF.Chan.Mode serverdeop: $1- }
-on ^*:servervoice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser)) DLF.Chan.Mode servervoice: $1- }
-on ^*:serverdevoice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser)) DLF.Chan.Mode serverdevoice: $1- }
-on ^*:mode:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modeschan)) DLF.Chan.Mode channel mode: $1- }
-on ^*:servermode:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modeschan)) DLF.Chan.Mode server mode: $1- }
+on ^*:ban:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$bnick)) DLF.Chan.Mode $1- }
+on ^*:unban:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$bnick)) DLF.Chan.Mode $1- }
+on ^*:op:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1- }
+on ^*:deop:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1- }
+on ^*:voice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$vnick)) DLF.Chan.Mode $1- }
+on ^*:devoice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$vnick)) DLF.Chan.Mode $1- }
+on ^*:serverop:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1- }
+on ^*:serverdeop:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1- }
+on ^*:servervoice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$vnick)) DLF.Chan.Mode $1- }
+on ^*:serverdevoice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$vnick)) DLF.Chan.Mode $1- }
+on ^*:mode:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modeschan)) DLF.Chan.Mode $1- }
+on ^*:servermode:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modeschan)) DLF.Chan.Mode $1- }
 
 ; Trigger processing
 on *:input:%DLF.channels: {
@@ -518,7 +518,7 @@ alias -l DLF.User.NoChannel {
 alias -l DLF.Chan.Mode {
   DLF.Watch.Called DLF.Chan.Mode
   if ($nick == $me) return
-  DLF.Win.Log Filter Mode $chan $nick sets $1-
+  DLF.Win.Log Filter Mode $chan $nick $nick sets mode: $1-
   halt
 }
 
@@ -556,7 +556,8 @@ alias -l DLF.Chan.Set {
 ; Check if channel is set whether it is network#channel or just #channel
 alias -l DLF.Chan.IsChanEvent {
   if ($DLF.Chan.IsDlfChan($chan) == $false) return $false
-  ;if ($nick == $me) return $false
+  if ($nick == $me) return $false
+  if ($2 == $me) return $false
   DLF.Stats.Count $chan Total
   if ($1 == 0) return $false
   return $true
