@@ -2713,7 +2713,7 @@ alias -l DLF.Update.Check {
 alias -l DLF.Update.Run {
   if ($dialog(DLF.Options.GUI)) did -b DLF.Options.GUI 180
   DLF.Options.Status Checking for dlFilter updates...
-  DLF.Socket.Get Update https://raw.githubusercontent.com/SanderSade/dlFilter/dlFilter-v118/dlFilter.version
+  DLF.Socket.Get Update https://raw.githubusercontent.com/SanderSade/dlFilter/master/dlFilter.version
 }
 
 on *:sockread:DLF.Socket.Update: {
