@@ -3819,10 +3819,8 @@ alias DLF.Watch.Filter {
     tokenize $asc($space)) $1 $3-
   }
   if (($2 == PING) || ($2 == PONG)) return $null
-  if (($1 != <-) $&
-    || ($2 != PRIVMSG) $&
-    || ($left($3,1) != $hashtag) $&
-    || ($DLF.Chan.IsDlfChan($3))) DLF.Watch.Log %text
+  if (($left($3,1) == $hashtag) && (!$DLF.Chan.IsDlfChan($3))) return $null
+  DLF.Watch.Log %text
   return $null
 }
 
