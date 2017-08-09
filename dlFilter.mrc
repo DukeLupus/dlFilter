@@ -349,7 +349,7 @@ alias -l DLF.ctcpVersion.Reply {
 
 on *:close:@#*: { DLF.oNotice.Close $target }
 
-#dlf_events on
+#dlf_events off
 
 ; Announce update when I join a filtered channel
 on me:*:join:%DLF.channels: { if ($DLF.Chan.IsDlfChan($chan)) DLF.Update.Announce }
@@ -503,7 +503,7 @@ alias -l DLF.User.NoChannel {
       var %chan = $comchan($1,%i)
       if ($DLF.Chan.IsDlfChan(%chan) == $false) echo -tc $event %chan $star $2-
       else {
-        DLF.Stats.Count %chan Total
+        if ($nick != $me) DLF.Stats.Count %chan Total
         %dlf = $true
       }
       dec %i
