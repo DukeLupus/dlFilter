@@ -36,6 +36,16 @@ dlFilter uses the following code from other people:
 
 /* CHANGE LOG
 
+  Immediate TODO
+        Add comment support to versions file
+        Option to filter any line from regular user containing control codes
+          (as likely to be unknown spam)
+        Add option to filter blank lines (i.e. blank after stripping control codes and spaces)
+        Add option to filter quizes
+        Check location and filename for oNotice log files
+        Direct Chanserv channel welcome notices to correct window.
+        Direct msgs from ops to channel(s) rather than allowing Query/Single Message window to open.
+
   Ideas for possible future enhancements
         Implement toolbar functionality with right click menu
         Check mIRC security settings not too lax
@@ -497,7 +507,7 @@ alias -l DLF.User.Channel {
 ; nick changes, quit
 alias -l DLF.User.NoChannel {
   DLF.Watch.Called DLF.User.NoChannel
-  if (%DLF.netchans != #) {
+  if (%DLF.netchans != $hashtag) {
     var %i = $comchan($1,0), %dlf = $false
     while (%i) {
       var %chan = $comchan($1,%i)
@@ -782,6 +792,7 @@ alias -l DLF.Priv.Text {
 
 alias -l DLF.Priv.Notice {
   DLF.Watch.Called DLF.Priv.Notice
+  DLF.Priv.NoticeChanserv $1-
   DLF.Priv.QueryOpen $1-
   DLF.@find.Response $1-
   if ($DLF.DccSend.IsTrigger) DLF.Win.Server $1-
@@ -792,6 +803,14 @@ alias -l DLF.Priv.Notice {
   if ($hiswm(privnotice.server,%txt)) DLF.Win.Server $1-
   DLF.Priv.CommonChan $1-
   DLF.Priv.RegularUser Notice $1-
+}
+
+alias -l DLF.Priv.NoticeChanserv {
+  if ($nick != ChanServ) return
+  if (($left($1,2) != [#) || ($right($1,1) != ])) return
+  var %chan = $left($right($1,-1),-1)
+  DLF.Win.Echo Notice %chan $nick $1-
+  halt
 }
 
 alias -l DLF.Priv.Action {
@@ -859,7 +878,7 @@ alias -l DLF.Priv.QueryOpen {
 }
 
 alias -l DLF.Priv.DollarDecode {
-  DLF.Win.Echo Warning Private $nick Messages containing $b($dollar $+ decode) are often malicious mIRC virus trying to infect your mIRC, and $nick is likely already infected with it. Please report this to the channel ops.
+  DLF.Win.Echo Warning Private $nick Messages containing $b($ $+ decode) are often malicious mIRC virus trying to infect your mIRC, and $nick is likely already infected with it. Please report this to the channel ops.
   DLF.Win.Echo Warning Private $nick $1-
   DLF.Halt Halted: Probable mIRC worm infection attempt.
 }
@@ -1423,7 +1442,7 @@ alias -l DLF.Win.Log {
 
   var %line = $DLF.Win.LineFormat($2-)
   var %col = $DLF.Win.Colour($2)
-  if (%log == 1) write %lfn $sbr($logstamp) $strip(%line)
+  if (%log == 1) write $DLF.Win.LogName($DLF.Win.WinName(%type)) $sbr($logstamp) $strip(%line)
   if ((%type = Filter) && (%DLF.showfiltered == 0)) {
     DLF.Watch.Log Dropped: Options set to not show filters
     return
@@ -2040,14 +2059,18 @@ alias -l DLF.oNotice.Open {
 }
 
 alias -l DLF.oNotice.Input {
+  var %ochan = $right($active,-1)
   if (($left($1,1) == /) && ($ctrlenter == $false) && ($1 != /me)) return
   if (($1 != /me) || ($ctrlenter == $true)) var %omsg = $iif($prefixown == 1,$tag($me) $+ $space) $+ $1-
   else var %omsg = $star $me $2-
   if (%DLF.win-onotice.timestamp == 1) var %omsg = $timestamp %omsg
-  aline -p $iif($1 != /me,$color(Normal),$color(Action)) $active %omsg
+  echo $iif($1 != /me,$color(Normal),$color(Action)) -st $active %omsg
   aline -nl $color(nicklist) $active $me
   window -S $active
-  var %ochan = $replace($active,@,$null)
+  if ($me !isop %ochan) {
+    echo 4 -t %ochan oNotice not sent: You are no longer an op in %ochan
+    return
+  }
   .onotice %ochan $1-
   DLF.oNotice.Log $active %omsg
 }
@@ -2060,7 +2083,7 @@ alias -l DLF.oNotice.Close {
 alias -l DLF.oNotice.Log {
   if (%DLF.win-onotice.log == 1) {
     var %log = %DLF.oNotice.LogFile($1)
-    write %log $sbr($logstamp) $2-
+    write -m1 %log $sbr($logstamp) $2-
   }
 }
 
@@ -3006,9 +3029,9 @@ alias -l DLF.Socket.Error {
 
 ; ========== Create dlFilter.gif if needed ==========
 alias -l DLF.CreateGif {
-  /bset -ta &gif 1 eJxz93SzsEwUYBBg+M4AArpO837sZhgFo2AEAsWfLIwMDP8ZdEAcUJ5g4PBn
-  /bset -ta &gif 61 +M8p47Eh4SAD4z9FkwqDh05tzOJ2LSsCGo52S7ByuHQYJLu1yghX7fkR8MiD
-  /bset -ta &gif 121 UVWWTWKm0JP9/brycT0SQinu3Syqt2I6Jz86MNOOlYmXy0SBwRoAZQAkYg==
+  bset -ta &gif 1 eJxz93SzsEwUYBBg+M4AArpO837sZhgFo2AEAsWfLIwMDP8ZdEAcUJ5g4PBn
+  bset -ta &gif 61 +M8p47Eh4SAD4z9FkwqDh05tzOJ2LSsCGo52S7ByuHQYJLu1yghX7fkR8MiD
+  bset -ta &gif 121 UVWWTWKm0JP9/brycT0SQinu3Syqt2I6Jz86MNOOlYmXy0SBwRoAZQAkYg==
   DLF.CreateBinaryFile &gif $+($nofile($script),dlFilter.gif)
 }
 
@@ -3626,7 +3649,6 @@ alias -l tab returnex $chr(9)
 alias -l space returnex $chr(32)
 alias -l nbsp return $chr(160)
 alias -l hashtag returnex $chr(35)
-alias -l dollar return $chr(36)
 alias -l lbr return $chr(40)
 alias -l rbr return $chr(41)
 alias -l star return $chr(42)
