@@ -308,7 +308,7 @@ ctcp ^*:VERSION*:#: {
 alias -l DLF.ctcpBlock.Chan {
   if ($nick isop $chan) return
   DLF.Win.Echo Blocked $chan $nick Channel ctcp $1 from $nick
-  if ($DLF.Chan.IsDlfChan($chan) {
+  if ($DLF.Chan.IsDlfChan($chan)) {
     DLF.Stats.Count $chan Total
     DLF.Win.Log Filter ctcp $chan $nick $1-
   }
