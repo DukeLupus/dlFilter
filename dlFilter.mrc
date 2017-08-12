@@ -38,9 +38,8 @@ dlFilter uses the following code from other people:
 
   Immediate TODO
         Add comment support to versions file
-        Check location and filename for oNotice log files
-        Direct msgs from ops to channel(s) rather than allowing Query/Single Message window to open.
-        Fix netchans to support chans which don't start with #
+        Test location and filename for oNotice log files
+        Add filtering of topic changes
 
   Ideas for possible future enhancements
         Implement toolbar functionality with right click menu
@@ -386,8 +385,8 @@ on ^*:part:%DLF.channels: {
 on ^*:kick:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.kicks)) DLF.User.Channel $chan $knick $iif(!$shortjoinsparts,$br($address($knick,5))) was kicked $iif(!$shortjoinsparts,from $chan ) by $nick $br($1-) }
 
 on ^*:nick: {
-  DLF.Win.NickChg
-  if ($DLF.Chan.IsUserEvent(%DLF.filter.nicks)) DLF.User.NoChannel $newnick $nick $br($address) is now known as $newnick
+  DLF.Ads.NickChg
+  if ($DLF.Chan.IsUserEvent(%DLF.filter.nicks)) DLF.User.NoChannel $newnick $nick $iif(!$shortjoinsparts,$br($address($knick,5))) is now known as $newnick
 }
 
 on ^*:quit: {
@@ -511,15 +510,17 @@ alias -l DLF.User.NoChannel {
     var %i = $comchan($1,0)
     while (%i) {
       var %chan = $comchan($1,%i)
-      if ($DLF.Chan.IsDlfChan(%chan) == $false) echo -tc $event %chan $star $2-
+      if (($nick == $me) || ($DLF.Chan.IsDlfChan(%chan) == $false)) echo -tc $event %chan $star $2-
       else {
-        if ($nick != $me) DLF.Stats.Count %chan Total
+        DLF.Stats.Count %chan Total
         %dlfchan = $true
       }
       dec %i
     }
   }
-  if (%dlfchan) DLF.User.Channel $hashtag $2-
+  if (%dlfchan) DLF.Win.Log Filter $event $hashtag $nick $2-
+  else DLF.Watch.Log Echoed to non-DLF channels
+  halt
 }
 
 ; Channel & User mode changes
@@ -1494,10 +1495,10 @@ alias -l DLF.Win.Ads {
 }
 
 alias -l DLF.Win.AdsShow {
-  var %tb = Server advertising $DLF.Win.TbMsg
-  if (%DLF.perconnect == 1) var %tabs = -t12,30
-  else var %tabs = -t25,45
-  var %win = $DLF.Win.WinOpen(Ads,-k0nwl %tabs,0,0,%tb)
+  var %tb = server advertising $DLF.Win.TbMsg
+  if (%DLF.perconnect == 1) var %tabs = -t20,40
+  else var %tabs = -t30,55
+  var %win = $DLF.Win.WinOpen(Ads,-k0nwl %tabs,0,0,0 %tb)
   if ($line(%win,0) == 0) {
     aline -n 6 %win This window shows adverts from servers describing how many files they have and how to get a list of their files.
     aline -n 2 %win However you will probably find it easier to use "@search search words" (or "@find search words") to locate files you want.
@@ -1510,29 +1511,40 @@ alias -l DLF.Win.AdsShow {
     $+($chr(149),$space),$null,$chr(149),$null,$+($chr(144),$space),$null,$chr(144),$null,$+($chr(8226),$space),$null,$chr(8226),$null)
   %line = $puttok(%line,$tab $+ $gettok(%line,2,$asc($space)),2,$asc($space))
   %line = $puttok(%line,$tab $+ $gettok(%line,3,$asc($space)),3,$asc($space))
-  var %srch = $gettok($strip(%line),1-7,$asc($space))
-  var %i = $line(%win,0)
+  var %srch = $gettok($strip(%line),1-7,$asc($space)), %ln = $calc($line(%win,0) + 1)
+  var %match = $+([,$iif(%DLF.perconnect == 0,$network),$chan,]*,$tag($DLF.Chan.GetMsgNick($chan,$nick)),*)
+  var %i = $fline(%win,%match,0)
+  echo -st Ads1: found chan/nick: %i
+  if (%i == 0) {
+    %match = $+([,$iif(%DLF.perconnect == 0,$network),$chan,]*)
+    %i = $fline(%win,%match,0)
+    echo -st Ads2: found chan: %i
+  }
+  if (%i == 0) {
+    %match = [*]*
+    %i = $fline(%win,%match,0)
+    echo -st Ads3: found any: %i
+  }
   while (%i) {
-    var %l = $gettok($strip($line(%win,%i)),1-7,$asc($space))
+    var %ln = $fline(%win,%match,%i)
+    var %l = $gettok($strip($line(%win,%ln)),1-7,$asc($space))
     if (%l == $crlf) break
     elseif (%l == %srch) {
-      rline $iif($line(%win,%i).state,-a) 3 %win %i %line
+      if (%line != $line(%win,%ln)) rline $iif($line(%win,%ln).state,-a) 3 %win %ln %line
       DLF.Watch.Log Advert from $nick replaced
       break
     }
     elseif (%l < %srch) {
-      inc %i
-      iline 3 %win %i %line
+      inc %ln
+      iline 3 %win %ln %line
       DLF.Watch.Log Advert from $nick added
       break
     }
     dec %i
   }
-  if ((%i == 0) || (%l == $crlf)) {
-    inc %i
-    iline 3 %win %i %line
-  }
+  if (%i == 0) iline 3 %win %ln %line
   window -b %win
+  DLF.Win.TitleBar %win %tb
 }
 
 alias -l DLF.Win.AdsGet {
@@ -1594,21 +1606,23 @@ alias -l DLF.Win.Part {
   DLF.Ads.ColourLines 14
   DLF.@find.ColourLines 14
 }
-alias -l DLF.Win.NickChg {
+alias -l DLF.Ads.NickChg {
   if ($query($nick)) queryrn $nick $newnick
   if ($chat($nick)) dcc nick -c $nick $newnick
   var %win = $DLF.Win.WinName(Ads)
   if (!$window(%win)) return
-  var %i = $line(%win,0)
+  var %match = $+([,$iif(%DLF.perconnect == 0,$network),*]*<*,$nick,>*)
+  var %i = $fline(%win,%match,0)
   while (%i) {
-    var %l = $strip($line(%win,%i))
+    var %l = $strip($fline(%win,%match,%i).text)
     if (%l == $crlf) break
-    var %nc = $left($right($gettok(%l,1,$asc($space)),-1),-1)
+    var %netchan = $left($right($gettok(%l,1,$asc($space)),-1),-1)
     var %nick = $DLF.Win.NickFromTag($gettok(%l,2,$asc($space)))
     var %nl = $len($network)
     if (($left(%nc,%nl) == $network) && ($left($right(%nc,- $+ %nl),1) isin $chantypes) && (%nick == $nick)) {
-      var %l = $line(%win,%i)
-      rline 3 %win %i $puttok(%l,$replace($gettok(%l,2,$asc($space)),$nick,$newnick),2,$asc($space))
+      var %ln = $fline(%win,%match,%i)
+      var %l = $line(%win,%ln)
+      rline 3 %win %ln $puttok(%l,$replace($gettok(%l,2,$asc($space)),$nick,$newnick),2,$asc($space))
     }
     dec %i
   }
@@ -1625,19 +1639,20 @@ alias -l DLF.Win.NickFromTag {
 alias -l DLF.Ads.ColourLines {
   var %win = $DLF.Win.WinName(Ads)
   if (!$window(%win)) return
-  var %i = $line(%win,0)
+  var %match = $+([,$iif(%DLF.perconnect == 0,$network),*]*<*,$nick,>*)
+  var %i = $fline(%win,%match,0)
   while (%i) {
-    var %l = $strip($line(%win,%i))
+    var %l = $strip($fline(%win,%match,%i).text)
     if (%l == $crlf) break
     var %nc = $left($right($gettok(%l,1,$asc($space)),-1),-1)
     var %nick = $DLF.Win.NickFromTag($gettok(%l,2,$asc($space)))
-    if (($left(%nc,%nl) == $network) && ($left($right(%nc,- $+ %nl),1) isin $chantypes) && (%nick == $nick)) cline $2 %win %i
+    if (($left(%nc,%nl) == $network) && ($left($right(%nc,- $+ %nl),1) isin $chantypes) && (%nick == $nick)) cline $2 %win $fline(%win,%match,%i)
     dec %i
   }
 }
 
 alias -l DLF.@find.ColourLines {
-  var %win = @dlF.Ads. $+ $network
+  var %win = @dlF.@find. $+ $network
   if (!$window(%win)) return
   var %i = $line(%win,0)
   while (%i) {
@@ -1699,7 +1714,7 @@ alias -l DLF.Win.Format {
 alias -l DLF.Win.Echo {
   var %line = $DLF.Win.Format($1-)
   var %col = $DLF.Win.Colour($1)
-  if ($2 !isin Private @find) {
+  if ($2 !isin Private @find $hashtag) {
     echo %col -t $2 %line
     DLF.Watch.Log Echoed: To $2
   }
@@ -1914,8 +1929,8 @@ alias -l DLF.@find.Results {
     %msg = %msg $c(4,0,:: Received from $nick ::)
   }
   var %win = $+(@dlF.@find.,$network)
-  if (!$window(%win)) {
-    window -lk0wn -t15 %win
+  if (!$window(%win)) window -lk0wn -t15 %win
+  if ($line(%win,0) == 0) {
     aline -n 6 %win This window shows @find results as received individually from various servers.
     aline -n 2 %win In the future you might want to use @search instead of @find as it is quicker and more efficicent.
     aline -n 2 %win If you use @search, consider installing the sbClient script to make processing @search results easier.
@@ -1939,18 +1954,18 @@ alias -l DLF.@find.Results {
   inc %i
   iline -hn $iif($left(%msg,1) == @,2,3) %win %i %msg
   window -b %win
-  DLF.@find.TitleBar %win Right-click for options or double-click to download
+  DLF.Win.TitleBar %win @find results from $network so far -=- Right-click for options or double-click to download
   DLF.Halt @find result: Result for %trig added to %win
 }
 
-alias -l DLF.@find.TitleBar {
+alias -l DLF.Win.TitleBar {
   var %i = $line($1,0)
   while (%i) {
     if ($line($1,%i) = $crlf) break
     dec %i
   }
   var %i = $calc($line($1,0) - %i)
-  titlebar $1 -=- %i @find results from $network so far $iif($2-,-=- $2-)
+  titlebar $1 -=- %i $2-
 }
 
 alias -l DLF.@find.Get {
@@ -1988,7 +2003,7 @@ alias -l DLF.@find.CopyLines {
     inc %i
   }
   dec %i
-  DLF.@find.TitleBar $active %i line(s) copied into clipboard
+  DLF.Win.TitleBar $active %i line(s) copied into clipboard
 }
 
 alias -l DLF.@find.ClearColours {
@@ -2021,7 +2036,7 @@ alias -l DLF.@find.SendToAutoGet {
   if (%MTautorequest == 1) MTkickstart $gettok(%temp,2,$asc($space))
   MTwhosinque
   echo -st %MTlogo Added %j File(s) To Waiting List From dlFilter
-  DLF.@find.TitleBar %win %j line(s) sent to AutoGet
+  DLF.Win.TitleBar %win %j line(s) sent to AutoGet
 }
 
 alias -l DLF.@find.SendTovPowerGet {
@@ -2038,7 +2053,7 @@ alias -l DLF.@find.SendTovPowerGet {
     inc %i
   }
   dec %i
-  DLF.@find.TitleBar %win %i line(s) sent to vPowerGet.NET
+  DLF.Win.TitleBar %win %i line(s) sent to vPowerGet.NET
 }
 
 alias -l DLF.@find.SaveResults {
@@ -3098,7 +3113,7 @@ alias -l DLF.hadd {
 alias -l DLF.CreateHashTables {
   var %matches = 0
   if ($hget(DLF.chantext.ads)) hfree DLF.chantext.ads
-  DLF.hadd chantext.ads *I-n-v-i-s-i-o-n*
+  DLF.hadd chantext.ads *I-n-v-i-s-i-o-n*
   DLF.hadd chantext.ads *¥*Mp3s*¥*
   DLF.hadd chantext.ads *§*DCC Send Failed*to*§*
   DLF.hadd chantext.ads *§kÎn§*ßy*§hådõ*
@@ -3108,14 +3123,10 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *±*
   DLF.hadd chantext.ads *» Port «*»*
   DLF.hadd chantext.ads * CSE Fact *
-  DLF.hadd chantext.ads *!*.mp3*SpR*
-  DLF.hadd chantext.ads *!*MB*Kbps*Khz*
   DLF.hadd chantext.ads *- DCC Transfer Status -*
   DLF.hadd chantext.ads *--PepsiScript--*
   DLF.hadd chantext.ads *-SpR skin used by PepsiScript*
-  DLF.hadd chantext.ads *-SpR-*
   DLF.hadd chantext.ads *.mp3*t×PLåY6*
-  DLF.hadd chantext.ads *<><><*><><>*
   DLF.hadd chantext.ads *@*DragonServe*
   DLF.hadd chantext.ads *@*Finålity*
   DLF.hadd chantext.ads *@*SDFind*
@@ -3136,7 +3147,9 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *File Servers Online*Trigger*Accessed*Served*
   DLF.hadd chantext.ads *Files In List*slots open*Queued*Next Send*
   DLF.hadd chantext.ads *Files*free Slots*Queued*Speed*Served*
-  DLF.hadd chantext.ads *For my list of * files type*
+  DLF.hadd chantext.ads *For my list of * files type*@*
+  DLF.hadd chantext.ads *For my list*files*type @*
+  DLF.hadd chantext.ads *For My Top Download Hit-chart, type @*
   DLF.hadd chantext.ads *Type*@* for my list*
   DLF.hadd chantext.ads *Type*@* to get my list*
   DLF.hadd chantext.ads *FTP service*FTP*port*bookz*
@@ -3144,10 +3157,6 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *has just received*for a total of*
   DLF.hadd chantext.ads *I am opening up*more slot*Taken*
   DLF.hadd chantext.ads *I am using*SpR JUKEBOX*http://spr.darkrealms.org*
-  DLF.hadd chantext.ads *I have just finished recieving*from*I have now recieved a total of*
-  DLF.hadd chantext.ads *I have just finished sending*.mp3 to*
-  DLF.hadd chantext.ads *I have just finished sending*I have now sent a total of*files since*
-  DLF.hadd chantext.ads *I have just finished sending*to*Empty*
   DLF.hadd chantext.ads *I have sent a total of*files and leeched a total of*since*
   DLF.hadd chantext.ads *I have spent a total time of*sending files and a total time of*recieving files*
   DLF.hadd chantext.ads *is playing*info*secs*
@@ -3166,17 +3175,12 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *Rank*~*x*~*
   DLF.hadd chantext.ads Search: * Mode:*
   DLF.hadd chantext.ads *send - to*at*cps*complete*left*
-  DLF.hadd chantext.ads *Sent*OS-Limits V*
   DLF.hadd chantext.ads *sent*to*size*speed*time*sent*
   DLF.hadd chantext.ads *Softwind*Softwind*
   DLF.hadd chantext.ads *SpR JUKEBOX*filesize*
-  DLF.hadd chantext.ads *SPr*!*.mp3*
-  DLF.hadd chantext.ads *SpR*[*mp3*]*
   DLF.hadd chantext.ads *Statistici 1*by Un_DuLciC*
   DLF.hadd chantext.ads *Successfully*Tx.Track*
   DLF.hadd chantext.ads *tìnkërßëll`s collection*Love Quotes*
-  DLF.hadd chantext.ads *Tape*!*.mp3*
-  DLF.hadd chantext.ads *Tape*!*MB*
   DLF.hadd chantext.ads *Tape*@*
   DLF.hadd chantext.ads *Tapez*Pour avoir ce Fichier*
   DLF.hadd chantext.ads *Tapez*Pour Ma Liste De*Fichier En Attente*
@@ -3191,19 +3195,20 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *Total*File Transfer in Progress*slot*empty*
   DLF.hadd chantext.ads *Trigger*@*
   DLF.hadd chantext.ads *Trigger*ctcp*
-  DLF.hadd chantext.ads *Type*!*.*
-  DLF.hadd chantext.ads *Type*!*to get this*
   DLF.hadd chantext.ads *Type @* list of *
   DLF.hadd chantext.ads *User Slots*Sends*Queues*Next Send Available*¤UControl¤*
   DLF.hadd chantext.ads *vient d'etre interrompu*Dcc Libre*
+  DLF.hadd chantext.ads *Welcome to #*, we have * detected servers online to serve you*
+  DLF.hadd chantext.ads *Combined channel status:*
   DLF.hadd chantext.ads *Wireless*mb*br*
   DLF.hadd chantext.ads *[BWI]*@*
   DLF.hadd chantext.ads *[Fserve Active]*
   DLF.hadd chantext.ads *[Mp3xBR]*
-  DLF.hadd chantext.ads *~*~SpR~*~*
   DLF.hadd chantext.ads @ * is now open via ftp @*
   DLF.hadd chantext.ads @ --*
   DLF.hadd chantext.ads @ Use @*
+  DLF.hadd chantext.announce *Tape: !* Pour Voir Vos Statistiques*
+  DLF.hadd chantext.ads *QNet Advanced DCC File Server*Sharing *B of stuff!*
   inc %matches $hget(DLF.chantext.ads,0).item
 
   if ($hget(DLF.chantext.cmds)) hfree DLF.chantext.cmds
@@ -3246,6 +3251,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *Receive Successful*Thanks for*
   DLF.hadd chantext.announce *Received*From*Size*Speed*Time*since*
   DLF.hadd chantext.announce *ROLL TIDE*Now Playing*mp3*
+  DLF.hadd chantext.announce *sent*to*at*total sent*files*yesterday*files*today*files*
   DLF.hadd chantext.announce *sets away*auto idle away*since*
   DLF.hadd chantext.announce *Thank You*for serving in*
   DLF.hadd chantext.announce *Thanks for the +v*
@@ -3256,6 +3262,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *Tocmai am primit*KeepTrack*
   DLF.hadd chantext.announce *Total Received*Files*Total Received Today*Files*
   DLF.hadd chantext.announce *Tx TIMEOUT*
+  DLF.hadd chantext.announce Type*!*.* To Get This *
   DLF.hadd chantext.announce *WaS auTo-VoiCeD THaNX FoR SHaRiNG HeRe iN*
   DLF.hadd chantext.announce *We have just finished receiving*From The One And Only*
   DLF.hadd chantext.announce *Welcome back to #* operator*.*
@@ -3263,6 +3270,21 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *[Away]*SysReset*
   DLF.hadd chantext.announce *[F][U][N]*
   DLF.hadd chantext.announce Request * —I-n-v-i-s-i-o-n—
+  DLF.hadd chantext.announce *Tape*!*.mp3*
+  DLF.hadd chantext.announce *Tape*!*MB*
+  DLF.hadd chantext.announce *!*.mp3*SpR*
+  DLF.hadd chantext.announce *!*MB*Kbps*Khz*
+  DLF.hadd chantext.announce *Sent*OS-Limits V*
+  DLF.hadd chantext.announce *<><><*><><>*
+  DLF.hadd chantext.announce *~*~SpR~*~*
+  DLF.hadd chantext.announce *I have just finished recieving*from*I have now recieved a total of*
+  DLF.hadd chantext.announce *I have just finished sending*.mp3 to*
+  DLF.hadd chantext.announce *I have just finished sending*I have now sent a total of*files since*
+  DLF.hadd chantext.announce *I have just finished sending*to*Empty*
+  DLF.hadd chantext.announce *Tape: !* Pour Voir Vos Statistiques*
+  DLF.hadd chantext.announce *-SpR-*
+  DLF.hadd chantext.announce *SPr*!*.mp3*
+  DLF.hadd chantext.announce *SpR*[*mp3*]*
   inc %matches $hget(DLF.chantext.announce,0).item
 
   if ($hget(DLF.chantext.always)) hfree DLF.chantext.always
