@@ -3200,14 +3200,13 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *tìnkërßëll`s collection*Love Quotes*
   DLF.hadd chantext.ads *Tape*@*
   DLF.hadd chantext.ads *Tapez*Pour avoir ce Fichier*
-  DLF.hadd chantext.ads *Tapez*Pour Ma Liste De*Fichier En Attente*
+  DLF.hadd chantext.ads *Tapez*Pour*Ma Liste De*Fichier En Attente*
   DLF.hadd chantext.ads *Tasteazã*@*
   DLF.hadd chantext.ads *Teclea: @*
   DLF.hadd chantext.ads *The Dcc Transfer to*has gone under*Transfer*
   DLF.hadd chantext.ads *There is a Slot Opening*Grab it Fast*
   DLF.hadd chantext.ads *There is a*Open*Say's Grab*
   DLF.hadd chantext.ads *To serve and to be served*@*
-  DLF.hadd chantext.ads *to*just got timed out*slot*Empty*
   DLF.hadd chantext.ads *Total Offered*Files*Total Sent*Files*Total Sent Today*Files*
   DLF.hadd chantext.ads *Total*File Transfer in Progress*slot*empty*
   DLF.hadd chantext.ads *Trigger*@*
@@ -3224,7 +3223,6 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads @ * is now open via ftp @*
   DLF.hadd chantext.ads @ --*
   DLF.hadd chantext.ads @ Use @*
-  DLF.hadd chantext.announce *Tape: !* Pour Voir Vos Statistiques*
   DLF.hadd chantext.ads *QNet Advanced DCC File Server*Sharing *B of stuff!*
   inc %matches $hget(DLF.chantext.ads,0).item
 
@@ -3276,6 +3274,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *Thanks*for Supplying an server in*
   DLF.hadd chantext.announce *Thanks*For The*@*
   DLF.hadd chantext.announce *Thanks*For*The*Voice*
+  DLF.hadd chantext.announce * to * just got timed out*slot*Empty*
   DLF.hadd chantext.announce *Tocmai am primit*KeepTrack*
   DLF.hadd chantext.announce *Total Received*Files*Total Received Today*Files*
   DLF.hadd chantext.announce *Tx TIMEOUT*
@@ -3291,7 +3290,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *Tape*!*MB*
   DLF.hadd chantext.announce *!*.mp3*SpR*
   DLF.hadd chantext.announce *!*MB*Kbps*Khz*
-  DLF.hadd chantext.announce *Sent*OS-Limits V*
+  DLF.hadd chantext.announce *Sent*to*OS-Limits v*
   DLF.hadd chantext.announce *<><><*><><>*
   DLF.hadd chantext.announce *~*~SpR~*~*
   DLF.hadd chantext.announce *I have just finished recieving*from*I have now recieved a total of*
@@ -3302,6 +3301,16 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *-SpR-*
   DLF.hadd chantext.announce *SPr*!*.mp3*
   DLF.hadd chantext.announce *SpR*[*mp3*]*
+  DLF.hadd chantext.announce *Tape*!* Pour Voir Vos Statistiques*
+  DLF.hadd chantext.announce *Type*!* To Get This*
+  DLF.hadd chantext.announce *- ??/??/????  *  Ajouté par *
+  DLF.hadd chantext.announce *Mode: Normal*
+  DLF.hadd chantext.announce ø
+  DLF.hadd chantext.announce *Je Vient Juste De Reçevoir * De La Pars De * Pour Un Total De * Fichier(s)*
+  DLF.hadd chantext.announce *The fastest Average Send Speeds captured last hour are*
+  DLF.hadd chantext.announce *Todays Most Popular Servers - as of *
+  DLF.hadd chantext.announce *Todays Top Leechers - as of *
+  DLF.hadd chantext.announce *I have just voiced * for being kewl And sharing*
   inc %matches $hget(DLF.chantext.announce,0).item
 
   if ($hget(DLF.chantext.always)) hfree DLF.chantext.always
