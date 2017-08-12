@@ -3150,7 +3150,6 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *DCC SEND COMPLETE*to*slot*
   DLF.hadd chantext.ads *DCC Send Failed of*to*
   DLF.hadd chantext.ads *Download this exciting book*
-  DLF.hadd chantext.ads *Empty! Grab one fast!*
   DLF.hadd chantext.ads *Enter @*to see the menu*
   DLF.hadd chantext.ads *Escribe*!*
   DLF.hadd chantext.ads *Escribe*@*
@@ -3245,6 +3244,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *I am AWAY*Reason*I have been Away for*
   DLF.hadd chantext.announce *I am AWAY*Reason*To page me*
   DLF.hadd chantext.announce *I have just finished receiving*from*
+  DLF.hadd chantext.announce *I have just finished sending * to *
   DLF.hadd chantext.announce *I have just finished receiving*from*have now received a total*
   DLF.hadd chantext.announce *I have just received*from*for a total of*KeepTrack*
   DLF.hadd chantext.announce *I have just received*from*leeched since*
