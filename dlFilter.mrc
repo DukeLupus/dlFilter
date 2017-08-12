@@ -1511,25 +1511,24 @@ alias -l DLF.Win.AdsShow {
     $+($chr(149),$space),$null,$chr(149),$null,$+($chr(144),$space),$null,$chr(144),$null,$+($chr(8226),$space),$null,$chr(8226),$null)
   %line = $puttok(%line,$tab $+ $gettok(%line,2,$asc($space)),2,$asc($space))
   %line = $puttok(%line,$tab $+ $gettok(%line,3,$asc($space)),3,$asc($space))
-  var %srch = $gettok($strip(%line),1-7,$asc($space)), %ln = $calc($line(%win,0) + 1)
+  var %srch = $gettok($strip(%line),1-7,$asc($space))
+  %srch = $puttok(%srch,$DLF.Win.NickFromTag($gettok(%srch,2,$asc(space))),2,$asc($space))
+  var %ln = $calc($line(%win,0) + 1)
   var %match = $+([,$iif(%DLF.perconnect == 0,$network),$chan,]*,$tag($DLF.Chan.GetMsgNick($chan,$nick)),*)
   var %i = $fline(%win,%match,0)
-  echo -st Ads1: found chan/nick: %i
   if (%i == 0) {
     %match = $+([,$iif(%DLF.perconnect == 0,$network),$chan,]*)
     %i = $fline(%win,%match,0)
-    echo -st Ads2: found chan: %i
   }
   if (%i == 0) {
     %match = [*]*
     %i = $fline(%win,%match,0)
-    echo -st Ads3: found any: %i
   }
   while (%i) {
     var %ln = $fline(%win,%match,%i)
     var %l = $gettok($strip($line(%win,%ln)),1-7,$asc($space))
-    if (%l == $crlf) break
-    elseif (%l == %srch) {
+    %l = $puttok(%l,$DLF.Win.NickFromTag($gettok(%l,2,$asc(space))),2,$asc($space))
+    if (%l == %srch) {
       if (%line != $line(%win,%ln)) rline $iif($line(%win,%ln).state,-a) 3 %win %ln %line
       DLF.Watch.Log Advert from $nick replaced
       break
