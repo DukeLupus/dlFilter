@@ -915,6 +915,10 @@ alias -l DLF.Priv.ctcp {
 
 alias -l DLF.Priv.ctcpReply {
   DLF.Watch.Called DLF.Priv.ctcpReply
+  if ($1 == VERSION) {
+    DLF.Win.Echo $event Private $nick $1-
+    DLF.Halt Echoed
+  }
   if ($hiswm(ctcp.reply,$1-)) DLF.Win.Filter $1-
   DLF.Priv.QueryOpen $1-
   DLF.Priv.CommonChan $1-
@@ -933,17 +937,8 @@ alias -l DLF.Priv.RegularUser {
     }
   }
   else {
-    ; echo to channel and prevent message window opening
-    var %i = $comchan($nick,0), %opchan = $false
-    while (%i) {
-      var %chan = $comchan($nick,%i)
-      if ($nick !isreg %chan) {
-        DLF.Win.Echo $event %chan $nick $1-
-        %opchan = $true
-      }
-      dec %i
-    }
-    if (%opchan) halt
+    DLF.Win.Echo $event Private $nick $2-
+    halt
   }
 }
 
@@ -1730,12 +1725,13 @@ alias -l DLF.Win.Echo {
     DLF.Watch.Log Echoed: To $2
   }
   else {
+    if ($1 != ctcpreply) %line = $2 $+ : %line
     var %sent = $null
     var %i = $comchan($3,0)
     while (%i) {
       var %chan = $comchan($3,%i)
       if ($DLF.Chan.IsDlfChan(%chan)) {
-        echo %col -t %chan $2 $+ : %line
+        echo %col -t %chan %line
         %sent = $addtok(%sent,%chan,$asc($comma))
       }
       dec %i
