@@ -686,7 +686,7 @@ alias -l DLF.Chan.ControlCodes {
 }
 
 alias -l DLF.Chan.NonAlpha {
-  if ((%DLF.filter.nonalpha == 1) && ($upper($1-) == $lower($1-))) {
+  if ((%DLF.filter.nonalpha == 1) && ($upper($1-) === $lower($1-))) {
     DLF.Watch.Log Filtered: Non-alphabetic line
     DLF.Win.Filter $1-
   }
@@ -1518,7 +1518,7 @@ alias -l DLF.Win.AdsShow {
   var %line = $DLF.Win.LineFormat($event $chan $nick $replace($strip($1-),$tab,$null,$+($space,$space),$space))
   var %ad = $replace($gettok(%line,3-,$asc($space)),$&
     $+($chr(149),$space),$null,$chr(149),$null,$+($chr(144),$space),$null,$chr(144),$null,$+($chr(8226),$space),$null,$chr(8226),$null)
-  while ($left(%ad,1) !isletter) %ad = $right(%ad,-1)
+  while (($left(%ad,1) !isletter) || ($asc($left(%ad,1)) >= 192)) %ad = $right(%ad,-1)
   %line = $gettok(%line,1,$asc($space)) $tab $+ $gettok(%line,2,$asc($space)) $tab $+ %ad
   var %srch = $replace($gettok($strip(%line),1-7,$asc($space)),$tab,$null)
   %srch = $puttok(%srch,$DLF.Win.NickFromTag($gettok(%srch,2,$asc($space))),2,$asc($space))
