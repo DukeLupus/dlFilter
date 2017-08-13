@@ -617,18 +617,18 @@ alias -l DLF.Chan.IsDlfChan {
 alias -l DLF.Chan.IsUserEvent {
   if ($1 == 0) return $false
   if (%DLF.netchans == $hashtag) return $true
-  var %i = $len($chantypes), %tot = 0, %ln = - $+ $len($network)
+  var %i = $len($chantypes), %ln = - $+ $len($network)
   while (%i) {
     var %match = $+($network,$mid($chantypes,%i,1),*)
     var %j = $wildtok(%DLF.netchans,%match,0,$asc($comma))
     while (%j) {
       var %nc = $wildtok(%DLF.netchans,%match,%j,$asc($comma))
-      if ($me isin $right(%nc,%ln)) inc %tot
+      if ($me isin $right(%nc,%ln)) return $true
       dec %j
     }
     dec %i
   }
-  return %tot
+  return $false
 }
 
 alias -l DLF.Chan.Text {
