@@ -360,38 +360,68 @@ on *:close:@#*: { DLF.oNotice.Close $target }
 
 #dlf_events off
 
-; Announce update when I join a filtered channel
-on me:*:join:%DLF.channels: { if ($DLF.Chan.IsDlfChan($chan)) DLF.Update.Announce }
-
 ; Channel user activity
 ; join, part, quit, nick changes, kick
-on ^*:join:%DLF.channels: {
+on me:*:join:#: {
+  DLF.@find.ColourLines 3
+  if ($DLF.Chan.IsDlfChan($chan)) {
+    DLF.Ads.ColourLines 3
+    DLF.Update.Announce
+  }
+}
+
+on ^*:join:#: {
+  DLF.@find.ColourLines 3
   if ($DLF.Chan.IsChanEvent) {
+    DLF.Ads.ColourLines 3
     DLF.DccSend.Rejoin
-    DLF.Win.Join
     ; Wait for 1 sec for user's modes to be applied to avoid checking ops
     if ((%DLF.ops.advertpriv) && ($me isop $chan)) .timer 1 1 .signal DLF.Ops.RequestVersion $nick
     if (%DLF.filter.joins) DLF.User.Channel $chan $iif($shortjoinsparts,Joins:) $nick $br($address) $iif(!$shortjoinsparts,has joined $chan)
   }
 }
 
-on ^*:part:%DLF.channels: {
+on me:*:part:#: {
+  DLF.@find.ColourLines 15
+  if ($DLF.Chan.IsDlfChan($chan)) DLF.Ads.ColourLines 14
+}
+
+on ^*:part:#: {
+  DLF.@find.ColourLines 15
   if ($DLF.Chan.IsChanEvent) {
-    DLF.Win.Part
+    DLF.Ads.ColourLines 15
     if (%DLF.filter.parts) DLF.User.Channel $chan $iif($shortjoinsparts,Parts:) $nick $br($address) $iif(!$shortjoinsparts,has left $chan) $iif($1-,$br($1-))
   }
 }
 
-on ^*:kick:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.kicks)) DLF.User.Channel $chan $knick $iif(!$shortjoinsparts,$br($address($knick,5))) was kicked $iif(!$shortjoinsparts,from $chan ) by $nick $br($1-) }
+on ^*:kick:#: {
+  DLF.@find.ColourLines 14
+  if ($DLF.Chan.IsChanEvent) {
+    DLF.Ads.ColourLines 14
+    if (%DLF.filter.kicks == 1) DLF.User.Channel $chan $knick $iif(!$shortjoinsparts,$br($address($knick,5))) was kicked $iif(!$shortjoinsparts,from $chan ) by $nick $br($1-)
+  }
+}
 
 on ^*:nick: {
   DLF.Ads.NickChg
   if ($DLF.Chan.IsUserEvent(%DLF.filter.nicks)) DLF.User.NoChannel $newnick $nick $iif(!$shortjoinsparts,$br($address($knick,5))) is now known as $newnick
 }
 
+on me:*:quit: {
+  DLF.@find.ColourLines 15
+  DLF.Ads.ColourLines 14
+}
+
+on *:disconnect: {
+  DLF.@find.ColourLines 15
+  DLF.Ads.ColourLines 14
+  DLF.Raw005.Reset
+}
+
 on ^*:quit: {
+  DLF.@find.ColourLines 14
   if ($DLF.Chan.IsUserEvent) {
-    DLF.Win.Part
+    DLF.Ads.ColourLines 14
     if (%DLF.filter.quits) DLF.User.NoChannel $nick $iif($shortjoinsparts,Quits:) $nick $br($address) $iif(!$shortjoinsparts,Quit) $br($1-)
   }
 }
@@ -461,7 +491,6 @@ on *:ctcpreply:*: { DLF.Priv.ctcpReply $1- }
 
 ; RPL_ISUPPORT 005 CNOTICE / CPRIVMSG to avoid 439 Target change too frequently message
 raw 005:*: { DLF.Raw005.Check $1- }
-on *:disconnect: { DLF.Raw005.Reset }
 
 ; Filter away messages
 raw 301:*: { DLF.Away.Filter $1- }
@@ -588,10 +617,15 @@ alias -l DLF.Chan.IsDlfChan {
 alias -l DLF.Chan.IsUserEvent {
   if ($1 == 0) return $false
   if (%DLF.netchans == $hashtag) return $true
-  var %i = $len($chantypes), %tot = 0
+  var %i = $len($chantypes), %tot = 0, %ln = - $+ $len($network)
   while (%i) {
-    var %c = $mid($chantypes,%i,1)
-    inc %tot + $wildtok(%DLF.netchans,$+($network,%c,*),0,$asc($comma))
+    var %match = $+($network,$mid($chantypes,%i,1),*)
+    var %j = $wildtok(%DLF.netchans,%match,0,$asc($comma))
+    while (%j) {
+      var %nc = $wildtok(%DLF.netchans,%match,%j,$asc($comma))
+      if ($me isin $right(%nc,%ln)) inc %tot
+      dec %j
+    }
     dec %i
   }
   return %tot
@@ -1149,7 +1183,7 @@ alias -l DLF.DccSend.Rejoin {
     var %chan = $gettok(%item,2,$asc(|))
     if (%chan != $chan) continue
     var %trig = $gettok(%item,3,$asc(|))
-    if (%trig != ! $+ $nick) continue
+    if ($right(%trig,-1) != $nick) continue
     var %fn = $decode($gettok(%item,5,$asc(|)))
     DLF.Chan.EditSend %chan %trig %fn
     DLF.Watch.Log $nick rejoined $chan: Request resent: %trig %fn
@@ -1533,7 +1567,8 @@ alias -l DLF.Win.AdsShow {
     var %l = $gettok($strip($replace($line(%win,%ln),$tab,$null)),1-7,$asc($space))
     %l = $puttok(%l,$DLF.Win.NickFromTag($gettok(%l,2,$asc($space))),2,$asc($space))
     if (%l == %srch) {
-      if (%line != $line(%win,%ln)) rline $iif($line(%win,%ln).state,-a) 3 %win %ln %line
+      if ($gettok(%line,3-,$asc($space)) != $gettok($line(%win,%ln),3-,$asc($space))) $&
+        rline $iif($line(%win,%ln).state,-a) 3 %win %ln %line
       DLF.Watch.Log Advert: $nick replaced
       break
     }
@@ -1604,14 +1639,6 @@ menu @dlF.Ads.* {
   -
 }
 
-alias -l DLF.Win.Join {
-  DLF.Ads.ColourLines 3
-  DLF.@find.ColourLines 3
-}
-alias -l DLF.Win.Part {
-  DLF.Ads.ColourLines 14
-  DLF.@find.ColourLines 14
-}
 alias -l DLF.Ads.NickChg {
   if ($query($nick)) queryrn $nick $newnick
   if ($chat($nick)) dcc nick -c $nick $newnick
@@ -1645,27 +1672,38 @@ alias -l DLF.Win.NickFromTag {
 alias -l DLF.Ads.ColourLines {
   var %win = $DLF.Win.WinName(Ads)
   if (!$window(%win)) return
-  var %match = $+([,$iif(%DLF.perconnect == 0,$network),*]*<*,$nick,>*)
+  if (($event == quit) || ($event == disconnect)) var %match = $+([,$iif(%DLF.perconnect == 0,$network),*]*)
+  else var %match = $+([,$iif(%DLF.perconnect == 0,$network),$chan,]*)
+  if ($nick != $me) %match = $+(%match,<*,$nick,>*)
   var %i = $fline(%win,%match,0)
+  var %ctpos = $iif(%DLF.perconnect == 0,$calc($len($network) + 2),2)
   while (%i) {
     var %l = $strip($fline(%win,%match,%i).text)
-    if (%l == $crlf) break
-    var %nc = $left($right($gettok(%l,1,$asc($space)),-1),-1)
-    var %nick = $DLF.Win.NickFromTag($gettok(%l,2,$asc($space)))
-    if (($left(%nc,%nl) == $network) && ($left($right(%nc,- $+ %nl),1) isin $chantypes) && (%nick == $nick)) cline $2 %win $fline(%win,%match,%i)
+    var %ln = $fline(%win,%match,%i)
     dec %i
+    var %chantype = $mid($gettok(%l,1,$asc($space)),%ctpos,1)
+    if (%chantype !isin $chantypes) continue
+    var %nick = $DLF.Win.NickFromTag($gettok(%l,2,$asc($space)))
+    if (($event == disconnect) || (%nick == $nick) || ($me == $nick)) cline $1 %win %ln
   }
 }
 
 alias -l DLF.@find.ColourLines {
   var %win = @dlF.@find. $+ $network
   if (!$window(%win)) return
-  var %i = $line(%win,0)
+  if ($nick == $me) DLF.@find.DoColourLines $1 %win *
+  elseif ($comchan($nick,0) == 0) {
+    DLF.@find.DoColourLines $1 %win $+(?,$nick, *)
+    DLF.@find.DoColourLines $1 %win $+(*:: Received from ,$nick)
+  }
+}
+
+alias -l DLF.@find.DoColourLines {
+  var %i = $fline($2,$3-,0)
   while (%i) {
-    var %l = $strip($line(%win,%i))
-    if (%l == $crlf) break
-    var %user = $right($gettok(%l,1,$asc($space)),-1)
-    if (%user == $nick) cline $2 $1 %i
+    var %l = $strip($fline($2,$3-,%i).text)
+    if (%l == $crlf) return
+    cline $1 $2 $fline($2,$3-,%i)
     dec %i
   }
 }
@@ -1923,7 +1961,7 @@ alias -l DLF.@find.Results {
   if ($left(%trig,1) = !) {
     var %rest = $strip(%rest)
     var %fn = $DLF.GetFilename(%rest)
-    %rest = $right(%rest,$calc($len(%rest) - $len(%fn) - 1))
+    %rest = $right(%rest,$calc(- $len(%fn) - 1))
     if ($gettok(%rest,1,$asc($space)) == ::INFO::) {
       %rest = :: Size: $gettok(%rest,2-,$asc($space))
       if ($pos(%rest,+,0) > 0) $&
@@ -1933,7 +1971,7 @@ alias -l DLF.@find.Results {
   }
   var %msg = %trig $tab $+ %rest
   if ((%trig != $+(!,$nick)) && (%trig != $+(@,$nick))) {
-    %msg = %msg $c(4,0,:: Received from $nick ::)
+    %msg = %msg $c(4,0,:: Received from $nick)
   }
   var %win = $+(@dlF.@find.,$network)
   if (!$window(%win)) window -lk0wn -t15 %win
@@ -3166,7 +3204,6 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *Type*@* to get my list*
   DLF.hadd chantext.ads *FTP service*FTP*port*bookz*
   DLF.hadd chantext.ads *FTP*address*port*login*password*
-  DLF.hadd chantext.ads *has just received*for a total of*
   DLF.hadd chantext.ads *I am opening up*more slot*Taken*
   DLF.hadd chantext.ads *I am using*SpR JUKEBOX*http://spr.darkrealms.org*
   DLF.hadd chantext.ads *I have sent a total of*files and leeched a total of*since*
@@ -3210,7 +3247,6 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *User Slots*Sends*Queues*Next Send Available*¤UControl¤*
   DLF.hadd chantext.ads *vient d'etre interrompu*Dcc Libre*
   DLF.hadd chantext.ads *Welcome to #*, we have * detected servers online to serve you*
-  DLF.hadd chantext.ads *Combined channel status:*
   DLF.hadd chantext.ads *Wireless*mb*br*
   DLF.hadd chantext.ads *[BWI]*@*
   DLF.hadd chantext.ads *[Fserve Active]*
@@ -3237,9 +3273,11 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *away*since*pager*
   DLF.hadd chantext.announce *Back*Duration*
   DLF.hadd chantext.announce *BJFileTracker V06 by BossJoe*
+  DLF.hadd chantext.announce *Combined channel status:*
   DLF.hadd chantext.announce *DCC Send Failed of*to*Starting next in Que*
   DLF.hadd chantext.announce *get - from*at*cps*complete*
   DLF.hadd chantext.announce *HêåvêñlyAway*
+  DLF.hadd chantext.announce *has just received*for a total of*
   DLF.hadd chantext.announce *have just finished recieving*from*I have leeched a total*
   DLF.hadd chantext.announce *I am AWAY*Reason*I have been Away for*
   DLF.hadd chantext.announce *I am AWAY*Reason*To page me*
@@ -3293,12 +3331,14 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *I have just finished sending*.mp3 to*
   DLF.hadd chantext.announce *I have just finished sending*I have now sent a total of*files since*
   DLF.hadd chantext.announce *I have just finished sending*to*Empty*
-  DLF.hadd chantext.announce *Tape: !* Pour Voir Vos Statistiques*
+  DLF.hadd chantext.announce *Random Play * Now Activated*
   DLF.hadd chantext.announce *-SpR-*
   DLF.hadd chantext.announce *SPr*!*.mp3*
   DLF.hadd chantext.announce *SpR*[*mp3*]*
   DLF.hadd chantext.announce *Tape*!* Pour Voir Vos Statistiques*
   DLF.hadd chantext.announce *Type*!* To Get This*
+  DLF.hadd chantext.announce *Welcome * person No* to join*
+  DLF.hadd chantext.announce *'s current status * Points this WEEK * Points this MONTH*
   DLF.hadd chantext.announce *- ??/??/????  *  Ajouté par *
   DLF.hadd chantext.announce *Mode: Normal*
   DLF.hadd chantext.announce ø
