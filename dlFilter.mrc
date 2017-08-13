@@ -622,8 +622,8 @@ alias -l DLF.Chan.IsUserEvent {
     var %match = $+($network,$mid($chantypes,%i,1),*)
     var %j = $wildtok(%DLF.netchans,%match,0,$asc($comma))
     while (%j) {
-      var %nc = $wildtok(%DLF.netchans,%match,%j,$asc($comma))
-      if ($me isin $right(%nc,%ln)) return $true
+      var %chan = $right($wildtok(%DLF.netchans,%match,%j,$asc($comma)),%ln)
+      if ($me ison %chan) return $true
       dec %j
     }
     dec %i
