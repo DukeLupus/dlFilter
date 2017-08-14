@@ -39,14 +39,14 @@ dlFilter uses the following code from other people:
   Immediate TODO
         Add comment support to versions file
         Test location and filename for oNotice log files
-        Add filtering of topic changes
+        Make FilterSearch dynamic i.e. new lines which match are added.
+        Remove window limits and use mIRC native functionality instead.
 
   Ideas for possible future enhancements
         Implement toolbar functionality with right click menu
         Check mIRC security settings not too lax
         Manage filetype ignore list like trust list i.e. temp add for requested filetypes.
         Advertising for sbClient for @search + option (await sbClient remediation).
-        Make FilterSearch dynamic i.e. new lines which match are added.
         Better icon file
         Right click channel line menu-items for adding to custom filter (if possible since not a list window)
         More menu options equivalent to dialog options
@@ -94,7 +94,7 @@ dlFilter uses the following code from other people:
         Own file requests are tracked and matching DCC Sends not halted regardless of whether server is regular user or not.
         Added dynamic titlebar to show channel dlF filtering statistics
         Added Ops channel advertising option - an op can advertise dlFilter once every x minutes.
-        Add Ops private advertising option which:
+        Added Ops private advertising option which:
           Version checks users as they join and if they are a mIRC user reminds them to install or upgrade dlF.
           Send advert to users doing @find.
         @find results from ps2 are treated as server responses and no longer give regular user warnings
@@ -111,6 +111,7 @@ dlFilter uses the following code from other people:
         Move ignore spammer functionality to timer because error on $input because it can't run in event
         Added option to accept private messages from user with a query window open.
         Chanserv channel welcome notices now directed to correct window.
+        Added filtering of topic changes
 
   1.17  Update opening comments and add change log
         Use custom identifiers for creating bold, colour etc.
@@ -1546,8 +1547,17 @@ alias -l DLF.Win.AdsShow {
   }
   var %line = $DLF.Win.LineFormat($event $chan $nick $replace($strip($1-),$tab,$null,$+($space,$space),$space))
   var %ad = $replace($gettok(%line,3-,$asc($space)),$&
-    $+($chr(149),$space),$null,$chr(149),$null,$+($chr(144),$space),$null,$chr(144),$null,$+($chr(8226),$space),$null,$chr(8226),$null)
-  while (($left(%ad,1) !isletter) || ($asc($left(%ad,1)) >= 192)) %ad = $right(%ad,-1)
+    $+($chr(149),$space),$space,$chr(149),$space,$+($chr(144),$space),$null,$chr(144),$null,$+($chr(8226),$space),$null,$chr(8226),$null,$+($space,$space),$space)
+  while ($left(%ad,1) == $space) %ad = $right(%ad,-1)
+  while (($left(%ad,1) !isletter) || ($asc($left(%ad,1)) >= 192)) %ad = $deltok(%ad,1,$asc($space))
+  while ($wildtok(%ad,@*,0,$asc($space))) {
+    var %tok = $wildtok(%ad,@*,1,$asc($space))
+    %ad = $reptok(%ad,%tok,$u(%tok),$asc($space))
+  }
+  while ($wildtok(%ad,!*,0,$asc($space))) {
+    var %tok = $wildtok(%ad,!*,1,$asc($space))
+    %ad = $reptok(%ad,%tok,$u(%tok),$asc($space))
+  }
   %line = $gettok(%line,1,$asc($space)) $tab $+ $gettok(%line,2,$asc($space)) $tab $+ %ad
   var %srch = $replace($gettok($strip(%line),1-7,$asc($space)),$tab,$null)
   %srch = $puttok(%srch,$DLF.Win.NickFromTag($gettok(%srch,2,$asc($space))),2,$asc($space))
@@ -3163,35 +3173,25 @@ alias -l DLF.hadd {
 
 alias -l DLF.CreateHashTables {
   var %matches = 0
+
+  if ($hget(DLF.chantext.cmds)) hfree DLF.chantext.cmds
+  DLF.hadd chantext.cmds !*
+  DLF.hadd chantext.cmds @*
+  ; mistypes
+  DLF.hadd chantext.cmds quit
+  DLF.hadd chantext.cmds exit
+  DLF.hadd chantext.cmds :quit
+  DLF.hadd chantext.cmds :exit
+  inc %matches $hget(DLF.chantext.cmds,0).item
+
   if ($hget(DLF.chantext.ads)) hfree DLF.chantext.ads
-  DLF.hadd chantext.ads *I-n-v-i-s-i-o-n*
-  DLF.hadd chantext.ads *¥*Mp3s*¥*
-  DLF.hadd chantext.ads *§*DCC Send Failed*to*§*
-  DLF.hadd chantext.ads *§kÎn§*ßy*§hådõ*
-  DLF.hadd chantext.ads *©§©*
-  DLF.hadd chantext.ads *« * » -*
-  DLF.hadd chantext.ads *«Scøøp MP3»*
-  DLF.hadd chantext.ads *±*
-  DLF.hadd chantext.ads *» Port «*»*
   DLF.hadd chantext.ads * CSE Fact *
-  DLF.hadd chantext.ads *- DCC Transfer Status -*
-  DLF.hadd chantext.ads *--PepsiScript--*
-  DLF.hadd chantext.ads *-SpR skin used by PepsiScript*
-  DLF.hadd chantext.ads *.mp3*t×PLåY6*
   DLF.hadd chantext.ads *@*DragonServe*
   DLF.hadd chantext.ads *@*Finålity*
   DLF.hadd chantext.ads *@*SDFind*
-  DLF.hadd chantext.ads *a recu*pour un total de*fichiers*
-  DLF.hadd chantext.ads *Bandwith*Usage*Current*Record*
-  DLF.hadd chantext.ads *Control*IRC Client*CTCPSERV*
-  DLF.hadd chantext.ads *DCC GET COMPLETE*from*slot*open*
-  DLF.hadd chantext.ads *DCC SEND COMPLETE*to*slot*
-  DLF.hadd chantext.ads *DCC Send Failed of*to*
-  DLF.hadd chantext.ads *Download this exciting book*
   DLF.hadd chantext.ads *Enter @*to see the menu*
   DLF.hadd chantext.ads *Escribe*!*
   DLF.hadd chantext.ads *Escribe*@*
-  DLF.hadd chantext.ads *failed*DCC Send Failed of*to*failed*
   DLF.hadd chantext.ads *File Server Online*Triggers*Sends*Queues*
   DLF.hadd chantext.ads *File Servers Online*Polaris*
   DLF.hadd chantext.ads *File Servers Online*Trigger*Accessed*Served*
@@ -3204,68 +3204,27 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *Type*@* to get my list*
   DLF.hadd chantext.ads *FTP service*FTP*port*bookz*
   DLF.hadd chantext.ads *FTP*address*port*login*password*
-  DLF.hadd chantext.ads *I am opening up*more slot*Taken*
-  DLF.hadd chantext.ads *I am using*SpR JUKEBOX*http://spr.darkrealms.org*
   DLF.hadd chantext.ads *I have sent a total of*files and leeched a total of*since*
   DLF.hadd chantext.ads *I have spent a total time of*sending files and a total time of*recieving files*
-  DLF.hadd chantext.ads *is playing*info*secs*
-  DLF.hadd chantext.ads *Je viens juste de terminer l'envoi de*Prenez-en un vite*
-  DLF.hadd chantext.ads *just left*Sending file Aborted*
-  DLF.hadd chantext.ads *left irc and didn't return in*min. Sending file Aborted*
-  DLF.hadd chantext.ads *left*and didn't return in*mins. Sending file Aborted*
   DLF.hadd chantext.ads List*@*
-  DLF.hadd chantext.ads *Now Sending*QwIRC*
-  DLF.hadd chantext.ads *OmeNServE*©^OmeN^*
-  DLF.hadd chantext.ads *Proofpack Server*Looking for new scans to proof*@proofpack for available proofing packs*
-  DLF.hadd chantext.ads *rßP£a*sk*n*
-  DLF.hadd chantext.ads *rßPLåY*
-  DLF.hadd chantext.ads *Random Play MP3 filez Now Plugged In*
-  DLF.hadd chantext.ads *Random Play MP3*Now Activated*
-  DLF.hadd chantext.ads *Rank*~*x*~*
   DLF.hadd chantext.ads Search: * Mode:*
-  DLF.hadd chantext.ads *send - to*at*cps*complete*left*
-  DLF.hadd chantext.ads *sent*to*size*speed*time*sent*
-  DLF.hadd chantext.ads *Softwind*Softwind*
-  DLF.hadd chantext.ads *SpR JUKEBOX*filesize*
   DLF.hadd chantext.ads *Statistici 1*by Un_DuLciC*
-  DLF.hadd chantext.ads *Successfully*Tx.Track*
-  DLF.hadd chantext.ads *tìnkërßëll`s collection*Love Quotes*
   DLF.hadd chantext.ads *Tape*@*
   DLF.hadd chantext.ads *Tapez*Pour avoir ce Fichier*
   DLF.hadd chantext.ads *Tapez*Pour*Ma Liste De*Fichier En Attente*
   DLF.hadd chantext.ads *Tasteazã*@*
   DLF.hadd chantext.ads *Teclea: @*
-  DLF.hadd chantext.ads *The Dcc Transfer to*has gone under*Transfer*
-  DLF.hadd chantext.ads *There is a Slot Opening*Grab it Fast*
-  DLF.hadd chantext.ads *There is a*Open*Say's Grab*
-  DLF.hadd chantext.ads *To serve and to be served*@*
   DLF.hadd chantext.ads *Total Offered*Files*Total Sent*Files*Total Sent Today*Files*
-  DLF.hadd chantext.ads *Total*File Transfer in Progress*slot*empty*
   DLF.hadd chantext.ads *Trigger*@*
   DLF.hadd chantext.ads *Trigger*ctcp*
+  DLF.hadd chantext.ads *Total*File Transfer in Progress*slot*empty*
   DLF.hadd chantext.ads *Type @* list of *
-  DLF.hadd chantext.ads *User Slots*Sends*Queues*Next Send Available*¤UControl¤*
-  DLF.hadd chantext.ads *vient d'etre interrompu*Dcc Libre*
-  DLF.hadd chantext.ads *Welcome to #*, we have * detected servers online to serve you*
-  DLF.hadd chantext.ads *Wireless*mb*br*
   DLF.hadd chantext.ads *[BWI]*@*
-  DLF.hadd chantext.ads *[Fserve Active]*
-  DLF.hadd chantext.ads *[Mp3xBR]*
   DLF.hadd chantext.ads @ * is now open via ftp @*
   DLF.hadd chantext.ads @ --*
   DLF.hadd chantext.ads @ Use @*
   DLF.hadd chantext.ads *QNet Advanced DCC File Server*Sharing *B of stuff!*
   inc %matches $hget(DLF.chantext.ads,0).item
-
-  if ($hget(DLF.chantext.cmds)) hfree DLF.chantext.cmds
-  DLF.hadd chantext.cmds !*
-  DLF.hadd chantext.cmds @*
-  ; mistypes
-  DLF.hadd chantext.cmds quit
-  DLF.hadd chantext.cmds exit
-  DLF.hadd chantext.cmds :quit
-  DLF.hadd chantext.cmds :exit
-  inc %matches $hget(DLF.chantext.cmds,0).item
 
   if ($hget(DLF.chantext.announce)) hfree DLF.chantext.announce
   DLF.hadd chantext.announce *§ÐfíñÐ âÐÐ-øñ§*
@@ -3347,6 +3306,58 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *Todays Most Popular Servers - as of *
   DLF.hadd chantext.announce *Todays Top Leechers - as of *
   DLF.hadd chantext.announce *I have just voiced * for being kewl And sharing*
+  DLF.hadd chantext.announce *I-n-v-i-s-i-o-n*
+  DLF.hadd chantext.announce *¥*Mp3s*¥*
+  DLF.hadd chantext.announce *§*DCC Send Failed*to*§*
+  DLF.hadd chantext.announce *§kÎn§*ßy*§hådõ*
+  DLF.hadd chantext.announce *©§©*
+  DLF.hadd chantext.announce *« * » -*
+  DLF.hadd chantext.announce *«Scøøp MP3»*
+  DLF.hadd chantext.announce *±*
+  DLF.hadd chantext.announce *» Port «*»*
+  DLF.hadd chantext.announce *- DCC Transfer Status -*
+  DLF.hadd chantext.announce *--PepsiScript--*
+  DLF.hadd chantext.announce *-SpR skin used by PepsiScript*
+  DLF.hadd chantext.announce *.mp3*t×PLåY6*
+  DLF.hadd chantext.announce *a recu*pour un total de*fichiers*
+  DLF.hadd chantext.announce *Bandwith*Usage*Current*Record*
+  DLF.hadd chantext.announce *Control*IRC Client*CTCPSERV*
+  DLF.hadd chantext.announce *DCC GET COMPLETE*from*slot*open*
+  DLF.hadd chantext.announce *DCC SEND COMPLETE*to*slot*
+  DLF.hadd chantext.announce *DCC Send Failed of*to*
+  DLF.hadd chantext.announce *Download this exciting book*
+  DLF.hadd chantext.announce *failed*DCC Send Failed of*to*failed*
+  DLF.hadd chantext.announce *I am opening up*more slot*Taken*
+  DLF.hadd chantext.announce *I am using*SpR JUKEBOX*http://spr.darkrealms.org*
+  DLF.hadd chantext.announce *is playing*info*secs*
+  DLF.hadd chantext.announce *Je viens juste de terminer l'envoi de*Prenez-en un vite*
+  DLF.hadd chantext.announce *just left*Sending file Aborted*
+  DLF.hadd chantext.announce *left irc and didn't return in*min. Sending file Aborted*
+  DLF.hadd chantext.announce *left*and didn't return in*mins. Sending file Aborted*
+  DLF.hadd chantext.announce *Now Sending*QwIRC*
+  DLF.hadd chantext.announce *OmeNServE*©^OmeN^*
+  DLF.hadd chantext.announce *Proofpack Server*Looking for new scans to proof*@proofpack for available proofing packs*
+  DLF.hadd chantext.announce *rßP£a*sk*n*
+  DLF.hadd chantext.announce *rßPLåY*
+  DLF.hadd chantext.announce *Random Play MP3 filez Now Plugged In*
+  DLF.hadd chantext.announce *Random Play MP3*Now Activated*
+  DLF.hadd chantext.announce *Rank*~*x*~*
+  DLF.hadd chantext.announce *send - to*at*cps*complete*left*
+  DLF.hadd chantext.announce *sent*to*size*speed*time*sent*
+  DLF.hadd chantext.announce *Softwind*Softwind*
+  DLF.hadd chantext.announce *SpR JUKEBOX*filesize*
+  DLF.hadd chantext.announce *Successfully*Tx.Track*
+  DLF.hadd chantext.announce *tìnkërßëll`s collection*Love Quotes*
+  DLF.hadd chantext.announce *The Dcc Transfer to*has gone under*Transfer*
+  DLF.hadd chantext.announce *There is a Slot Opening*Grab it Fast*
+  DLF.hadd chantext.announce *There is a*Open*Say's Grab*
+  DLF.hadd chantext.announce *To serve and to be served*@*
+  DLF.hadd chantext.announce *User Slots*Sends*Queues*Next Send Available*¤UControl¤*
+  DLF.hadd chantext.announce *vient d'etre interrompu*Dcc Libre*
+  DLF.hadd chantext.announce *Welcome to #*, we have * detected servers online to serve you*
+  DLF.hadd chantext.announce *Wireless*mb*br*
+  DLF.hadd chantext.announce *[Fserve Active]*
+  DLF.hadd chantext.announce *[Mp3xBR]*
   inc %matches $hget(DLF.chantext.announce,0).item
 
   if ($hget(DLF.chantext.always)) hfree DLF.chantext.always
