@@ -1259,10 +1259,18 @@ alias -l DLF.DccSend.FileRcvd {
   ; Some servers change spaces to underscores
   ; But we cannot rename if Options / DCC / Folders / Command is set
   ; because it would run after this using the wrong filename
-  if ((%origfn != $null) $&
-   && (%fn != %origfn) $&
-   && ($DLF.DccSend.IsNotGetCommand(%fn))) $&
-    rename $filename $qt($+($noqt($nofile($filename)),%origfn))
+  if ((%origfn != $null) && $&
+      (%fn != %origfn) && $&
+      ($DLF.DccSend.IsNotGetCommand(%fn)) && $&
+      ($left(%trig,1) == !) && $&
+      (. isin $gettok(%origfn,-1,$asc($space)))) {
+    var %oldfn = $qt($filename)
+    var %newfn = $qt($+($noqt($nofile($filename)),%origfn))
+    echo -s Renaming %oldfn to %newfn
+    DLF.Watch.Log Renaming %oldfn to %newfn
+    if ($isfile(%newfn)) .remove %newfn
+    .rename $qt($filename) $qt($+($noqt($nofile($filename)),%origfn))
+  }
 }
 
 ; Check that there is no mIRC Options / DCC / Folders / Command for the file
@@ -1590,39 +1598,65 @@ alias -l DLF.Win.AdsShow {
 
 alias -l DLF.Win.AdsGet {
   var %line = $strip($line($active,$1))
-  if (list of !isin %line) return
   var %re = /[[]([^]]+)[]]\s+<[&@%+]*([^>]+?)>.*?\W(@\S+)\s+/Fi
   if ($regex(DLF.Win.AdsGet,%line,%re) > 0) {
     var %chan = $regml(DLF.Win.AdsGet,1)
     var %nick = $regml(DLF.Win.AdsGet,2)
     var %trig = $regml(DLF.Win.AdsGet,3)
-    if ((%trig = @find) || ($left(%trig,7) == @search)) return
-    var %c = $left(%chan,1)
-    if (%c isin $chantypes) {
-      var %net = $gettok(%chan,1,$asc(%c))
-      %chan = %c $+ $gettok(%chan,2,$asc(%c))
-    }
-    else var %net = $network
-    if ((%net) && (%chan) && (%nick) && (%trig)) {
-      var %cid = $cid
+    echo -s chan %chan nick %nick trig %trig
+    if ((%trig == @find) || ($left(%trig,7) == @search)) return
+    var %cid = $cid
+    if ($gettok($active,-1,$asc(.)) == All) {
       var %i = $scon(0)
       while (%i) {
-        if ($scon(%i).network == %net) {
-          scid $scon(%i)
-          ; Use editbox not msg so other scripts (like sbClient) get On Input event
-          if (%nick ison %chan) DLF.Chan.EditSend %chan %trig
-          break
+        var %net = $scon(%i).network, %ln = $len(%net)
+        if ($left(%chan,%ln) == %net) {
+          var %trychan = $right(%chan,- $+ %ln)
+          var %c = $left(%trychan,1)
+          if (%c isin $scon(%i).chantypes) {
+            %chan = %trychan
+            break
+          }
         }
         dec %i
       }
+      if (%i == 0) return $input(No longer connected to network %net,o)
+      scid $scon(%i)
+    }
+    else var %net = $network
+    ; Use editbox not msg so other scripts (like sbClient) get On Input event
+    if (%nick ison %chan) {
+      DLF.Chan.EditSend %chan %trig
       scid %cid
+      return
+    }
+    else {
+      scid %cid
+      return $input(No longer in channel %chan on network %net,o)
     }
   }
 }
 
+alias -l DLF.InvalidSelection {
+  var %i = $sline($menu,0)
+  if (%i == $null) return $true
+  if (%i == 0) return $true
+  var %min = $min($line($menu,0),10)
+  while (%min) {
+    if ($line($menu,%min) == $crlf) break
+    dec %min
+  }
+  echo -s %min
+  while (%i) {
+    if ($sline($menu,%i).ln > %min) return $false
+    dec %i
+  }
+  return $true
+}
+
 menu @dlF.Ads.* {
   dclick: DLF.Win.AdsGet $1
-  $iif($sline($active,0) == $null,$style(2)) Get list of files from selected servers: {
+  $iif($DLF.InvalidSelection,$style(2)) Get list of files from selected servers: {
     var %i = $sline($active,0)
     while (%i) {
       DLF.Win.AdsGet $sline($active,%i).ln
@@ -1852,7 +1886,7 @@ alias -l DLF.Win.Search {
 ; ========== @find ==========
 menu @dlF.@find.* {
   dclick: DLF.@find.Get $1
-  $iif($sline($active,0) == $null,$style(2)) Get selected files: {
+  $iif($DLF.InvalidSelection,$style(2)) Get selected files: {
     var %i = $sline($active,0)
     while (%i) {
       DLF.@find.Get $sline($active,%i).ln
@@ -2037,13 +2071,13 @@ alias -l DLF.@find.Get {
 
 alias -l DLF.@find.CopyLines {
   var %lines = $sline($active,0)
-  if (!%lines) halt
+  if (!%lines) return
   DLF.@find.ClearColours
   clipboard
-  var %lines = $line($active,0)
   var %i = 1
   while (%i <= %lines) {
     clipboard -an $gettok($sline($active,%i),1,$asc($space)) $DLF.GetFileName($gettok($sline($active,%i),2-,$asc($space)))
+    echo -s cline 3 $active $sline($active,%i).ln
     cline 3 $active $sline($active,%i).ln
     inc %i
   }
@@ -2054,6 +2088,7 @@ alias -l DLF.@find.CopyLines {
 alias -l DLF.@find.ClearColours {
   var %i = $line($active,0)
   while (%i) {
+    if ($line($active,%i) == $crlf) return
     if ($line($active,%i).color != 15) cline $color(Normal) $active %i
     dec %i
   }
