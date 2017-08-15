@@ -75,7 +75,6 @@ dlFilter uses the following code from other people:
         Added option to auto-resend the file request up to 3 times if the send was incomplete.
         Added option to rename file back to original name if server has changed it (unless mIRC DCC Get Options will run a command on the file).
         Added option to filter any line from regular user containing control codes (as likely to be unknown spam)
-        Added option to filter lines without alphabetics
         Removed New Release filters
         Improved DLF.Debug code
         Created toolbar gif file from embedded data without needing to download it.
@@ -658,7 +657,6 @@ alias -l DLF.Chan.Text {
   */
   if ((%DLF.filter.requests == 1) && ($DLF.Chan.IsCmd(%txt))) DLF.Win.Filter $1-
   DLF.Chan.ControlCodes $1-
-  DLF.Chan.NonAlpha $1-
 }
 
 alias -l DLF.Chan.Action {
@@ -668,7 +666,6 @@ alias -l DLF.Chan.Action {
   if ((%DLF.filter.ads == 1) && ($hiswm(chanaction.spam,%action))) DLF.Win.Filter $1-
   if ((%DLF.filter.aways == 1) && ($hiswm(chanaction.away,%action))) DLF.Win.Filter $1-
   DLF.Chan.ControlCodes $1-
-  DLF.Chan.NonAlpha $1-
 }
 
 alias -l DLF.Chan.Notice {
@@ -716,13 +713,6 @@ alias -l DLF.Chan.IsCmd {
 alias -l DLF.Chan.ControlCodes {
   if ((%DLF.filter.controlcodes == 1) && ($strip($1-) != $1-)) {
     DLF.Watch.Log Filtered: Contains control codes
-    DLF.Win.Filter $1-
-  }
-}
-
-alias -l DLF.Chan.NonAlpha {
-  if ((%DLF.filter.nonalpha == 1) && ($upper($1-) === $lower($1-))) {
-    DLF.Watch.Log Filtered: Non-alphabetic line
     DLF.Win.Filter $1-
   }
 }
@@ -2246,7 +2236,6 @@ dialog -l DLF.Options.GUI {
   check "Filter private spam", 335, 7 77 155 6, tab 300
   check "... and /ignore spammer for 1h (asks confirmation)", 340, 15 86 146 6, tab 300
   check "Filter channel messages with control codes (usually a bot)", 345, 7 95 155 6, tab 300
-  check "Filter messages without alphabetics", 350, 7 104 155 6, tab 300
   check "Filter channel topic messages", 355, 7 113 155 6, tab 300
   check "Filter responses to my requests to separate window", 360, 7 122 155 6, tab 300
   check "Filter requests to you in PM (@yournick, !yournick)", 365, 7 131 155 6, tab 300
@@ -2372,7 +2361,6 @@ alias -l DLF.Options.Initialise {
   DLF.Options.InitOption filter.spampriv 1
   DLF.Options.InitOption spam.addignore 0
   DLF.Options.InitOption filter.controlcodes 1
-  DLF.Options.InitOption filter.nonalpha 1
   DLF.Options.InitOption filter.topic 0
   DLF.Options.InitOption serverwin 0
   DLF.Options.InitOption private.requests 1
@@ -2476,7 +2464,6 @@ alias -l DLF.Options.Init {
   else %DLF.spam.addignore = 0
   if (%DLF.spam.addignore == 1) did -c DLF.Options.GUI 340
   if (%DLF.filter.controlcodes == 1) did -c DLF.Options.GUI 345
-  if (%DLF.filter.nonalpha == 1) did -c DLF.Options.GUI 350
   if (%DLF.filter.topic == 1) did -c DLF.Options.GUI 355
   if (%DLF.serverwin == 1) did -c DLF.Options.GUI 360
   if (%DLF.private.requests == 1) did -c DLF.Options.GUI 365
@@ -2546,7 +2533,6 @@ alias -l DLF.Options.Save {
   %DLF.filter.spampriv = $did(335).state
   %DLF.spam.addignore = $did(340).state
   %DLF.filter.controlcodes = $did(345).state
-  %DLF.filter.nonalpha = $did(350).state
   %DLF.filter.topic = $did(355).state
   %DLF.serverwin = $did(360).state
   %DLF.private.requests = $did(365).state
@@ -3208,6 +3194,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *I have spent a total time of*sending files and a total time of*recieving files*
   DLF.hadd chantext.ads List*@*
   DLF.hadd chantext.ads Search: * Mode:*
+  DLF.hadd chantext.ads *Pour ma liste écrire*@* fichiers * Slots* utilisé*
   DLF.hadd chantext.ads *Statistici 1*by Un_DuLciC*
   DLF.hadd chantext.ads *Tape*@*
   DLF.hadd chantext.ads *Tapez*Pour avoir ce Fichier*
