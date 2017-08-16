@@ -1140,7 +1140,6 @@ alias -l DLF.DccSend.IsRequest {
   if (($left(%trig,1) == !) && ($right(%trig,-1) != $nick)) return $false
   if ($left(%trig,1) == @) {
     if (($right(%trig,-1) != $nick) && ($right($gettok(%trig,1,$asc(-)),-1) != $nick)) return $false
-    if ($nick !isin %fn) return $false
     if ($gettok(%fn,-1,$asc(.)) !isin txt zip rar) return $false
   }
   DLF.Watch.Log File request found: %trig $1-
@@ -1211,8 +1210,8 @@ alias -l DLF.DccSend.Send {
     var %bad = exe pif application gadget msi msp com scr hta cpl msc jar bat cmd vb vbs vbe js jse ws wsf mrc doc wsc wsh ps1 ps1xml ps2 ps2xml psc1 psc2 msh msh1 msh2 mshxml msh1xml msh2xml scf lnk inf reg doc xls ppt docm dotm xlsm xltm xlam pptm potm ppam ppsm sldm
     if ($istok(%bad,%ext,$asc($space))) DLF.DccSend.Block dangerous filetype
   }
-  if ((%DLF.dccsend.nocomchan == 1) && ($comchan($nick,0) == 0)) DLF.DccSend.Block the user is not in a common channel
   if ((%DLF.dccsend.trusted == 1) && (!%trusted)) DLF.DccSend.Block the user is not in your DCC Get trust list
+  if ((%DLF.dccsend.nocomchan == 1) && ($comchan($nick,0) == 0)) DLF.DccSend.Block the user is not in a common channel
   if ((%DLF.dccsend.regular == 1) && ($DLF.IsRegularUser($nick)) DLF.DccSend.Block the user is a regular user
   DLF.Watch.Log DCC Send accepted
   DLF.DccSend.Receiving %fn
@@ -1223,7 +1222,8 @@ alias -l DLF.DccSend.Block {
   dcc reject
   DLF.Watch.Log Blocked: dcc send from $nick - $1-
   DLF.Status Blocked: DCC Send from $nick $br($address) because $1- $+ : $filename
-  DLF.Win.Log Filter Blocked Private $nick DCC Send from $nick $br($address) because $1- $+ :
+  DLF.Status If this file was requested add this nick to your DCC trusted list with $+ $c(4,$color(Background),$space,/dcc trust $nick,$space) $+ and retry your request.
+  DLF.Win.Log Filter Blocked Private $nick DCC Send from $nick $br($address) because $1-
   DLF.Win.Filter DCC SEND $filename
 }
 
@@ -1603,7 +1603,6 @@ alias -l DLF.Win.AdsGet {
     var %chan = $regml(DLF.Win.AdsGet,1)
     var %nick = $regml(DLF.Win.AdsGet,2)
     var %trig = $regml(DLF.Win.AdsGet,3)
-    echo -s chan %chan nick %nick trig %trig
     if ((%trig == @find) || ($left(%trig,7) == @search)) return
     var %cid = $cid
     if ($gettok($active,-1,$asc(.)) == All) {
