@@ -2901,14 +2901,16 @@ on *:sockclose:DLF.Socket.Update: {
 }
 
 alias -l DLF.Update.ProcessLine {
-  if ($gettok($1-,1,$asc($eq)) == dlFilter) {
-    %DLF.version.web = $gettok($1-,2,$asc($eq))
-    %DLF.version.web.mirc = $gettok($1-,3,$asc($eq))
+  if ($gettok($1-,1,$asc(|)) == dlFilter) {
+    %DLF.version.web = $gettok($1-,2,$asc(|))
+    %DLF.version.web.mirc = $gettok($1-,3,$asc(|))
+    %DLF.version.web.comment = $gettok($1-,4,$asc(|))
     set %DLF.update.lastcheck $ctime
   }
-  elseif ($gettok($1-,1,$asc($eq)) == dlFilter.beta) {
-    %DLF.version.beta = $gettok($1-,2,$asc($eq))
-    %DLF.version.beta.mirc = $gettok($1-,3,$asc($eq))
+  elseif ($gettok($1-,1,$asc(|)) == dlFilter.beta) {
+    %DLF.version.beta = $gettok($1-,2,$asc(|))
+    %DLF.version.beta.mirc = $gettok($1-,3,$asc(|))
+    %DLF.version.beta.comment = $gettok($1-,4,$asc(|))
   }
 }
 
@@ -2918,11 +2920,11 @@ alias -l DLF.Update.CheckVersions {
     if ((%DLF.update.betas) $&
       && (%DLF.version.beta) $&
       && (%DLF.version.beta > %DLF.version.web)) {
-      if (%DLF.version.beta > $DLF.SetVersion) DLF.Update.DownloadAvailable %DLF.version.beta %DLF.version.beta.mirc beta
+      if (%DLF.version.beta > $DLF.SetVersion) DLF.Update.DownloadAvailable beta %DLF.version.beta %DLF.version.beta.mirc %DLF.version.beta.comment
       elseif (%DLF.version.web == $DLF.SetVersion) DLF.Options.Status Running current version of dlFilter beta
       else DLF.Options.Status Running a newer version $br($DLF.SetVersion) than web beta version $br(%DLF.version.beta)
     }
-    elseif (%DLF.version.web > $DLF.SetVersion) DLF.Update.DownloadAvailable %DLF.version.web %DLF.version.web.mirc
+    elseif (%DLF.version.web > $DLF.SetVersion) DLF.Update.DownloadAvailable production %DLF.version.web %DLF.version.web.mirc %DLF.version.web.comment
     elseif (%DLF.version.web == $DLF.SetVersion) DLF.Options.Status Running current version of dlFilter
     else DLF.Options.Status Running a newer version $br($DLF.SetVersion) than website $br(%DLF.version.web)
   }
@@ -2930,8 +2932,8 @@ alias -l DLF.Update.CheckVersions {
 }
 
 alias -l DLF.Update.DownloadAvailable {
-  var %ver = $iif($3,$3 version,version) $1
-  if ($version >= $2) {
+  var %ver = $1 version $2 $iif($4-,- $4-)
+  if ($version >= $3) {
     DLF.Options.Status You can update dlFilter to %ver
     did -e DLF.Options.GUI 180
   }
@@ -2941,22 +2943,20 @@ alias -l DLF.Update.DownloadAvailable {
   var %nets = $scon(0)
   while (%nets) {
     scid $scon(%nets)
-    if (%DLF.netchans == #) {
-      var %cnt = $chan(0)
-      while (%cnt) {
-        DLF.Update.ChanAnnounce $chan(%cnt) $1 $2 $3
-        dec %cnt
+    if (%DLF.netchans == $hashtag) {
+      var %i = $chan(0)
+      while (%i) {
+        DLF.Update.ChanAnnounce $chan(%i) $1-
+        dec %i
       }
     }
     else {
-      var %cnt = $numtok(%DLF.netchans,$asc($comma))
-      while (%cnt) {
-        var %netchan = $gettok(%DLF.netchans,%cnt,$asc($comma))
-        var %net = $gettok(%netchan,1,$asc($hashtag))
-        if (%net == $null) var %chan = %netchan
-        else var %chan = $hashtag $+ $gettok(%netchan,2,$asc($hashtag))
-        if (((%net == $null) || (%net == $network)) && ($chan(%chan))) DLF.Update.ChanAnnounce %chan $1 $2 $3
-        dec %cnt
+      var %i = $numtok(%DLF.netchans,$asc($comma)), %ln = $len($network)
+      while (%i) {
+        var %netchan = $gettok(%DLF.netchans,%i,$asc($comma)), %chan = %netchan
+        if ($left(%netchan,%ln) == $network)) %chan = $right(%netchan,- $+ %ln)
+        if (($left(%chan,1) isin $chantypes) && ($me ison %chan)) DLF.Update.ChanAnnounce %chan $1-
+        dec %i
       }
     }
     dec %nets
@@ -2971,15 +2971,15 @@ alias -l DLF.Update.Announce {
     if ((%DLF.update.betas) $&
       && (%DLF.version.beta) $&
       && (%DLF.version.beta > %DLF.version.web) $&
-      && (%DLF.version.beta > $DLF.SetVersion)) DLF.Update.ChanAnnounce $chan %DLF.version.beta %DLF.version.beta.mirc beta
-    elseif (%DLF.version.web > $DLF.SetVersion) DLF.Update.ChanAnnounce $chan %DLF.version.web %DLF.version.web.mirc
+      && (%DLF.version.beta > $DLF.SetVersion)) DLF.Update.ChanAnnounce $chan production %DLF.version.beta %DLF.version.beta.mirc %DLF.version.beta.comment
+    elseif (%DLF.version.web > $DLF.SetVersion) DLF.Update.ChanAnnounce $chan beta %DLF.version.web %DLF.version.web.mirc %DLF.version.web.comment
   }
 }
 
 alias -l DLF.Update.ChanAnnounce {
-  var %ver = $iif($4,$4 version,version) $br($2)
-  echo -t $1 $c(1,9,$DLF.logo A new %ver of dlFilter is available.)
-  if ($3 > $version) echo -t $1 $c(1,9,$DLF.logo However you need to $c(4,upgrade mIRC) before you can download it.)
+  var %ver = $3 $+ $iif($5-,: $5-,.)
+  echo -t $1 $c(1,9,$DLF.logo A new $2 version of dlFilter is available: version %ver)
+  if ($4 > $version) echo -t $1 $c(1,9,$DLF.logo However you need to $c(4,upgrade mIRC) to > v $+ $4 before you can download it.)
   else echo -t $1 $c(1,9,$DLF.logo Use the Update button in dlFilter Options to download and install.)
 }
 
