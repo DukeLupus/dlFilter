@@ -38,6 +38,8 @@ dlFilter uses the following code from other people:
 
   Immediate TODO
         Test location and filename for oNotice log files
+        @find docolourlines with all info as parms on timer after 1s (to allow for join / part / quit to work its way through
+        check when queryopen runs so that @find and Ads lines are processed first.
 
   Ideas for possible future enhancements
         Implement toolbar functionality with right click menu
@@ -363,16 +365,8 @@ on *:close:@#*: { DLF.oNotice.Close $target }
 
 ; Channel user activity
 ; join, part, quit, nick changes, kick
-on me:*:join:#: {
-  DLF.@find.ColourLines 3
-  if ($DLF.Chan.IsDlfChan($chan)) {
-    DLF.Ads.ColourLines 3
-    DLF.Update.Announce
-  }
-}
-
 on ^*:join:#: {
-  DLF.@find.ColourLines 3
+  DLF.@find.ColourNick 3
   if ($DLF.Chan.IsChanEvent) {
     DLF.Ads.ColourLines 3
     DLF.DccSend.Rejoin
@@ -382,13 +376,8 @@ on ^*:join:#: {
   }
 }
 
-on me:*:part:#: {
-  DLF.@find.ColourLines 15
-  if ($DLF.Chan.IsDlfChan($chan)) DLF.Ads.ColourLines 14
-}
-
 on ^*:part:#: {
-  DLF.@find.ColourLines 15
+  DLF.@find.ColourNick 15
   if ($DLF.Chan.IsChanEvent) {
     DLF.Ads.ColourLines 15
     if (%DLF.filter.parts) DLF.User.Channel $chan $iif($shortjoinsparts,Parts:) $nick $br($address) $iif(!$shortjoinsparts,has left $chan) $iif($1-,$br($1-))
@@ -396,7 +385,7 @@ on ^*:part:#: {
 }
 
 on ^*:kick:#: {
-  DLF.@find.ColourLines 14
+  DLF.@find.ColourNick 14
   if ($DLF.Chan.IsChanEvent) {
     DLF.Ads.ColourLines 14
     if (%DLF.filter.kicks == 1) DLF.User.Channel $chan $knick $iif(!$shortjoinsparts,$br($address($knick,5))) was kicked $iif(!$shortjoinsparts,from $chan ) by $nick $br($1-)
@@ -408,23 +397,36 @@ on ^*:nick: {
   if ($DLF.Chan.IsUserEvent(%DLF.filter.nicks)) DLF.User.NoChannel $newnick $nick $iif(!$shortjoinsparts,$br($address($knick,5))) is now known as $newnick
 }
 
-on me:*:quit: {
-  DLF.@find.ColourLines 15
-  DLF.Ads.ColourLines 14
-}
-
-on *:disconnect: {
-  DLF.@find.ColourLines 15
-  DLF.Ads.ColourLines 14
-  DLF.Raw005.Reset
-}
-
 on ^*:quit: {
-  DLF.@find.ColourLines 14
+  DLF.@find.ColourNick 14
   if ($DLF.Chan.IsUserEvent) {
     DLF.Ads.ColourLines 14
     if (%DLF.filter.quits) DLF.User.NoChannel $nick $iif($shortjoinsparts,Quits:) $nick $br($address) $iif(!$shortjoinsparts,Quit) $br($1-)
   }
+}
+
+on me:*:join:#: {
+  DLF.@find.ColourMe 3
+  if ($DLF.Chan.IsDlfChan($chan)) {
+    DLF.Ads.ColourLines 3
+    DLF.Update.Announce
+  }
+}
+
+on me:*:part:#: {
+  DLF.@find.ColourMe 15
+  if ($DLF.Chan.IsDlfChan($chan)) DLF.Ads.ColourLines 14
+}
+
+on me:*:quit: {
+  DLF.@find.ColourMe 15
+  DLF.Ads.ColourLines 14
+}
+
+on *:disconnect: {
+  DLF.@find.ColourMe 15
+  DLF.Ads.ColourLines 14
+  DLF.Raw005.Reset
 }
 
 ; User mode changes
@@ -720,23 +722,19 @@ alias -l DLF.Chan.ControlCodes {
   }
 }
 
-alias -l DLF.Chan.SetNickColour {
+alias DLF.Chan.SetNickColour {
   if (%DLF.colornicks == 1) {
-    var %chans
-    if ($left(%chans,1) isin $chantypes) %chans = $chan
-    else {
-      var %i = $comchan($nick,0)
-      while (%i) {
-        %chans = %chans $comchan($nick,%i)
-        dec %i
-      }
-    }
-    var %i = $numtok(%chans,$asc($space))
+    var %nick = $iif($1 != $null,$1,$nick)
+    var %i = $comchan(%nick,0)
     while (%i) {
-      var %chan = $gettok(%chans,%i,$asc($space))
+      var %chan = $comchan(%nick,%i)
       dec %i
-      var %pnick = $nick(%chan,$nick).pnick
-      var %cnick = $cnick(%pnick,1)
+      if ($nick(%chan,%nick).color != 4) cline 4 %chan %nick
+      continue
+
+      ; remaining code in this loop is obsolete and can be removed once we are happy with above code
+      var %pnick = $nick(%chan,%nick).pnick
+      var %cnick = $cnick(%pnick)
       var %nickrule = $true
       if ((%cnick == 0) || ($enablenickcolors == $false)) var %colour = $color(Listbox)
       elseif ($cnick(%cnick).method == 1) var %colour = $color(Listbox)
@@ -756,7 +754,7 @@ alias -l DLF.Chan.SetNickColour {
         %nickrule = $iif($cnick(%cnick).notify,$true,%nickrule)
         %nickrule = $iif($cnick(%cnick).idle,$true,%nickrule)
       }
-      if ((%nickrule) && ($nick(%chan,$nick).color == %colour)) cline 4 %chan $nick
+      if ((%nickrule) && ($nick(%chan,%nick).color == %colour)) cline 4 %chan %nick
     }
   }
 }
@@ -837,20 +835,18 @@ alias -l DLF.Priv.Text {
   if ((%DLF.filter.spampriv == 1) && ($hiswm(privtext.spam,%txt)) && (!$window($1))) DLF.Priv.SpamFilter $1-
   if ($hiswm(privtext.server,%txt)) DLF.Win.Server $1-
   if ((%DLF.filter.aways == 1) && ($hiswm(privtext.away,%txt))) DLF.Win.Filter $1-
-  DLF.Priv.OpsUser $1-
 }
 
 alias -l DLF.Priv.Notice {
   DLF.Watch.Called DLF.Priv.Notice
   DLF.Priv.NoticeChanserv $1-
-  DLF.Priv.QueryOpen $1-
   DLF.@find.Response $1-
   if ($DLF.DccSend.IsTrigger) DLF.Win.Server $1-
   DLF.Custom.Filter $1-
-  DLF.Priv.QueryOpen $1-
   var %txt = $strip($1-)
   if ($hiswm(privnotice.dnd,%txt)) DLF.Win.Filter $1-
   if ($hiswm(privnotice.server,%txt)) DLF.Win.Server $1-
+  DLF.Priv.QueryOpen $1-
   DLF.Priv.CommonChan $1-
   DLF.Priv.RegularUser Notice $1-
 }
@@ -1143,7 +1139,7 @@ alias -l DLF.DccSend.IsRequest {
   if (($left(%trig,1) == !) && ($right(%trig,-1) != $nick)) return $false
   if ($left(%trig,1) == @) {
     if (($right(%trig,-1) != $nick) && ($right($gettok(%trig,1,$asc(-)),-1) != $nick)) return $false
-    if ($gettok(%fn,-1,$asc(.)) !isin txt zip rar) return $false
+    if ($gettok(%fn,-1,$asc(.)) !isin txt zip rar 7z) return $false
   }
   DLF.Watch.Log File request found: %trig $1-
   return $true
@@ -1206,7 +1202,7 @@ alias -l DLF.DccSend.Send {
     DLF.Watch.Log Accepted: DCC Send - user requested this file from this server
     return
   }
-  elseif (%DLF.dccsend.requested == 1) DLF.DccSend.Block the file was not requested
+  elseif (%DLF.dccsend.requested == 1) DLF.DccSend.Block the file was not requested or @ trigger response has invalid filetype
   if (%DLF.dccsend.dangerous == 1) {
     var %ext = $nopath($filename)
     var %ext = $right(%ext,$calc(- $pos(%ext,.,$pos(%ext,.,0))))
@@ -1269,7 +1265,6 @@ alias -l DLF.DccSend.FileRcvd {
       (. isin $gettok(%origfn,-1,$asc($space)))) {
     var %oldfn = $qt($filename)
     var %newfn = $qt($+($noqt($nofile($filename)),%origfn))
-    echo -s Renaming %oldfn to %newfn
     DLF.Watch.Log Renaming %oldfn to %newfn
     if ($isfile(%newfn)) .remove %newfn
     .rename $qt($filename) $qt($+($noqt($nofile($filename)),%origfn))
@@ -1608,6 +1603,8 @@ alias -l DLF.Win.AdsGet {
     var %chan = $regml(DLF.Win.AdsGet,1)
     var %nick = $regml(DLF.Win.AdsGet,2)
     var %trig = $regml(DLF.Win.AdsGet,3)
+    var %illegal = ,./!¬"£$%&*()+=;:@'~#<>?
+    while ($right(%trig,1) isin %illegal) %trig = $left(%trig,-1)
     if ((%trig == @find) || ($left(%trig,7) == @search)) return
     var %cid = $cid
     if ($gettok($active,-1,$asc(.)) == All) {
@@ -1650,7 +1647,6 @@ alias -l DLF.InvalidSelection {
     if ($line($menu,%min) == $crlf) break
     dec %min
   }
-  echo -s %min
   while (%i) {
     if ($sline($menu,%i).ln > %min) return $false
     dec %i
@@ -1726,11 +1722,10 @@ alias -l DLF.Ads.ColourLines {
   }
 }
 
-alias -l DLF.@find.ColourLines {
+alias -l DLF.@find.ColourNick {
   var %win = @dlF.@find. $+ $network
   if (!$window(%win)) return
-  if ($nick == $me) DLF.@find.DoColourLines $1 %win *
-  elseif ($comchan($nick,0) == 0) {
+  if ($comchan($nick,0) == 0) {
     DLF.@find.DoColourLines $1 %win $+(?,$nick, *)
     DLF.@find.DoColourLines $1 %win $+(*:: Received from ,$nick)
   }
@@ -1742,6 +1737,22 @@ alias -l DLF.@find.DoColourLines {
     var %l = $strip($fline($2,$3-,%i).text)
     if (%l == $crlf) return
     cline $1 $2 $fline($2,$3-,%i)
+    dec %i
+  }
+}
+
+alias -l DLF.@find.ColourMe {
+  var %win = @dlF.@find. $+ $network
+  if (!$window(%win)) return
+  var %i = $line(%win,0)
+  while (%i) {
+    var %l = $strip($line(%win,%i))
+    if (%l == $crlf) return
+    var %nick = $right($gettok(%l,1,$asc($space)),-1)
+    if ((($event == part) && ($comchan(%nick,0) == 0)) $&
+     || (($event == join) && ($nick($chan,%nick) != $null)) $&
+     || ($event == quit)) $&
+      cline $1 $2 %i
     dec %i
   }
 }
@@ -1924,14 +1935,12 @@ alias -l DLF.@find.Request {
 }
 
 alias -l DLF.@find.IsResponse {
-  var %net = $network $+ #*
+  var %net = $network $+ *, %ln = - $+ $len($network)
   var %n = $hfind(DLF.@find.requests,%net,0,w).item
   while (%n) {
     var %netchan = $hfind(DLF.@find.requests,%net,%n,w).item
-    var %net = $gettok(%netchan,1,$asc($hashtag))
-    if (%net == $null) %net = $network
-    var %chan = $hashtag $+ $gettok(%netchan,2,$asc($hashtag))
-    if ((%net == $network) && ($nick ison %chan)) {
+    var %chan = $right(%netchan,%ln)
+    if (($left(%chan,1) isin $chantypes) && ($nick ison %chan)) {
       DLF.Watch.Log @find.IsResponse: %chan
       return $true
     }
@@ -1942,6 +1951,7 @@ alias -l DLF.@find.IsResponse {
 
 alias -l DLF.@find.Response {
   if ($DLF.@find.IsResponse) {
+    DLF.Chan.SetNickColour
     var %txt = $strip($1-)
     DLF.@find.OnlyPartial $1-
     if ($hiswm(find.header,%txt)) {
@@ -1965,7 +1975,7 @@ alias -l DLF.@find.Response {
       if (%DLF.searchresults == 1) {
         DLF.Win.Log Filter $event @find $nick $1-
         DLF.@find.Results $2-
-      }
+        }
       else DLF.Win.Log Server $event @find $nick $2-
       halt
     }
@@ -1988,7 +1998,12 @@ alias -l DLF.@find.OnlyPartial {
   if (%found == %displayed) return
   DLF.Chan.SetNickColour
   if (%DLF.searchresults == 0) DLF.Win.Log Server $event @find $nick $1-
-  else DLF.@find.Results %list $iif(%search,For $qt(%search) found,Found) %found $+ , but displaying only %displayed $c(14,:: Double click here to get the server's full list)
+  else {
+    var %r = $iif(%search,For $qt(%search))
+    if (%found > 0) %r = $iif(%r != $null,%r found,Found) %found $+ , but
+    %r = $iif(%r != $null,%r displaying only %displayed,First %displayed results displayed)
+    DLF.@find.Results %list %r $c(14,:: Double click here to get the server's full list)
+  }
 }
 
 alias -l DLF.@find.Regex {
@@ -1996,7 +2011,9 @@ alias -l DLF.@find.Regex {
   var %n = $numtok($2,$asc($space))
   var %result = $null
   while (%n) {
-    %result = $regml(DLF.@find.Regex,$gettok($2,%n,$asc($space))) $+ : $+ %result
+    var %i = $gettok($2,%n,$asc($space))
+    %result = : $+ %result
+    %result = $iif(%i > 0,$regml(DLF.@find.Regex,%i),0) $+ %result
     dec %n
   }
   return %result
@@ -2014,8 +2031,8 @@ alias -l DLF.@find.Results {
       %rest = :: Size: $gettok(%rest,2-,$asc($space))
       if ($pos(%rest,+,0) > 0) $&
         %rest = $left(%rest,$calc($pos(%rest,+,1) - 1))
-      %rest = %fn $c(14,%rest)
     }
+    %rest = %fn $c(14,%rest)
   }
   var %msg = %trig $tab $+ %rest
   if ((%trig != $+(!,$nick)) && (%trig != $+(@,$nick))) {
@@ -2086,12 +2103,11 @@ alias -l DLF.@find.Get {
 alias -l DLF.@find.CopyLines {
   var %lines = $sline($active,0)
   if (!%lines) return
-  DLF.@find.ClearColours
+  DLF.@find.ResetColours
   clipboard
   var %i = 1
   while (%i <= %lines) {
     clipboard -an $gettok($sline($active,%i),1,$asc($space)) $DLF.GetFileName($gettok($sline($active,%i),2-,$asc($space)))
-    echo -s cline 3 $active $sline($active,%i).ln
     cline 3 $active $sline($active,%i).ln
     inc %i
   }
@@ -2099,11 +2115,11 @@ alias -l DLF.@find.CopyLines {
   DLF.Win.TitleBar $active %i line(s) copied into clipboard
 }
 
-alias -l DLF.@find.ClearColours {
+alias -l DLF.@find.ResetColours {
   var %i = $line($active,0)
   while (%i) {
     if ($line($active,%i) == $crlf) return
-    if ($line($active,%i).color != 15) cline $color(Normal) $active %i
+    if ($line($active,%i).color != 15) cline 3 $active %i
     dec %i
   }
 }
@@ -2137,7 +2153,7 @@ alias -l DLF.@find.SendTovPowerGet {
   var %win = $active
   var %lines = $sline(%win,0)
   if (!%lines) halt
-  DLF.@find.ClearColours
+  DLF.@find.ResetColours
   var %i = 1
   while (%i <= %lines) {
     if ($com(vPG.NET,AddFiles,1,bstr,$sline(%win,%i)) == 0) {
@@ -2286,7 +2302,7 @@ dialog -l DLF.Options.GUI {
   check "... and /ignore spammer for 1h (asks confirmation)", 340, 15 86 146 6, tab 300
   check "Filter channel messages with control codes (usually a bot)", 345, 7 95 155 6, tab 300
   check "Filter channel topic messages", 355, 7 113 155 6, tab 300
-  check "Filter responses to my requests to separate window", 360, 7 122 155 6, tab 300
+  check "Filter server responses to my requests to separate window", 360, 7 122 155 6, tab 300
   check "Filter requests to you in PM (@yournick, !yournick)", 365, 7 131 155 6, tab 300
   check "Separate dlF windows per connection", 370, 7 140 155 6, tab 300
   box " Filter user events ", 375, 4 151 160 48, tab 300
@@ -3648,7 +3664,7 @@ alias -l DLF.CreateHashTables {
   if ($hget(DLF.find.headregex)) hfree DLF.find.headregex
   hmake DLF.find.headregex 10
   hadd DLF.find.headregex ^\s*From\s+list\s+(@\S+)\s+found\s+([0-9,]+),\s+displaying\s+([0-9]+):$ 1 2 3
-  hadd DLF.find.headregex ^\s*Resultlimit\s+by\W+([0-9,]+)\s+reached\.\s+Download\s+my\s+list\s+for\s+more,\s+by\s+typing\s+(@\S+) 2 1 1
+  hadd DLF.find.headregex ^\s*Result.*limit\s+by\s+([0-9,]+)\s+reached\.\s+Download\s+my\s+list\s+for\s+more,\s+by\s+typing\s+(@\S+) 2 0 1
   hadd DLF.find.headregex ^\s*Search\s+Result\W+More\s+than\s+([0-9,]+)\s+Matches\s+For\s+(.*?)\W+Get\s+My\s+List\s+Of\s+[0-9\54]+\s+Files\s+By\s+Typing\s+(@\S+)\s+In\s+The\s+Channel\s+Or\s+Refine\s+Your\s+Search.\s+Sending\s+first\s+([0-9\54]+)\s+Results\W+OmenServe 3 1 4 2
   hadd DLF.find.headregex ^\s*Search\s+Result\W+([0-9\54]+)\s+Matches\s+For\s+(.*?)\s+Get\s+My\s+List\s+Of\s+[0-9\54]+\s+Files\s+By\s+Typing\s+(@\S+)\s+In\s+The\s+Channel\s+Or\s+Refine\s+Your\s+Search.\s+Sending\s+first\s+([0-9\54]+)\s+Results\W+OmenServe 3 1 4 2
   hadd DLF.find.headregex ^\s*Search\s+Result\s+\+\s+More\s+than\s+([0-9\54]+)\s+Matches\s+For\s+(.*?)\s+\+\s+Get\s+My\s+List\s+Of\s+[0-9\54]+\s+Files\s+By\s+Typing\s+(@\S+)\s+In\s+The\s+Channel\s+Or\s+Refine\s+Your\s+Search\.\s+Sending\s+first\s+([0-9\54]+)\s+Results 3 1 4 2
