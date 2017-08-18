@@ -38,7 +38,6 @@ dlFilter uses the following code from other people:
 
   Immediate TODO
         Test location and filename for oNotice log files
-        Make FilterSearch dynamic i.e. new lines which match are added.
 
   Ideas for possible future enhancements
         Implement toolbar functionality with right click menu
@@ -111,6 +110,8 @@ dlFilter uses the following code from other people:
         Added filtering of topic changes
         Added release update comment display
         Made filter / watch window size limiting automated and removed limit options.
+        Added Search for Watch window
+        Added dynamic update for filter/server/watch search windows
 
   1.17  Update opening comments and add change log
         Use custom identifiers for creating bold, colour etc.
@@ -1525,6 +1526,7 @@ alias -l DLF.Win.Log {
   if (%strip == 1) %line = $strip(%line)
   if (%wrap == 1) aline -pi %col %win %line
   else aline %col %win %line
+  DLF.Win.SearchAdd %win %wrap %col %line
   DLF.Watch.Log Filtered: To %win
 }
 
@@ -1881,6 +1883,18 @@ alias -l DLF.Win.Search {
   filter -wwcbzph4 %wf %ws %sstring
   var %matches = $iif($filtered == 0,No matches,$iif($filtered == 1,One match,$filtered matches))
   titlebar %ws -=- Search finished. -=- %matches found for $qt(%sstring) in %wf
+}
+
+alias -l DLF.Win.SearchAdd {
+  var %win = $puttok($1,$+($gettok($1,2,$asc(.)),Search),2,$asc(.))
+  if (!$window(%win)) return
+  var %tb = $window(%win).title
+  var %match = /found for $qt((.*)) in $1/F
+  if ($regex(DLF.Win.SearchAdd,%tb,%match) == 0) return
+  var %wild = $regml(DLF.Win.SearchAdd,1)
+  if (%wild !iswm $4-) return
+  if ($2 == 1) aline -pi $3 %win $4-
+  else aline $3 %win $4-
 }
 
 ; ========== @find ==========
@@ -3970,6 +3984,15 @@ alias -l DLF.mIRCini {
 
 ; ========== DLF.Watch.* ==========
 ; Routines to help developers by providing a filtered debug window
+menu @dlF.Watch.* {
+  Search: DLF.Win.Search $menu $?="Enter search string"
+  -
+  Clear: clear
+  Options: DLF.Options.Show
+  Disable: debug -c off
+  -
+}
+
 alias DLF.Watch {
   if ((($0 == 0) && ($debug)) || ($1- == off)) debug off
   else {
@@ -4021,7 +4044,9 @@ alias -l DLF.Watch.Log {
     elseif ($1 == ->) %c = 12
     elseif ($1 == Halted:) %c = 4
     else %c = 3
-    aline -ip %c $debug $timestamp $1-
+    var %l = $timestamp $1-
+    aline -pi %c $debug %l
+    DLF.Win.SearchAdd $debug 1 %c %l
   }
 }
 
