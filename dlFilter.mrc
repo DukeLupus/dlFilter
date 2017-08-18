@@ -37,10 +37,8 @@ dlFilter uses the following code from other people:
 /* CHANGE LOG
 
   Immediate TODO
-        Add comment support to versions file
         Test location and filename for oNotice log files
         Make FilterSearch dynamic i.e. new lines which match are added.
-        Remove window limits and use mIRC native functionality instead.
 
   Ideas for possible future enhancements
         Implement toolbar functionality with right click menu
@@ -111,6 +109,8 @@ dlFilter uses the following code from other people:
         Added option to accept private messages from user with a query window open.
         Chanserv channel welcome notices now directed to correct window.
         Added filtering of topic changes
+        Added release update comment display
+        Made filter / watch window size limiting automated and removed limit options.
 
   1.17  Update opening comments and add change log
         Use custom identifiers for creating bold, colour etc.
@@ -199,8 +199,10 @@ on *:signal:DLF.Initialise: { DLF.Initialise $1- }
 alias DLF.Initialise {
   ; Handle obsolete variables
   .unset %DLF.custom.selected
+  .unset %DLF.filtered.limit
   .unset %DLF.newreleases
   .unset %DLF.ptext
+  .unset %DLF.server.limit
   .unset %DLF.showstatus
   ; Make variables more consistent
   if (%DLF.netchans == $null) %DLF.netchans = %DLF.channels
@@ -227,7 +229,6 @@ alias DLF.Initialise {
   DLF.RenameVar private.requests privrequests
   DLF.RenameVar serverwin server
   DLF.RenameVar update.betas betas
-  DLF.RenameVar win-filter.limit filtered.limit
   DLF.RenameVar win-filter.log filtered.log
   DLF.RenameVar win-filter.strip filtered.strip
   DLF.RenameVar win-filter.timestamp filtered.timestamp
@@ -235,7 +236,6 @@ alias DLF.Initialise {
   DLF.RenameVar win-onotice.enabled o.enabled
   DLF.RenameVar win-onotice.log o.log
   DLF.RenameVar win-onotice.timestamp o.timestamp
-  DLF.RenameVar win-server.limit server.limit
   DLF.RenameVar win-server.log server.log
   DLF.RenameVar win-server.strip server.strip
   DLF.RenameVar win-server.timestamp server.timestamp
@@ -432,6 +432,8 @@ on ^*:ban:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$bnic
 on ^*:unban:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$bnick)) DLF.Chan.Mode $1- }
 on ^*:op:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1- }
 on ^*:deop:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1- }
+on ^*:owner:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1- }
+on ^*:deowner:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1- }
 on ^*:voice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$vnick)) DLF.Chan.Mode $1- }
 on ^*:devoice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$vnick)) DLF.Chan.Mode $1- }
 on ^*:serverop:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1- }
@@ -1500,7 +1502,6 @@ alias -l DLF.Win.Log {
   }
   else DLF.Error DLF.Win.Log: Invalid window name: $1
   var %log   = $iif(%type == Server,%DLF.win-server.log,%DLF.win-filter.log)
-  var %limit = $iif(%type == Server,%DLF.win-server.limit,%DLF.win-filter.limit)
   var %ts    = $iif(%type == Server,%DLF.win-server.timestamp,%DLF.win-filter.timestamp)
   var %strip = $iif(%type == Server,%DLF.win-server.strip,%DLF.win-filter.strip)
   var %wrap  = $iif(%type == Server,%DLF.win-server.wrap,%DLF.win-filter.wrap)
@@ -1515,9 +1516,11 @@ alias -l DLF.Win.Log {
 
   if (%type == Filter) var %tb = Filtered
   elseif (%type == Server) var %tb = Server response
-  var %win = $DLF.Win.WinOpen(%type,-k0nw,%log,%limit,%tb $DLF.Win.TbMsg)
+  var %win = $DLF.Win.WinOpen(%type,-k0nw,%log,%tb $DLF.Win.TbMsg)
 
-  if ((%limit == 1) && ($line(%win,0) >= 1500)) dline %win $+(1-,$calc($line(%win,0) - 3900))
+  ; If user has scrolled up from the bottom of custom window, mIRC does not delete excess lines
+  ; Since user can leave these windows scrolled up, they would grow uncontrollably unless we prune them manually.
+  if (($window(%win).type == custom) && ($line(%win,0) >= $calc($windowbuffer * 1.2))) dline %win $+(1-,$calc($line(%win,0) - $int($windowbuffer * 1.1)))
   if (%ts == 1) %line = $timestamp %line
   if (%strip == 1) %line = $strip(%line)
   if (%wrap == 1) aline -pi %col %win %line
@@ -1535,7 +1538,7 @@ alias -l DLF.Win.AdsShow {
   var %tb = server advertising $DLF.Win.TbMsg
   if (%DLF.perconnect == 1) var %tabs = -t20,40
   else var %tabs = -t30,55
-  var %win = $DLF.Win.WinOpen(Ads,-k0nwl %tabs,0,0,0 %tb)
+  var %win = $DLF.Win.WinOpen(Ads,-k0nwl %tabs,0,0 %tb)
   if ($line(%win,0) == 0) {
     aline -n 6 %win This window shows adverts from servers describing how many files they have and how to get a list of their files.
     aline -n 2 %win However you will probably find it easier to use "@search search words" (or "@find search words") to locate files you want.
@@ -1749,7 +1752,7 @@ alias -l DLF.Win.LogName {
   return $qt($+($logdir,%lfn))
 }
 
-; %winname = $DLF.Win.WinOpen(type,switches,log,limit,title)
+; %winname = $DLF.Win.WinOpen(type,switches,log,title)
 alias -l DLF.Win.WinOpen {
   var %win = $DLF.Win.WinName($1)
   if ($window(%win)) return %win
@@ -1757,8 +1760,8 @@ alias -l DLF.Win.WinOpen {
   var %switches = $2
   if (%DLF.perconnect == 0) %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ z,1,$asc($space))
   window %switches %win
-  if (($3) && ($isfile(%lfn))) loadbuf $iif($4,3900) -p %win %lfn
-  if ($5- != $null) titlebar %win -=- $5-
+  if (($3) && ($isfile(%lfn))) loadbuf $windowbuffer -p %win %lfn
+  if ($4- != $null) titlebar %win -=- $4-
   return %win
 }
 
@@ -1821,7 +1824,6 @@ menu @dlF.Filter.* {
   $iif(%DLF.win-filter.timestamp == 1,$style(1)) Timestamp: DLF.Options.ToggleOption filtered.timestamp
   $iif(%DLF.win-filter.strip == 1,$style(1)) Strip codes: DLF.Options.ToggleOption filtered.strip
   $iif(%DLF.win-filter.wrap == 1,$style(1)) Wrap lines: DLF.Options.ToggleOption filtered.wrap
-  $iif(%DLF.win-filter.limit == 1,$style(1)) Limit number of lines: DLF.Options.ToggleOption filtered.limit
   $iif(%DLF.win-filter.log == 1,$style(1)) Log: DLF.Options.ToggleOption filtered.log
   -
   Clear: clear
@@ -1839,7 +1841,6 @@ menu @dlF.Server.* {
   $iif(%DLF.win-server.timestamp == 1,$style(1)) Timestamp: DLF.Options.ToggleOption server.timestamp
   $iif(%DLF.win-server.strip == 1,$style(1)) Strip codes: DLF.Options.ToggleOption server.strip
   $iif(%DLF.win-server.wrap == 1,$style(1)) Wrap lines: DLF.Options.ToggleOption server.wrap
-  $iif(%DLF.win-server.limit == 1,$style(1)) Limit number of lines: DLF.Options.ToggleOption server.limit
   $iif(%DLF.win-server.log == 1,$style(1)) Log: DLF.Options.ToggleOption server.log
   -
   Clear: clear
@@ -2443,12 +2444,10 @@ alias -l DLF.Options.Initialise {
 
   ; Options only available in menu not options
   ; TODO Consider adding these as options
-  DLF.Options.InitOption win-filter.limit 1
   DLF.Options.InitOption win-filter.log 0
   DLF.Options.InitOption win-filter.timestamp 1
   DLF.Options.InitOption win-filter.wrap 1
   DLF.Options.InitOption win-filter.strip 0
-  DLF.Options.InitOption win-server.limit 1
   DLF.Options.InitOption win-server.log 0
   DLF.Options.InitOption win-server.timestamp 1
   DLF.Options.InitOption win-server.wrap 1
@@ -3960,6 +3959,7 @@ alias -l prefixown return $DLF.mIRCini(options,0,23)
 alias -l showmodeprefix return $DLF.mIRCini(options,2,30)
 alias -l enablenickcolors return $DLF.mIRCini(options,0,32)
 alias -l shortjoinsparts return $DLF.mIRCini(options,2,19)
+alias -l windowbuffer return $DLF.mIRCini(options,3,1)
 
 alias -l DLF.mIRCini {
   var %item = $iif($2 isnum,n) $+ $2
@@ -4013,6 +4013,9 @@ alias -l DLF.Watch.Log {
   if ($0 == 0) return
   if ($left($debug,1) != @) write $debug $1-
   else {
+    ; If user has scrolled up from the bottom of custom window, mIRC does not delete excess lines
+    ; Since user can leave these windows scrolled up, they would grow uncontrollably unless we prune them manually.
+    if (($window($debug).type == custom) && ($line($debug,0) >= $calc($windowbuffer * 1.2))) dline $debug $+(1-,$calc($line($debug,0) - $int($windowbuffer * 1.1)))
     var %c
     if ($1 == <-) %c = 1
     elseif ($1 == ->) %c = 12
