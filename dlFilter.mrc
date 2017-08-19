@@ -40,6 +40,7 @@ dlFilter uses the following code from other people:
         Test location and filename for oNotice log files
         @find docolourlines with all info as parms on timer after 1s (to allow for join / part / quit to work its way through
         check when queryopen runs so that @find and Ads lines are processed first.
+        Add ON Keydown support for Ctrl-C/Z copying (from sbClient)
 
   Ideas for possible future enhancements
         Implement toolbar functionality with right click menu
@@ -377,9 +378,9 @@ on ^*:join:#: {
 }
 
 on ^*:part:#: {
-  DLF.@find.ColourNick 15
+  DLF.@find.ColourNick 14
   if ($DLF.Chan.IsChanEvent) {
-    DLF.Ads.ColourLines 15
+    DLF.Ads.ColourLines 14
     if (%DLF.filter.parts) DLF.User.Channel $chan $iif($shortjoinsparts,Parts:) $nick $br($address) $iif(!$shortjoinsparts,has left $chan) $iif($1-,$br($1-))
   }
 }
@@ -406,7 +407,8 @@ on ^*:quit: {
 }
 
 on me:*:join:#: {
-  DLF.@find.ColourMe 3
+  ; Delay to allow channel nicks to be populated
+  .timer 1 2 DLF.@find.ColourMe $event $chan
   if ($DLF.Chan.IsDlfChan($chan)) {
     DLF.Ads.ColourLines 3
     DLF.Update.Announce
@@ -414,17 +416,17 @@ on me:*:join:#: {
 }
 
 on me:*:part:#: {
-  DLF.@find.ColourMe 15
+  DLF.@find.ColourMe $event $chan
   if ($DLF.Chan.IsDlfChan($chan)) DLF.Ads.ColourLines 14
 }
 
 on me:*:quit: {
-  DLF.@find.ColourMe 15
+  DLF.@find.ColourMe $event
   DLF.Ads.ColourLines 14
 }
 
 on *:disconnect: {
-  DLF.@find.ColourMe 15
+  DLF.@find.ColourMe $event
   DLF.Ads.ColourLines 14
   DLF.Raw005.Reset
 }
@@ -1741,6 +1743,7 @@ alias -l DLF.@find.DoColourLines {
   }
 }
 
+; DLF.@find.ColourMe colour event chan
 alias -l DLF.@find.ColourMe {
   var %win = @dlF.@find. $+ $network
   if (!$window(%win)) return
@@ -1748,12 +1751,17 @@ alias -l DLF.@find.ColourMe {
   while (%i) {
     var %l = $strip($line(%win,%i))
     if (%l == $crlf) return
-    var %nick = $right($gettok(%l,1,$asc($space)),-1)
-    if ((($event == part) && ($comchan(%nick,0) == 0)) $&
-     || (($event == join) && ($nick($chan,%nick) != $null)) $&
-     || ($event == quit)) $&
-      cline $1 $2 %i
     dec %i
+    var %nick = $right($gettok(%l,1,$asc($space)),-1), %c = 14
+    if ($1 == join) {
+      if ($nick($2,%nick) == $null) continue
+      %c = 3
+    }
+    elseif ($1 == part) {
+      if ($comchan(%nick,0) > 1) continue
+      if (($comchan(%nick,0) == 1) && ($nick($2,%nick) == $null)) continue
+    }
+    cline %c %win $calc(%i + 1)
   }
 }
 
@@ -2093,7 +2101,7 @@ alias -l DLF.@find.Get {
     if ($DLF.Chan.IsDlfChan(%chan)) {
       ; Use editbox not msg so other scripts (like sbClient) get On Input event
       DLF.Chan.EditSend %chan %trig %fn
-      cline 15 $active $1
+      cline 7 $active $1
       return
     }
     dec %i
