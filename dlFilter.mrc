@@ -369,7 +369,7 @@ on *:close:@#*: { DLF.oNotice.Close $target }
 on ^*:join:#: {
   DLF.@find.ColourNick 3
   if ($DLF.Chan.IsChanEvent) {
-    DLF.Ads.ColourLines 3
+    DLF.Ads.ColourLines $event $nick $chan
     DLF.DccSend.Rejoin
     ; Wait for 1 sec for user's modes to be applied to avoid checking ops
     if ((%DLF.ops.advertpriv) && ($me isop $chan)) .timer 1 1 .signal DLF.Ops.RequestVersion $nick
@@ -380,7 +380,7 @@ on ^*:join:#: {
 on ^*:part:#: {
   DLF.@find.ColourNick 14
   if ($DLF.Chan.IsChanEvent) {
-    DLF.Ads.ColourLines 14
+    DLF.Ads.ColourLines $event $nick $chan
     if (%DLF.filter.parts) DLF.User.Channel $chan $iif($shortjoinsparts,Parts:) $nick $br($address) $iif(!$shortjoinsparts,has left $chan) $iif($1-,$br($1-))
   }
 }
@@ -388,7 +388,7 @@ on ^*:part:#: {
 on ^*:kick:#: {
   DLF.@find.ColourNick 14
   if ($DLF.Chan.IsChanEvent) {
-    DLF.Ads.ColourLines 14
+    DLF.Ads.ColourLines $event $nick $chan
     if (%DLF.filter.kicks == 1) DLF.User.Channel $chan $knick $iif(!$shortjoinsparts,$br($address($knick,5))) was kicked $iif(!$shortjoinsparts,from $chan ) by $nick $br($1-)
   }
 }
@@ -401,7 +401,7 @@ on ^*:nick: {
 on ^*:quit: {
   DLF.@find.ColourNick 14
   if ($DLF.Chan.IsUserEvent) {
-    DLF.Ads.ColourLines 14
+    DLF.Ads.ColourLines $event $nick
     if (%DLF.filter.quits) DLF.User.NoChannel $nick $iif($shortjoinsparts,Quits:) $nick $br($address) $iif(!$shortjoinsparts,Quit) $br($1-)
   }
 }
@@ -410,24 +410,24 @@ on me:*:join:#: {
   ; Delay to allow channel nicks to be populated
   .timer 1 2 DLF.@find.ColourMe $event $chan
   if ($DLF.Chan.IsDlfChan($chan)) {
-    DLF.Ads.ColourLines 3
+    .timer 1 2 DLF.Ads.ColourLines $event $nick $chan
     DLF.Update.Announce
   }
 }
 
 on me:*:part:#: {
   DLF.@find.ColourMe $event $chan
-  if ($DLF.Chan.IsDlfChan($chan)) DLF.Ads.ColourLines 14
+  if ($DLF.Chan.IsDlfChan($chan)) DLF.Ads.ColourLines $event $nick $chan
 }
 
 on me:*:quit: {
   DLF.@find.ColourMe $event
-  DLF.Ads.ColourLines 14
+  DLF.Ads.ColourLines $event $nick
 }
 
 on *:disconnect: {
   DLF.@find.ColourMe $event
-  DLF.Ads.ColourLines 14
+  DLF.Ads.ColourLines $event $nick
   DLF.Raw005.Reset
 }
 
@@ -1705,22 +1705,25 @@ alias -l DLF.Win.NickFromTag {
   return %nick
 }
 
+; DLF.Ads.ColourLines $event $nick $chan $event $nick $chan
 alias -l DLF.Ads.ColourLines {
   var %win = $DLF.Win.WinName(Ads)
   if (!$window(%win)) return
-  if (($event == quit) || ($event == disconnect)) var %match = $+([,$iif(%DLF.perconnect == 0,$network),*]*)
-  else var %match = $+([,$iif(%DLF.perconnect == 0,$network),$chan,]*)
-  if ($nick != $me) %match = $+(%match,<*,$nick,>*)
+  if (($1 == quit) || ($1 == disconnect)) var %match = $+([,$iif(%DLF.perconnect == 0,$network),*]*)
+  else var %match = $+([,$iif(%DLF.perconnect == 0,$network),$3,]*)
+  if ($2 != $me) %match = $+(%match,<*,$2,>*)
   var %i = $fline(%win,%match,0)
-  var %ctpos = $iif(%DLF.perconnect == 0,$calc($len($network) + 2),2)
+  var %ln = - $+ $len($network)
   while (%i) {
     var %l = $strip($fline(%win,%match,%i).text)
     var %ln = $fline(%win,%match,%i)
     dec %i
-    var %chantype = $mid($gettok(%l,1,$asc($space)),%ctpos,1)
-    if (%chantype !isin $chantypes) continue
+    var %chan = $left($right($gettok(%l,1,$asc($space)),-1),-1)
+    if (%DLF.perconnect == 0) %chan = $right(%chan,%ln)
+    if ($left(%chan,1) !isin $chantypes) continue
     var %nick = $DLF.Win.NickFromTag($gettok(%l,2,$asc($space)))
-    if (($event == disconnect) || (%nick == $nick) || ($me == $nick)) cline $1 %win %ln
+    if (($1 == join) && ($nick(%chan,%nick) != $null)) cline 3 %win %ln
+    elseif (($1 == disconnect) || (%nick == $2) || ($me == $2)) cline 14 %win %ln
   }
 }
 
