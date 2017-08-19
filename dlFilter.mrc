@@ -38,7 +38,6 @@ dlFilter uses the following code from other people:
 
   Immediate TODO
         Test location and filename for oNotice log files
-        @find docolourlines with all info as parms on timer after 1s (to allow for join / part / quit to work its way through
         check when queryopen runs so that @find and Ads lines are processed first.
         Add ON Keydown support for Ctrl-C/Z copying (from sbClient)
 
@@ -97,7 +96,7 @@ dlFilter uses the following code from other people:
           Version checks users as they join and if they are a mIRC user reminds them to install or upgrade dlF.
           Send advert to users doing @find.
         @find results from ps2 are treated as server responses and no longer give regular user warnings
-        Lines in @find / Ads windows change colour as servers join/part the channel.
+        Lines in @find / Ads windows change colour as user or servers join/part/quit/disconnect.
         "Regular user tried to" warning messages sent to appropriate channels
         Resend requests if server rejoins the channel (in case it has been restarted and request was lost).
         Block channel-wide ctcp requests for VERSION, FINGER, TIME & PING if not from op.
@@ -115,6 +114,7 @@ dlFilter uses the following code from other people:
         Made filter / watch window size limiting automated and removed limit options.
         Added Search for Watch window
         Added dynamic update for filter/server/watch search windows
+        Added ability to report false positive server ads
 
   1.17  Update opening comments and add change log
         Use custom identifiers for creating bold, colour etc.
@@ -1598,13 +1598,42 @@ alias -l DLF.Win.AdsShow {
   DLF.Win.TitleBar %win %tb
 }
 
-alias -l DLF.Win.AdsGet {
+alias -l DLF.Ads.ReportFalseAd {
+  var %min = $line($active,0)
+  while (%min) {
+    if ($line($active,%min) == $crlf) break
+    dec %min
+  }
+  var %n = $sline($active,0), %i = 1, %body
+  while (%i <= %n) {
+    var %ln = $sline($active,%i).ln
+    inc %i
+    if (%ln <= %min) continue
+    var %line = $strip($line($active,%ln))
+    if (%DLF.perconnect == 1) $&
+      %line = $puttok(%line,$+([,$network,$right($left($gettok(%line,1,$asc($space)),-1),-1),]),1,$asc($space))
+    var %body = %body $+ $urlencode($crlf $+ %line)
+    if ($len(%body) > 1900) return $input(To many lines selected. $+ $crlf $+ Please select fewer lines and retry.,o,Too many lines)
+  }
+  %body = $right(%body,-6)
+  url -a mailto:dlfilter@gmail.com?subject=dlFilter%20False%20Positive%20Ads&body= $+ %body
+}
+
+alias -l DLF.Ads.GetListMulti {
+  var %i = $sline($active,0)
+  while (%i) {
+    DLF.Ads.GetList $sline($active,%i).ln
+    dec %i
+  }
+}
+
+alias -l DLF.Ads.GetList {
   var %line = $strip($line($active,$1))
   var %re = /[[]([^]]+)[]]\s+<[&@%+]*([^>]+?)>.*?\W(@\S+)\s+/Fi
-  if ($regex(DLF.Win.AdsGet,%line,%re) > 0) {
-    var %chan = $regml(DLF.Win.AdsGet,1)
-    var %nick = $regml(DLF.Win.AdsGet,2)
-    var %trig = $regml(DLF.Win.AdsGet,3)
+  if ($regex(DLF.Ads.GetList,%line,%re) > 0) {
+    var %chan = $regml(DLF.Ads.GetList,1)
+    var %nick = $regml(DLF.Ads.GetList,2)
+    var %trig = $regml(DLF.Ads.GetList,3)
     var %illegal = ,./!¬"£$%&*()+=;:@'~#<>?
     while ($right(%trig,1) isin %illegal) %trig = $left(%trig,-1)
     if ((%trig == @find) || ($left(%trig,7) == @search)) return
@@ -1623,7 +1652,7 @@ alias -l DLF.Win.AdsGet {
         }
         dec %i
       }
-      if (%i == 0) return $input(No longer connected to network %net,o)
+      if (%i == 0) return $input(No longer connected to network %net,o,Network no longer connected)
       scid $scon(%i)
     }
     else var %net = $network
@@ -1635,7 +1664,7 @@ alias -l DLF.Win.AdsGet {
     }
     else {
       scid %cid
-      return $input(No longer in channel %chan on network %net,o)
+      return $input(No longer in channel %chan on network %net,o,No longer in channel)
     }
   }
 }
@@ -1657,14 +1686,10 @@ alias -l DLF.InvalidSelection {
 }
 
 menu @dlF.Ads.* {
-  dclick: DLF.Win.AdsGet $1
-  $iif($DLF.InvalidSelection,$style(2)) Get list of files from selected servers: {
-    var %i = $sline($active,0)
-    while (%i) {
-      DLF.Win.AdsGet $sline($active,%i).ln
-      dec %i
-    }
-  }
+  dclick: DLF.Ads.GetList $1
+  $iif($DLF.InvalidSelection,$style(2)) Get list of files from selected servers: DLF.Ads.GetListMulti
+  -
+  $iif($DLF.InvalidSelection,$style(2)) Report line(s) which shouldn't be considered ads: DLF.Ads.ReportFalseAd
   -
   Clear: clear
   Options: DLF.Options.Show
@@ -3825,6 +3850,19 @@ alias -l max {
     dec %i
   }
   return %res
+}
+
+alias urlencode {
+  var %t = $1
+  var %reserved = $+($cr,$lf,$tab,$space,!#$&'()*+,$comma,/:;=?@[]%)
+  var %i = $len(%reserved)
+  while (%i) {
+    var %c = $mid(%reserved,%i,1)
+    var %r = $base($asc(%c),10,16,2)
+    %t = $replacex(%t,%c,$+(%,%r))
+    dec %i
+  }
+  return %t
 }
 
 ; Generate and run an identifier call from identifier name, parameters and property
