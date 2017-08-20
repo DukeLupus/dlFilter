@@ -512,6 +512,9 @@ raw 421:*: {
 on *:active:*: { DLF.Stats.Active }
 on *:connect: { DLF.Update.Check }
 
+; Process Ctrl-C on @find window
+on *:keydown:@dlf.@find.*:*: { if ((!$keyrpt) && ($keyval == 3)) DLF.@find.CopyLines }
+
 #dlf_events end
 
 ; Following is just in case groups get reset to default...
@@ -1595,7 +1598,7 @@ alias -l DLF.Win.AdsShow {
     DLF.Watch.Log Advert: $nick prepended
   }
   window -b %win
-  DLF.Win.TitleBar %win %tb
+  titleBar %win -=- $calc($line(%win,0) - 5) %tb
 }
 
 alias -l DLF.Ads.ReportFalseAd {
@@ -1905,7 +1908,7 @@ menu @dlF.*Search.* {
   Copy line: {
     .clipboard
     .clipboard $sline($active,1)
-    cline 14 $active $sline($active,1).ln
+    cline 7 $active $sline($active,1).ln
   }
   Clear: clear
   Close: window -c $active
@@ -2078,9 +2081,9 @@ alias -l DLF.@find.Results {
   if (!$window(%win)) window -lk0wn -t15 %win
   if ($line(%win,0) == 0) {
     aline -n 6 %win This window shows @find results as received individually from various servers.
-    aline -n 2 %win In the future you might want to use @search instead of @find as it is quicker and more efficicent.
+    aline -n 2 %win In the future you might want to use @search instead of @find as it is quicker and more efficient.
     aline -n 2 %win If you use @search, consider installing the sbClient script to make processing @search results easier.
-    aline -n 4 %win You can select lines and copy and paste them into the channel to get files,
+    aline -n 4 %win You can select lines and copy (Ctrl-C) and paste them (Ctrl-V) into the channel to get files,
     aline -n 4 %win or double-click to have the file request sent for you.
     aline -n 1 %win $crlf
   }
@@ -2100,18 +2103,9 @@ alias -l DLF.@find.Results {
   inc %i
   iline -hn $iif($left(%msg,1) == @,2,3) %win %i %msg
   window -b %win
-  DLF.Win.TitleBar %win @find results from $network so far -=- Right-click for options or double-click to download
+  if ($timer($+($active,.Titlebar))) [ $+(.timer,$active,.Titlebar) ] off
+  titlebar %win -=- $calc($line(%win,0) - 6) @find results from $network so far -=- Right-click for options or double-click to download
   DLF.Halt @find result: Result for %trig added to %win
-}
-
-alias -l DLF.Win.TitleBar {
-  var %i = $line($1,0)
-  while (%i) {
-    if ($line($1,%i) = $crlf) break
-    dec %i
-  }
-  var %i = $calc($line($1,0) - %i)
-  titlebar $1 -=- %i $2-
 }
 
 alias -l DLF.@find.Get {
@@ -2144,18 +2138,19 @@ alias -l DLF.@find.CopyLines {
   var %i = 1
   while (%i <= %lines) {
     clipboard -an $gettok($sline($active,%i),1,$asc($space)) $DLF.GetFileName($gettok($sline($active,%i),2-,$asc($space)))
-    cline 3 $active $sline($active,%i).ln
+    cline 7 $active $sline($active,%i).ln
     inc %i
   }
   dec %i
-  DLF.Win.TitleBar $active %i line(s) copied into clipboard
+  if (!$timer($+($active,.Titlebar))) [ $+(.timer,$active,.Titlebar) ] 1 30 titlebar $active $window($active).title
+  titlebar $active -=- %i line(s) copied to clipboard
 }
 
 alias -l DLF.@find.ResetColours {
   var %i = $line($active,0)
   while (%i) {
     if ($line($active,%i) == $crlf) return
-    if ($line($active,%i).color != 15) cline 3 $active %i
+    if ($line($active,%i).color != 14) cline 3 $active %i
     dec %i
   }
 }
@@ -2182,7 +2177,7 @@ alias -l DLF.@find.SendToAutoGet {
   if (%MTautorequest == 1) MTkickstart $gettok(%temp,2,$asc($space))
   MTwhosinque
   echo -st %MTlogo Added %j File(s) To Waiting List From dlFilter
-  DLF.Win.TitleBar %win %j line(s) sent to AutoGet
+  titlebar %win -=- %j line(s) sent to AutoGet
 }
 
 alias -l DLF.@find.SendTovPowerGet {
@@ -2199,7 +2194,7 @@ alias -l DLF.@find.SendTovPowerGet {
     inc %i
   }
   dec %i
-  DLF.Win.TitleBar %win %i line(s) sent to vPowerGet.NET
+  titlebar %win -=- %i line(s) sent to vPowerGet.NET
 }
 
 alias -l DLF.@find.SaveResults {
@@ -3797,7 +3792,7 @@ alias -l DLF.GetFileName {
   }
   %txt = $noqt(%txt)
   var %dots = $numtok(%txt,$asc(.))
-  while (%dots) {
+  while (%dots > 1) {
     var %type = $gettok($gettok(%txt,%dots,$asc(.)),1,$asc($space))
     if (%type isalnum) {
       var %name = $gettok(%txt,$+(1-,$calc(%dots - 1)),$asc(.))
