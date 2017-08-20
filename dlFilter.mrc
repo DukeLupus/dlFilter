@@ -804,24 +804,24 @@ alias -l DLF.Priv.Text {
   DLF.Priv.Request $1-
   DLF.Priv.QueryOpen $1-
   DLF.Custom.Filter $1-
-  DLF.Priv.CommonChan $1-
-  DLF.Priv.RegularUser Normal $1-
   var %txt = $strip($1-)
   if ((%DLF.filter.spampriv == 1) && ($hiswm(privtext.spam,%txt)) && (!$window($1))) DLF.Priv.SpamFilter $1-
   if ($hiswm(privtext.server,%txt)) DLF.Win.Server $1-
   if ((%DLF.filter.aways == 1) && ($hiswm(privtext.away,%txt))) DLF.Win.Filter $1-
+  DLF.Priv.CommonChan $1-
+  DLF.Priv.RegularUser Normal $1-
 }
 
 alias -l DLF.Priv.Notice {
   DLF.Watch.Called DLF.Priv.Notice
-  DLF.Priv.NoticeChanserv $1-
   DLF.@find.Response $1-
+  DLF.Priv.NoticeChanserv $1-
   if ($DLF.DccSend.IsTrigger) DLF.Win.Server $1-
   DLF.Custom.Filter $1-
+  DLF.Priv.QueryOpen $1-
   var %txt = $strip($1-)
   if ($hiswm(privnotice.dnd,%txt)) DLF.Win.Filter $1-
   if ($hiswm(privnotice.server,%txt)) DLF.Win.Server $1-
-  DLF.Priv.QueryOpen $1-
   DLF.Priv.CommonChan $1-
   DLF.Priv.RegularUser Notice $1-
 }
