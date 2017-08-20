@@ -39,7 +39,6 @@ dlFilter uses the following code from other people:
   Immediate TODO
         Test location and filename for oNotice log files
         check when queryopen runs so that @find and Ads lines are processed first.
-        Add ON Keydown support for Ctrl-C/Z copying (from sbClient)
 
   Ideas for possible future enhancements
         Implement toolbar functionality with right click menu
@@ -115,6 +114,7 @@ dlFilter uses the following code from other people:
         Added Search for Watch window
         Added dynamic update for filter/server/watch search windows
         Added ability to report false positive server ads
+        Added Ctrl-C to copy lines in @find windows
 
   1.17  Update opening comments and add change log
         Use custom identifiers for creating bold, colour etc.
@@ -1575,16 +1575,24 @@ alias -l DLF.Win.IsInvalidSelection {
   var %i = $sline($menu,0)
   if (%i == $null) return $true
   if (%i == 0) return $true
-  var %min = $min($line($menu,0),10)
-  while (%min) {
-    if ($line($menu,%min) == $crlf) break
-    dec %min
-  }
+  var %min = $DLF.Win.MinSelectLine
   while (%i) {
     if ($sline($menu,%i).ln > %min) return $false
     dec %i
   }
   return $true
+}
+
+alias -l DLF.Win.MinSelectLine {
+  if ($window($active).type != listbox) DLF.Error DLF.Win.MinSelectLine attempted on non-listbox window: $active
+  var %max = $min($line($active,0),20)
+  var %i = 1
+  while (%i <= %max) {
+    var %l = $line($active,%i)
+    inc %i
+    if (%l == $crlf) return %i
+  }
+  return 1
 }
 
 alias -l DLF.Win.NickFromTag {
@@ -1751,11 +1759,7 @@ alias -l DLF.Ads.Show {
 }
 
 alias -l DLF.Ads.ReportFalseAd {
-  var %min = $line($active,0)
-  while (%min) {
-    if ($line($active,%min) == $crlf) break
-    dec %min
-  }
+  var %min = $DLF.Win.MinSelectLine
   var %n = $sline($active,0), %i = 1, %body
   while (%i <= %n) {
     var %ln = $sline($active,%i).ln
@@ -2071,6 +2075,7 @@ alias -l DLF.@find.Results {
 }
 
 alias -l DLF.@find.Get {
+  if ($DLF.Win.MinSelectLine < $1) return
   var %line = $replace($line($active,$1),$tab,$space)
   var %trig = $gettok(%line,1,$asc($space))
   var %type = $left(%trig,1)
@@ -2097,15 +2102,20 @@ alias -l DLF.@find.CopyLines {
   if (!%lines) return
   DLF.@find.ResetColours
   clipboard
-  var %i = 1
+  var %i = 1, %c = 0
+  var %min = $DLF.Win.MinSelectLine
   while (%i <= %lines) {
-    clipboard -an $gettok($sline($active,%i),1,$asc($space)) $DLF.GetFileName($gettok($sline($active,%i),2-,$asc($space)))
-    cline 7 $active $sline($active,%i).ln
+    var %ln = $sline($active,%i).ln
+    if (%ln >= %min) {
+      clipboard -an $gettok($sline($active,%i),1,$asc($space)) $DLF.GetFileName($gettok($sline($active,%i),2-,$asc($space)))
+      cline 7 $active %ln
+      inc %c
+    }
     inc %i
   }
-  dec %i
-  if (!$timer($+($active,.Titlebar))) [ $+(.timer,$active,.Titlebar) ] 1 30 titlebar $active $window($active).title
-  titlebar $active -=- %i line(s) copied to clipboard
+  if ($timer($+($active,.Titlebar))) [ $+(.timer,$active,.Titlebar) ] 1 30 $timer($+($active,.Titlebar)).com
+  else [ $+(.timer,$active,.Titlebar) ] 1 30 titlebar $active $window($active).title
+  titlebar $active -=- %c line(s) copied to clipboard
 }
 
 alias -l DLF.@find.ResetColours {
