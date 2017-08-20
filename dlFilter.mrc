@@ -1712,11 +1712,11 @@ alias -l DLF.Ads.Show {
   while (($left(%ad,1) !isletter) || ($asc($left(%ad,1)) >= 192)) %ad = $deltok(%ad,1,$asc($space))
   while ($wildtok(%ad,@*,0,$asc($space))) {
     var %tok = $wildtok(%ad,@*,1,$asc($space))
-    %ad = $reptok(%ad,%tok,$u(%tok),$asc($space))
+    %ad = $reptok(%ad,%tok,$b(%tok),$asc($space))
   }
   while ($wildtok(%ad,!*,0,$asc($space))) {
     var %tok = $wildtok(%ad,!*,1,$asc($space))
-    %ad = $reptok(%ad,%tok,$u(%tok),$asc($space))
+    %ad = $reptok(%ad,%tok,$b(%tok),$asc($space))
   }
   %line = $gettok(%line,1,$asc($space)) $tab $+ $gettok(%line,2,$asc($space)) $tab $+ %ad
   var %srch = $replace($gettok($strip(%line),1-7,$asc($space)),$tab,$null)
@@ -1847,7 +1847,7 @@ alias -l DLF.Ads.NickChg {
   }
 }
 
-; DLF.Ads.ColourLines $event $nick $chan $event $nick $chan
+; DLF.Ads.ColourLines $event $nick $chan
 alias -l DLF.Ads.ColourLines {
   var %win = $DLF.Win.WinName(Ads)
   if (!$window(%win)) return
@@ -1864,7 +1864,10 @@ alias -l DLF.Ads.ColourLines {
     if (%DLF.perconnect == 0) %chan = $right(%chan,%ln)
     if ($left(%chan,1) !isin $chantypes) continue
     var %nick = $DLF.Win.NickFromTag($gettok(%l,2,$asc($space)))
-    if (($1 == join) && ($nick(%chan,%nick) != $null)) cline 3 %win %ln
+    if (($1 == join) && ($nick(%chan,%nick) != $null)) {
+      DLF.Chan.SetNickColour %nick
+      cline 3 %win %ln
+    }
     elseif (($1 == disconnect) || (%nick == $2) || ($me == $2)) cline 14 %win %ln
   }
 }
@@ -2131,17 +2134,18 @@ alias -l DLF.@find.ColourNick {
   var %win = @dlF.@find. $+ $network
   if (!$window(%win)) return
   if ($comchan($nick,0) == 0) {
-    DLF.@find.DoColourLines $1 %win $+(?,$nick, *)
-    DLF.@find.DoColourLines $1 %win $+(*:: Received from ,$nick)
+    DLF.@find.DoColourLines $1 %win $nick $+(?,$nick, *)
+    DLF.@find.DoColourLines $1 %win $nick $+(*:: Received from ,$nick)
   }
 }
 
 alias -l DLF.@find.DoColourLines {
-  var %i = $fline($2,$3-,0)
+  var %i = $fline($2,$4-,0)
+  if ((%i > 0) && ($event == join)) DLF.Chan.SetNickColour $3
   while (%i) {
-    var %l = $strip($fline($2,$3-,%i).text)
+    var %l = $strip($fline($2,$4-,%i).text)
     if (%l == $crlf) return
-    cline $1 $2 $fline($2,$3-,%i)
+    cline $1 $2 $fline($2,$4-,%i)
     dec %i
   }
 }
@@ -2157,6 +2161,7 @@ alias -l DLF.@find.ColourMe {
     dec %i
     var %nick = $right($gettok(%l,1,$asc($space)),-1), %c = 14
     if ($1 == join) {
+      DLF.Chan.SetNickColour %nick
       if ($nick($2,%nick) == $null) continue
       %c = 3
     }
