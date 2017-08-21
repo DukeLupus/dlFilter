@@ -1130,11 +1130,17 @@ alias -l DLF.DccSend.Request {
 
 alias -l DLF.DccSend.GetRequest {
   var %fn = $replace($noqt($DLF.GetFileName($strip($1-))),$space,_)
-  var %req = $hfind(DLF.dccsend.requests,$+($network,|#*|!,$nick,|,%fn,|*),1,w).item
+  var %req = $hfind(DLF.dccsend.requests,$+($network,|*|!,$nick,|,%fn,|*),1,w).item
   if (%req) return %req
-  var %req = $hfind(DLF.dccsend.requests,$+($network,|#*|@,$nick,|*|*),1,w).item
+  if (*_results_for__*.txt.zip iswm %fn) {
+    var %srch = $gettok(%fn,1,$asc(.))
+    var %srch = $right(%srch,$calc(- $pos(%srch,__,1) - 1))
+    var %req = $hfind(DLF.dccsend.requests,$+($network,|*|@search*|,%srch,|*),1,w).item
+    if (%req) return %req
+  }
+  var %req = $hfind(DLF.dccsend.requests,$+($network,|*|@,$nick,|*|*),1,w).item
   if (%req) return %req
-  return $hfind(DLF.dccsend.requests,$+($network,|#*|@,$nick,-*|*|*),1,w).item
+  return $hfind(DLF.dccsend.requests,$+($network,|*|@,$nick,-*|*|*),1,w).item
 }
 
 alias -l DLF.DccSend.IsRequest {
@@ -1144,7 +1150,8 @@ alias -l DLF.DccSend.IsRequest {
   var %trig = $gettok(%req,3,$asc(|))
   if (($left(%trig,1) == !) && ($right(%trig,-1) != $nick)) return $false
   if ($left(%trig,1) == @) {
-    if (($right(%trig,-1) != $nick) && ($right($gettok(%trig,1,$asc(-)),-1) != $nick)) return $false
+    var %nick = $right(%trig,-1)
+    if ((($left(%trig,7) != @search) || ($DLF.IsRegularUser($nick))) && (%nick != $nick) && ($gettok(%nick,1,$asc(-)) != $nick)) return $false
     if ($gettok(%fn,-1,$asc(.)) !isin txt zip rar 7z) return $false
   }
   DLF.Watch.Log File request found: %trig $1-
@@ -1152,7 +1159,7 @@ alias -l DLF.DccSend.IsRequest {
 }
 
 alias -l DLF.DccSend.IsTrigger {
-  var %srch = $+($network,|#*|*,$nick,|*|*)
+  var %srch = $+($network,|*|*,$nick,|*|*)
   var %i = $hfind(DLF.dccsend.requests,%srch,0,w).item
   if (%i == 0) return $false
   while (%i) {
