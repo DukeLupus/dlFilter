@@ -41,6 +41,12 @@ dlFilter uses the following code from other people:
         Option to trim ads for servers which have been offline for xx hours.
         Instead of open/close Ads / Filter windows, instead always populate but show/hide instead.
           (So that history is available if you need it.)
+        Joins/Ops/Parts/Quit should update oNotice nick lists.
+        oNotice nick lists should show op chars and colours as per mIRC settings.
+        oNotice windows need a descriptive titlebar.
+        Work out how to handle fileserver responses to @find (undernet#mp3servers @find mercury)
+          (Might need to a. filter out "blank" lines ($crlf or all === or ---- for example), b. spot start and end lines ("QNet File Server v0.95beta search results for *mercury*" then "Use @ruprecht-search to search all lists, @ruprecht-help for more info" and c. filter everything from this user inbetween)
+        On nick change rename query/dcc chat/get/send/fileserv.
 
   Ideas for possible future enhancements
         Implement toolbar functionality with right click menu
@@ -296,7 +302,7 @@ menu menubar {
 
 menu channel {
   -
-  $iif($me !isop $chan, $style(2)) Send oNotice: DLF.oNotice.Open
+  $iif($me !isop $chan, $style(2)) Open oNotice chat window: DLF.oNotice.Open
   -
   dlFilter
   ..$iif($DLF.Chan.IsDlfChan($chan,$false),Remove this channel from,Add this channel to) filtering: DLF.Chan.AddRemove
@@ -348,7 +354,7 @@ alias -l DLF.ctcpBlock.Priv {
     DLF.Halt Halted: ctcp finger blocked
   }
   ; dlFilter ctcp response only to people who are in a common channel or in chat
-  if (($query($nick)) || ($chat($nick,0) || (%comchan > 0)) {
+  if (($query($nick)) || ($chat($nick,0)) || (%comchan > 0)) {
     if ($1 == VERSION) DLF.ctcpVersion.Reply Private
     return
   }
@@ -768,8 +774,7 @@ alias -l DLF.Chan.SetNickColour {
   }
 }
 
-alias -l DLF.Chan.GetMsgNick {
-  if ($1 == Private) return $2
+alias DLF.Chan.GetMsgNick {
   var %pnick = $DLF.Chan.pNick($1,$2)
   var %cnick = $cnick(%pnick)
   if ((%cnick == 0) || ($enablenickcolors == $false)) var %colour = $color(Listbox)
@@ -805,6 +810,7 @@ alias -l DLF.Priv.Text {
   DLF.Watch.Called DLF.Priv.Text
   DLF.@find.Response $1-
   DLF.Priv.Request $1-
+  if ($DLF.DccSend.IsTrigger) DLF.Win.Server $1-
   DLF.Priv.QueryOpen $1-
   DLF.Custom.Filter $1-
   var %txt = $strip($1-)
@@ -1218,19 +1224,20 @@ alias -l DLF.DccSend.Send {
     DLF.Watch.Log Accepted: DCC Send - user requested this file from this server
     return
   }
-  elseif (%DLF.dccsend.requested == 1) DLF.DccSend.Block the file was not requested or @ trigger response has invalid filetype
-  if (%DLF.dccsend.dangerous == 1) {
-    var %ext = $nopath($filename)
-    var %ext = $right(%ext,$calc(- $pos(%ext,.,$pos(%ext,.,0))))
-    var %bad = exe pif application gadget msi msp com scr hta cpl msc jar bat cmd vb vbs vbe js jse ws wsf mrc doc wsc wsh ps1 ps1xml ps2 ps2xml psc1 psc2 msh msh1 msh2 mshxml msh1xml msh2xml scf lnk inf reg doc xls ppt docm dotm xlsm xltm xlam pptm potm ppam ppsm sldm
-    if ($istok(%bad,%ext,$asc($space))) DLF.DccSend.Block dangerous filetype
+  if (!%trusted) {
+    if (%DLF.dccsend.requested == 1) DLF.DccSend.Block the file was not requested or @ trigger response has invalid filetype
+    if (%DLF.dccsend.dangerous == 1) {
+      var %ext = $nopath($filename)
+      var %ext = $gettok(%ext,-1,$asc(.))
+      var %bad = exe pif application gadget msi msp com scr hta cpl msc jar bat cmd vb vbs vbe js jse ws wsf mrc doc wsc wsh ps1 ps1xml ps2 ps2xml psc1 psc2 msh msh1 msh2 mshxml msh1xml msh2xml scf lnk inf reg doc xls ppt docm dotm xlsm xltm xlam pptm potm ppam ppsm sldm
+      if ($istok(%bad,%ext,$asc($space))) DLF.DccSend.Block dangerous filetype
+    }
+    if (%DLF.dccsend.trusted == 1) DLF.DccSend.Block the user is not in your DCC Get trust list
+    if ((%DLF.dccsend.nocomchan == 1) && ($comchan($nick,0) == 0)) DLF.DccSend.Block the user is not in a common channel
+    if ((%DLF.dccsend.regular == 1) && ($DLF.IsRegularUser($nick)) DLF.DccSend.Block the user is a regular user
   }
-  if ((%DLF.dccsend.trusted == 1) && (!%trusted)) DLF.DccSend.Block the user is not in your DCC Get trust list
-  if ((%DLF.dccsend.nocomchan == 1) && ($comchan($nick,0) == 0)) DLF.DccSend.Block the user is not in a common channel
-  if ((%DLF.dccsend.regular == 1) && ($DLF.IsRegularUser($nick)) DLF.DccSend.Block the user is a regular user
   DLF.Watch.Log DCC Send accepted
   DLF.DccSend.Receiving %fn
-  return
 }
 
 alias -l DLF.DccSend.Block {
@@ -1361,6 +1368,8 @@ alias -l DLF.DccSend.IsTrusted {
   if (%addr == $null) return $false
   var %i = $trust(0)
   while (%i) {
+    var %trust = $trust(%i)
+    if (($numtok(%trust,$asc(!)) < 2) && (%trust == $gettok(%addr,1,$asc(!)))) return $true
     if ($trust(%i) iswm %addr) return $true
     dec %i
   }
@@ -1638,7 +1647,7 @@ alias -l DLF.Win.LineFormat {
   tokenize $asc($space) $1-
   var %nc = $null
   if (%DLF.perconnect == 0) %nc = $network
-  if (($left($2,1) == $hashtag) && ($2 != $hashtag)) %nc = %nc $+ $2
+  if (($left($2,1) isin $chantypes) && ($2 != $hashtag)) %nc = %nc $+ $2
   if (%nc != $null) %nc = $sbr(%nc)
   return %nc $DLF.Win.Format($1-)
 }
@@ -1648,7 +1657,7 @@ alias -l DLF.Win.Colour return $color($DLF.Win.MsgType($1))
 
 alias -l DLF.Win.Format {
   tokenize $asc($space) $1-
-  if (($1 isin Normal Text) && ($3 == $me) && ($prefixown == 0)) return $4-
+  if (($1 isin Normal Text) && ($3 == $me) && ($prefixown == 0)) return > $4-
   elseif ($1 isin Normal Text) return $tag($DLF.Chan.GetMsgNick($2,$3)) $4-
   elseif ($1 == Action) return * $3-
   elseif ($1 == Notice) return $+(-,$3,-) $4-
@@ -2089,7 +2098,7 @@ alias -l DLF.@find.Results {
 }
 
 alias -l DLF.@find.Get {
-  if ($DLF.Win.MinSelectLine < $1) return
+  if ($1 < $DLF.Win.MinSelectLine) return
   var %line = $replace($line($active,$1),$tab,$space)
   var %trig = $gettok(%line,1,$asc($space))
   var %type = $left(%trig,1)
@@ -2281,10 +2290,10 @@ alias -l DLF.oNotice.Open {
 alias -l DLF.oNotice.Input {
   var %ochan = $right($active,-1)
   if (($left($1,1) == /) && ($ctrlenter == $false) && ($1 != /me)) return
-  if (($1 != /me) || ($ctrlenter == $true)) var %omsg = $iif($prefixown == 1,$tag($me) $+ $space) $+ $1-
+  if (($1 != /me) || ($ctrlenter == $true)) var %omsg = $iif($prefixown == 1,$tag($me),>) $1-
   else var %omsg = * $me $2-
   if (%DLF.win-onotice.timestamp == 1) var %omsg = $timestamp %omsg
-  echo $iif($1 != /me,$color(Normal),$color(Action)) -st $active %omsg
+  echo $iif($1 != /me,$color(Normal),$color(Action)) $active %omsg
   aline -nl $color(nicklist) $active $me
   window -S $active
   if ($me !isop %ochan) {
@@ -2302,7 +2311,7 @@ alias -l DLF.oNotice.Close {
 
 alias -l DLF.oNotice.Log {
   if (%DLF.win-onotice.log == 1) {
-    var %log = %DLF.oNotice.LogFile($1)
+    var %log = $DLF.oNotice.LogFile($1)
     write -m1 %log $sbr($logstamp) $2-
   }
 }
