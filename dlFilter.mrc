@@ -38,7 +38,9 @@ dlFilter uses the following code from other people:
 
   Immediate TODO
         Test location and filename for oNotice log files
-        check when queryopen runs so that @find and Ads lines are processed first.
+        Option to trim ads for servers which have been offline for xx hours.
+        Instead of open/close Ads / Filter windows, instead always populate but show/hide instead.
+          (So that history is available if you need it.)
 
   Ideas for possible future enhancements
         Implement toolbar functionality with right click menu
@@ -730,12 +732,13 @@ alias -l DLF.Chan.ControlCodes {
 
 alias -l DLF.Chan.SetNickColour {
   if (%DLF.colornicks == 1) {
+    var %c = $color(Highlight)
     var %nick = $iif($1 != $null,$1,$nick)
     var %i = $comchan(%nick,0)
     while (%i) {
       var %chan = $comchan(%nick,%i)
       dec %i
-      if ($nick(%chan,%nick).color != 4) cline 4 %chan %nick
+      if ($nick(%chan,%nick).color != %c) cline %c %chan %nick
       continue
 
       ; remaining code in this loop is obsolete and can be removed once we are happy with above code
@@ -1584,7 +1587,7 @@ alias -l DLF.Win.IsInvalidSelection {
   if (%i == 0) return $true
   var %min = $DLF.Win.MinSelectLine
   while (%i) {
-    if ($sline($menu,%i).ln > %min) return $false
+    if ($sline($menu,%i).ln >= %min) return $false
     dec %i
   }
   return $true
@@ -1647,6 +1650,7 @@ alias -l DLF.Win.Format {
   tokenize $asc($space) $1-
   if (($1 isin Normal Text) && ($3 == $me) && ($prefixown == 0)) return $4-
   elseif ($1 isin Normal Text) return $tag($DLF.Chan.GetMsgNick($2,$3)) $4-
+  elseif ($1 == Action) return * $3-
   elseif ($1 == Notice) return $+(-,$3,-) $4-
   elseif (($1 == ctcp) && ($4 == DCC)) return $4-
   elseif ($1 == ctcp) return $sbr($3 $+ $iif(($2 != Private) && ($2 != $3),: $+ $2) $4) $5-
@@ -2333,8 +2337,9 @@ dialog -l DLF.Options.GUI {
   tab "Ops", 700
   tab "Custom", 800
   tab "About", 900
-  button "Close", 30, 2 205 67 11, ok default flat
-  check "Show/hide filtered lines", 40, 74 205 92 11, push
+  check "Show/hide filtered lines", 40, 1 205 60 11, push
+  button "Close", 30, 65 205 36 11, ok default flat
+  check "Show/hide server ads", 320, 106 205 60 11, push
   ; tab Channels
   text "List the channels you want dlFilter to operate on. Use # by itself to make dlFilter work on all networks and channels.",105, 5 25 160 12, tab 100 multi
   text "Channel to add (select dropdown / type #chan or net#chan):", 110, 5 40 160 7, tab 100
@@ -2351,12 +2356,11 @@ dialog -l DLF.Options.GUI {
   box " General ", 305, 4 23 160 127, tab 300
   check "Filter other users Search / File requests", 310, 7 32 155 6, tab 300
   check "Filter adverts and announcements", 315, 7 41 155 6, tab 300
-  check "Show adverts and announcements in a separate window", 320, 7 50 155 6, tab 300
-  check "Filter channel mode changes (e.g. user limits)", 325, 7 59 155 6, tab 300
-  check "Filter channel spam", 330, 7 68 155 6, tab 300
-  check "Filter private spam", 335, 7 77 155 6, tab 300
-  check "... and /ignore spammer for 1h (asks confirmation)", 340, 15 86 146 6, tab 300
-  check "Filter channel messages with control codes (usually a bot)", 345, 7 95 155 6, tab 300
+  check "Filter channel mode changes (e.g. user limits)", 325, 7 68 155 6, tab 300
+  check "Filter channel spam", 330, 7 77 155 6, tab 300
+  check "Filter private spam", 335, 7 86 155 6, tab 300
+  check "... and /ignore spammer for 1h (asks confirmation)", 340, 15 95 146 6, tab 300
+  check "Filter channel messages with control codes (usually a bot)", 345, 7 104 155 6, tab 300
   check "Filter channel topic messages", 355, 7 113 155 6, tab 300
   check "Filter server responses to my requests to separate window", 360, 7 122 155 6, tab 300
   check "Filter requests to you in PM (@yournick, !yournick)", 365, 7 131 155 6, tab 300
@@ -3330,6 +3334,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads @ --*
   DLF.hadd chantext.ads @ Use @*
   DLF.hadd chantext.ads *QNet Advanced DCC File Server*Sharing *B of stuff!*
+  DLF.hadd chantext.ads *Has The Best Servers*We have * Servers Sharing * Files*
   inc %matches $hget(DLF.chantext.ads,0).item
 
   if ($hget(DLF.chantext.announce)) hfree DLF.chantext.announce
