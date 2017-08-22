@@ -390,6 +390,7 @@ on ^*:join:#: {
 }
 
 on ^*:part:#: {
+  DLF.oNotice.DelNick
   DLF.@find.ColourNick 14
   if ($DLF.Chan.IsChanEvent) {
     DLF.Ads.ColourLines $event $nick $chan
@@ -411,6 +412,7 @@ on ^*:nick: {
 }
 
 on ^*:quit: {
+  DLF.oNotice.DelAll
   DLF.@find.ColourNick 14
   if ($DLF.Chan.IsUserEvent) {
     DLF.Ads.ColourLines $event $nick
@@ -437,6 +439,10 @@ on me:*:quit: {
   DLF.Ads.ColourLines $event $nick
 }
 
+on me:*:op:# {
+  DLF.oNotice.AddChan
+}
+
 on *:disconnect: {
   DLF.@find.ColourMe $event
   DLF.Ads.ColourLines $event $nick
@@ -447,8 +453,14 @@ on *:disconnect: {
 ; ban, unban, op, deop, voice, devoice etc.
 on ^*:ban:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$bnick)) DLF.Chan.Mode $1- }
 on ^*:unban:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$bnick)) DLF.Chan.Mode $1- }
-on ^*:op:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1- }
-on ^*:deop:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1- }
+on ^*:op:%DLF.channels: {
+  DLF.oNotice.AddNick
+  if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1-
+}
+on ^*:deop:%DLF.channels: {
+  DLF.oNotice.DelNick
+  if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1-
+}
 on ^*:owner:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1- }
 on ^*:deowner:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1- }
 on ^*:voice:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$vnick)) DLF.Chan.Mode $1- }
@@ -777,19 +789,23 @@ alias -l DLF.Chan.SetNickColour {
   }
 }
 
-alias DLF.Chan.GetMsgNick {
-  var %pnick = $DLF.Chan.pNick($1,$2)
-  var %cnick = $cnick(%pnick)
-  if ((%cnick == 0) || ($enablenickcolors == $false)) var %colour = $color(Listbox)
-  elseif ($cnick(%cnick).method == 2) var %colour = $color(Listbox)
-  else var %colour = $cnick(%cnick).color
-  if (%colour == 0) %colour = 1
-  var %nick = $iif(($showmodeprefix) && ($left($1,1) isin $chantypes),%pnick,$2)
+alias DLF.Chan.MsgNick {
+  var %nick = $DLF.Chan.PrefixedNick($1,$2)
+  var %colour = $DLF.Chan.NickColour($nick($1,$2).pnick)
   if (%colour != $null) %nick = $c(%colour,%nick)
   return %nick
 }
 
-alias -l DLF.Chan.pNick return $nick($1,$2).pnick
+alias DLF.Chan.NickColour {
+  var %cnick = $cnick($1)
+  if ((%cnick == 0) || ($enablenickcolors == $false)) var %colour = $color(Listbox)
+  elseif ($cnick(%cnick).method == 2) var %colour = $color(Listbox)
+  else var %colour = $cnick(%cnick).color
+  if (%colour == 0) %colour = 1
+  return %colour
+}
+
+alias -l DLF.Chan.PrefixedNick return $iif(($showmodeprefix) && ($left($1,1) isin $chantypes),$nick($1,$2).pnick,$2)
 
 alias -l DLF.Chan.EditSend {
   ; Done with timers to allow messages to be sent before doing the next one.
@@ -1643,7 +1659,7 @@ alias -l DLF.Win.WinOpen {
   if (%DLF.perconnect == 0) %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ z,1,$asc($space))
   if ((%DLF.background == 1) && ($4 == 0)) %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ h,1,$asc($space))
   window %switches %win
-  if (($3) && ($isfile(%lfn))) loadbuf $windowbuffer -p %win %lfn
+  if (($3) && ($isfile(%lfn))) loadbuf $windowbuffer -rpi %win %lfn
   if ($4- != $null) titlebar %win -=- $5-
   return %win
 }
@@ -1663,7 +1679,7 @@ alias -l DLF.Win.Colour return $color($DLF.Win.MsgType($1))
 alias -l DLF.Win.Format {
   tokenize $asc($space) $1-
   if (($1 isin Normal Text) && ($3 == $me) && ($prefixown == 0)) return > $4-
-  elseif ($1 isin Normal Text) return $tag($DLF.Chan.GetMsgNick($2,$3)) $4-
+  elseif ($1 isin Normal Text) return $tag($DLF.Chan.MsgNick($2,$3)) $4-
   elseif ($1 == Action) return * $3-
   elseif ($1 == Notice) return $+(-,$3,-) $4-
   elseif (($1 == ctcp) && ($4 == DCC)) return $4-
@@ -1745,7 +1761,7 @@ alias -l DLF.Ads.Show {
   var %srch = $replace($gettok($strip(%line),1-7,$asc($space)),$tab,$null)
   %srch = $puttok(%srch,$DLF.Win.NickFromTag($gettok(%srch,2,$asc($space))),2,$asc($space))
   var %ln = $calc($line(%win,0) + 1)
-  var %match = $+([,$iif(%DLF.perconnect == 0,$network),$chan,]*,$tag($DLF.Chan.GetMsgNick($chan,$nick)),*)
+  var %match = $+([,$iif(%DLF.perconnect == 0,$network),$chan,]*,$tag($DLF.Chan.MsgNick($chan,$nick)),*)
   var %i = $fline(%win,%match,0)
   if (%i == 0) {
     %match = $+([,$iif(%DLF.perconnect == 0,$network),$chan,]*)
@@ -2257,18 +2273,33 @@ menu @#* {
 }
 
 alias -l DLF.oNotice.IsoNotice {
+  echo -s Channel notice $event $chan $nick $1-
+  if ($target != @ $+ $chan) return $false
   if (%DLF.win-onotice.enabled != 1) return $false
   if ($me !isop $chan) return $false
   if ($nick !isop $chan) return $false
   return $true
 }
 
+alias -l DLF.oNotice.Open {
+  if ($me !isop $chan) return
+  var %chan = $+(@,$chan)
+  var %win = $+(%chan,.,$network)
+  if ($window(%win)) return %win
+  DLF.oNotice.Log %chan ----- Session started -----
+  window $+(-el12mS,$iif($1 == 0,n)) %win
+  var %log = $DLF.oNotice.LogFile(%chan)
+  if ((%DLF.win-onotice.log == 1) && ($isfile(%log))) .loadbuf $windowbuffer -rpi %win %log
+  titlebar %win -=- Chat window for ops in $chan on $network
+  DLF.oNotice.AddChan
+  return %win
+}
+
 alias -l DLF.oNotice.Channel {
   var %win = $DLF.oNotice.Open(0)
   if ($1 == @) var %omsg = $2-
   else var %omsg = $1-
-  aline -nl $color(nicklist) %win $nick
-  window -S %win
+  DLF.oNotice.AddNick
   if ($gettok(%omsg,1,$asc($space)) != /me) %omsg = $color(text) %win $tag($nick) %omsg
   else %omsg = $color(action) %win * $nick $gettok(%omsg,2-,$asc($space))
   aline -ph %omsg
@@ -2277,32 +2308,93 @@ alias -l DLF.oNotice.Channel {
   DLF.Halt Halted: oNotice sent to %win
 }
 
-alias -l DLF.oNotice.Open {
-  if ($me !isop $chan) return
-  var %win = @ $+ $chan
-  if (!$window(%win)) {
-    DLF.oNotice.Log %win ----- Session started -----
-    window $+(-eg1k1l12mSw,$iif($1 == 0,n)) %win
-    var %log = $DLF.oNotice.LogFile(%win)
-    if ((%DLF.win-onotice.log == 1) && ($isfile(%log))) .loadbuf -r %win %log
+alias -l DLF.oNotice.AddChan {
+  var %win = $+(@,$chan,.,$network)
+  if (!$window(%win)) return
+  var %i = $nick($chan,0,o)
+  while (%i) {
+    DLF.oNotice.AddNick $nick($chan,%i,o)
+    dec %i
   }
-  return %win
+}
+
+alias -l DLF.oNotice.AddNick {
+  var %win = $+(@,$chan,.,$network)
+  var %nick = $iif($1 != $null,$1,$nick)
+  if (!$window(%win)) return
+  aline -nl $DLF.Chan.NickColour($nick($chan,%nick).pnick) %win $DLF.Chan.PrefixedNick($chan,%nick)
+  window -S $1
+}
+
+alias -l DLF.oNotice.DelNick {
+  var %chan = $iif($1 != $null,$1,$chan)
+  var %win = $+(@,%chan,.,$network)
+  if (!$window(%win)) return
+  var %match = * $+ $nick
+  var %j = $fline(%win,%match,0,1)
+  while (%j) {
+    var %l = $fline(%win,%match,%j,1)
+    var %nick = $line(%win,%l,1)
+    while ($left(%nick,1) isin $prefix) %nick = $right(%nick,-1)
+    if (%nick == $nick) {
+      dline %win %l
+      return
+    }
+    dec %j
+  }
+}
+
+alias -l DLF.oNotice.DelAll {
+  var %match = $+(@#*.,$network)
+  var %i = $window(%match,0)
+  while (%i) {
+    var %win = $window(%match,%i)
+    if ($cid == $window(%win).cid) {
+      var %chan = $right($deltok(%win,-1,$asc(.)),-1)
+      if ($nick == $me) clear -l %win
+      else DLF.oNotice.DelNick %chan
+    }
+    dec %i
+  }
+}
+
+alias -l DLF.oNotice.NickChg {
+  var %match = $+(@#*.,$network)
+  var %i = $window(%match,0)
+  while (%i) {
+    var %win = $window(%match,%i)
+    if ($cid == $window(%win).cid) {
+      var %chan = $right($deltok(%win,-1,$asc(.)),-1)
+      var %nickmatch = * $+ $nick
+      var %j = $fline(%win,%nickmatch,0,1)
+      while (%j) {
+        var %l = $fline(%win,%nickmatch,%j,1)
+        var %nick = $line(%win,%l,1)
+        while ($left(%nick,1) isin $prefix) %nick = $right(%nick,-1)
+        if (%nick == $nick) {
+          rline -l %win %l $replace($line(%win,%l,1),$nick,$newnick)
+          break
+        }
+        dec %j
+      }
+    }
+    dec %i
+  }
 }
 
 alias -l DLF.oNotice.Input {
-  var %ochan = $right($active,-1)
+  var %chan = $right($active,-1)
+  if ($gettok(%chan,-1,$asc(.)) == $network) %chan = $deltok(%chan,-1,$asc(.))
   if (($left($1,1) == /) && ($ctrlenter == $false) && ($1 != /me)) return
   if (($1 != /me) || ($ctrlenter == $true)) var %omsg = $iif($prefixown == 1,$tag($me),>) $1-
   else var %omsg = * $me $2-
   if (%DLF.win-onotice.timestamp == 1) var %omsg = $timestamp %omsg
   echo $iif($1 != /me,$color(Normal),$color(Action)) $active %omsg
-  aline -nl $color(nicklist) $active $me
-  window -S $active
-  if ($me !isop %ochan) {
-    echo 4 -t %ochan oNotice not sent: You are no longer an op in %ochan
+  if ($me !isop %chan) {
+    echo 4 -t $active $DLF.Logo oNotice not sent: You are no longer an op in %ochan
     return
   }
-  .onotice %ochan $1-
+  .notice @ $+ %chan $1-
   DLF.oNotice.Log $active %omsg
 }
 
@@ -2318,7 +2410,11 @@ alias -l DLF.oNotice.Log {
   }
 }
 
-alias -l DLF.oNotice.LogFile return $+($logdir,$mklogfn($1))
+alias -l DLF.oNotice.LogFile {
+  var %chan = $1
+  if ($gettok(%chan,-1,$asc(.)) == $network) %chan = $deltok(%chan,-1,$asc(.))
+  return $+($logdir,$mklogfn(%chan))
+}
 
 ; ========== mIRC security check - future functionality ==========
 ; IRC / Catcher / Chat links; Confirm requests checked.
