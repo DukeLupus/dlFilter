@@ -489,7 +489,10 @@ on *:getfail:*: DLF.DccSend.GetFailed $1-
 ; Channel messages
 on ^*:text:*:%DLF.channels: { if ($DLF.Chan.IsChanEvent) DLF.Chan.Text $1- }
 on ^*:action:*:%DLF.channels: { if ($DLF.Chan.IsChanEvent) DLF.Chan.Action $1- }
-on ^*:notice:*:%DLF.channels: { if ($DLF.Chan.IsChanEvent) DLF.Chan.Notice $1- }
+on ^*:notice:*:%DLF.channels: {
+  if ($DLF.oNotice.IsoNotice) DLF.oNotice.Channel $1-
+  if ($DLF.Chan.IsChanEvent) DLF.Chan.Notice $1-
+}
 on ^@*:notice:*:#: { if ($DLF.oNotice.IsoNotice) DLF.oNotice.Channel $1- }
 on *:input:@#* { DLF.oNotice.Input $1- }
 
@@ -2273,11 +2276,12 @@ menu @#* {
 }
 
 alias -l DLF.oNotice.IsoNotice {
-  echo -s Channel notice $event $chan $nick $1-
+  echo -s Channel notice $target $event $chan $nick $1-
   if ($target != @ $+ $chan) return $false
   if (%DLF.win-onotice.enabled != 1) return $false
   if ($me !isop $chan) return $false
   if ($nick !isop $chan) return $false
+  DLF.Watch.Log Is oNotice
   return $true
 }
 
@@ -2299,12 +2303,11 @@ alias -l DLF.oNotice.Channel {
   var %win = $DLF.oNotice.Open(0)
   if ($1 == @) var %omsg = $2-
   else var %omsg = $1-
-  DLF.oNotice.AddNick
-  if ($gettok(%omsg,1,$asc($space)) != /me) %omsg = $color(text) %win $tag($nick) %omsg
-  else %omsg = $color(action) %win * $nick $gettok(%omsg,2-,$asc($space))
+  if ($gettok(%omsg,1,$asc($space)) != /me) %omsg = $color(text) %win $iif(%DLF.win-onotice.timestamp == 1,$timestamp) $tag($nick) %omsg
+  else %omsg = $color(action) %win $iif(%DLF.win-onotice.timestamp == 1,$timestamp) * $nick $gettok(%omsg,2-,$asc($space))
+  DLF.oNotice.Log $gettok(%omsg,2-,$asc($space))
+  echo -s aline -ph %omsg
   aline -ph %omsg
-  if (%DLF.win-onotice.timestamp == 1) var %omsg = $timestamp %omsg
-  DLF.oNotice.Log %win $gettok(%omsg,2-,$asc($space))
   DLF.Halt Halted: oNotice sent to %win
 }
 
@@ -2323,7 +2326,7 @@ alias -l DLF.oNotice.AddNick {
   var %nick = $iif($1 != $null,$1,$nick)
   if (!$window(%win)) return
   aline -nl $DLF.Chan.NickColour($nick($chan,%nick).pnick) %win $DLF.Chan.PrefixedNick($chan,%nick)
-  window -S $1
+  window -S %win
 }
 
 alias -l DLF.oNotice.DelNick {
