@@ -39,14 +39,13 @@ dlFilter uses the following code from other people:
   Immediate TODO
         Test location and filename for oNotice log files
         Option to trim ads for servers which have been offline for xx hours.
-        Instead of open/close Ads / Filter windows, instead always populate but show/hide instead.
-          (So that history is available if you need it.)
         Joins/Ops/Parts/Quit should update oNotice nick lists.
         oNotice nick lists should show op chars and colours as per mIRC settings.
         oNotice windows need a descriptive titlebar.
         Work out how to handle fileserver responses to @find (undernet#mp3servers @find mercury)
           (Might need to a. filter out "blank" lines ($crlf or all === or ---- for example), b. spot start and end lines ("QNet File Server v0.95beta search results for *mercury*" then "Use @ruprecht-search to search all lists, @ruprecht-help for more info" and c. filter everything from this user inbetween)
         On nick change rename query/dcc chat/get/send/fileserv.
+        oNotice should use /notice @#chan rather than /onotice which sends individual notices to ops.
 
   Ideas for possible future enhancements
         Implement toolbar functionality with right click menu
@@ -123,6 +122,9 @@ dlFilter uses the following code from other people:
         Added dynamic update for filter/server/watch search windows
         Added ability to report false positive server ads
         Added Ctrl-C to copy lines in @find windows
+        When loading, only show options dialog if new variable has been set
+        Added option to load Filter/Ads windows in the background
+        Improved oNotice functionality - use notice @#chan, populate user lists comprehensively
 
   1.17  Update opening comments and add change log
         Use custom identifiers for creating bold, colour etc.
@@ -185,8 +187,9 @@ on *:load: {
   DLF.LoadCheck .load
 
   set -u1 %DLF.JustLoaded 1
+  set -u1 %DLF.OptionInit $false
   DLF.Initialise
-  DLF.Options.Show
+  if (%DLF.OptionInit != $false) DLF.Options.Show
   DLF.StatusAll Loading complete.
   return
 
@@ -1063,21 +1066,21 @@ alias -l DLF.Ops.VersionReply {
   else var %ver = ?
   if ((%mod == $strip($DLF.Logo)) && (%ver isnum)) {
     if (!$hfind(DLF.ops.dlfUsers,%idx)) {
-      hadd -mu86340 DLF.ops.dlfUsers %idx %ver
+      hadd -mu86400 DLF.ops.dlfUsers %idx %ver
       DLF.Watch.Log dlf version added
     }
     else DLF.Watch.Log dlf version already known
   }
   elseif ((%mod == sbClient) && (%ver isnum)) {
     if (!$hfind(DLF.ops.sbcUsers,%idx)) {
-      hadd -mu86340 DLF.ops.sbcUsers %idx %ver
+      hadd -mu86400 DLF.ops.sbcUsers %idx %ver
       DLF.Watch.Log sbc version added
     }
     else DLF.Watch.Log sbc version already known
   }
   elseif (%mod == mIRC) {
     if (!$hfind(DLF.ops.mircUsers,%idx)) {
-      hadd -mu86340 DLF.ops.mircUsers %idx %ver
+      hadd -mu86400 DLF.ops.mircUsers %idx %ver
       ; Wait 1s for advertising to allow for any more version messages
       .timer 1 1 .signal DLF.Ops.AdvertPrivDLF $nick
       DLF.Watch.Log mirc version added
@@ -1092,7 +1095,7 @@ alias -l DLF.Ops.AdvertPrivDLF {
   DLF.Watch.Called DLF.Ops.AdvertPrivDLF
   var %idx = $+($network,@,$1)
   if ($hfind(DLF.ops.privateAd,%idx)) return
-  hadd -mu86340 DLF.ops.privateAd %idx $ctime
+  hadd -mu86400 DLF.ops.privateAd %idx $ctime
   var %mircVer = $hget(DLF.ops.mircUsers,%idx)
   var %dlfVer = $hget(DLF.ops.dlfUsers,%idx)
   var %sbcVer = $hget(DLF.ops.sbcUsers,%idx)
@@ -1499,10 +1502,7 @@ menu @dlF.Filter.* {
   -
   Clear: clear
   Options: DLF.Options.Show
-  Hide filter window: {
-    %DLF.showfiltered = 0
-    close -@ @dlF.Filter*.*
-  }
+  Hide filter window: DLF.Options.ToggleShowFilter
   -
 }
 
@@ -1516,7 +1516,7 @@ menu @dlF.Server.* {
   -
   Clear: clear
   Options: DLF.Options.Show
-  Disable: {
+  Close: {
     %DLF.serverwin = 0
     close -@ @DLF.Server*.*
   }
@@ -1564,14 +1564,18 @@ alias -l DLF.Win.Log {
   var %line = $DLF.Win.LineFormat($2-)
   var %col = $DLF.Win.Colour($2)
   if (%log == 1) write $DLF.Win.LogName($DLF.Win.WinName(%type)) $sbr($logstamp) $strip(%line)
-  if ((%type = Filter) && (%DLF.showfiltered == 0)) {
+  if ((%type = Filter) && (%DLF.showfiltered == 0) && (%DLF.background == 0)) {
     DLF.Watch.Log Dropped: Options set to not show filters
     return
   }
 
-  if (%type == Filter) var %tb = Filtered
-  elseif (%type == Server) var %tb = Server response
-  var %win = $DLF.Win.WinOpen(%type,-k0nw,%log,%tb $DLF.Win.TbMsg)
+  var %show = 1, %tb
+  if (%type == Filter) {
+    %tb = Filtered
+    %show = %DLF.showfiltered
+  }
+  elseif (%type == Server) %tb = Server response
+  var %win = $DLF.Win.WinOpen(%type,-k0nw,%log,%show,%tb $DLF.Win.TbMsg)
 
   ; If user has scrolled up from the bottom of custom window, mIRC does not delete excess lines
   ; Since user can leave these windows scrolled up, they would grow uncontrollably unless we prune them manually.
@@ -1586,7 +1590,7 @@ alias -l DLF.Win.Log {
 
 alias -l DLF.Win.Ads {
   DLF.Chan.SetNickColour
-  if (%DLF.serverads == 1) DLF.Ads.Show $1-
+  DLF.Ads.Show $1-
   DLF.Win.Filter $1-
 }
 
@@ -1630,16 +1634,17 @@ alias -l DLF.Win.LogName {
   return $qt($+($logdir,%lfn))
 }
 
-; %winname = $DLF.Win.WinOpen(type,switches,log,title)
+; %winname = $DLF.Win.WinOpen(type,switches,log,show,title)
 alias -l DLF.Win.WinOpen {
   var %win = $DLF.Win.WinName($1)
   if ($window(%win)) return %win
   var %lfn = $DLF.Win.LogName(%win)
   var %switches = $2
   if (%DLF.perconnect == 0) %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ z,1,$asc($space))
+  if ((%DLF.background == 1) && ($4 == 0)) %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ h,1,$asc($space))
   window %switches %win
   if (($3) && ($isfile(%lfn))) loadbuf $windowbuffer -p %win %lfn
-  if ($4- != $null) titlebar %win -=- $4-
+  if ($4- != $null) titlebar %win -=- $5-
   return %win
 }
 
@@ -1706,18 +1711,16 @@ menu @dlF.Ads.* {
   -
   Clear: clear
   Options: DLF.Options.Show
-  Disable: {
-    %DLF.serverads = 0
-    close -@ @DLF.Ads*.*
-  }
+  Hide: DLF.Options.ToggleShowAds
   -
 }
 
 alias -l DLF.Ads.Show {
+  if ((%DLF.serverads == 0) && (%DLF.background == 0)) return
   var %tb = server advertising $DLF.Win.TbMsg
   if (%DLF.perconnect == 1) var %tabs = -t20,40
   else var %tabs = -t30,55
-  var %win = $DLF.Win.WinOpen(Ads,-k0nwl %tabs,0,0 %tb)
+  var %win = $DLF.Win.WinOpen(Ads,-k0nwl %tabs,0,%DLF.serverads,0 %tb)
   if ($line(%win,0) == 0) {
     aline -n 6 %win This window shows adverts from servers describing how many files they have and how to get a list of their files.
     aline -n 2 %win However you will probably find it easier to use "@search search words" (or "@find search words") to locate files you want.
@@ -2255,7 +2258,6 @@ menu @#* {
 
 alias -l DLF.oNotice.IsoNotice {
   if (%DLF.win-onotice.enabled != 1) return $false
-  ;if ($target != $+(@,$chan)) return $false
   if ($me !isop $chan) return $false
   if ($nick !isop $chan) return $false
   return $true
@@ -2346,12 +2348,12 @@ dialog -l DLF.Options.GUI {
   tab "Ops", 700
   tab "Custom", 800
   tab "About", 900
-  check "Show/hide filtered lines", 40, 1 205 60 11, push
-  button "Close", 30, 65 205 36 11, ok default flat
-  check "Show/hide server ads", 320, 106 205 60 11, push
+  check "Show/hide filtered lines", 30, 1 205 60 11, push
+  check "Show/hide server ads", 40, 65 205 60 11, push
+  button "Close", 50, 129 205 37 11, ok default flat
   ; tab Channels
   text "List the channels you want dlFilter to operate on. Use # by itself to make dlFilter work on all networks and channels.",105, 5 25 160 12, tab 100 multi
-  text "Channel to add (select dropdown / type #chan or net#chan):", 110, 5 40 160 7, tab 100
+  text "Channel to add (select dropdown / type #chan or net#chan):", 110, 5 30 160 7, tab 100
   combo 120, 4 48 160 6, tab 100 drop edit
   button "Add", 130, 5 61 76 11, tab 100 flat disable
   button "Remove", 135, 86 61 76 11, tab 100 flat disable
@@ -2365,21 +2367,22 @@ dialog -l DLF.Options.GUI {
   box " General ", 305, 4 23 160 127, tab 300
   check "Filter other users Search / File requests", 310, 7 32 155 6, tab 300
   check "Filter adverts and announcements", 315, 7 41 155 6, tab 300
-  check "Filter channel mode changes (e.g. user limits)", 325, 7 68 155 6, tab 300
-  check "Filter channel spam", 330, 7 77 155 6, tab 300
-  check "Filter private spam", 335, 7 86 155 6, tab 300
-  check "... and /ignore spammer for 1h (asks confirmation)", 340, 15 95 146 6, tab 300
-  check "Filter channel messages with control codes (usually a bot)", 345, 7 104 155 6, tab 300
-  check "Filter channel topic messages", 355, 7 113 155 6, tab 300
-  check "Filter server responses to my requests to separate window", 360, 7 122 155 6, tab 300
-  check "Filter requests to you in PM (@yournick, !yournick)", 365, 7 131 155 6, tab 300
-  check "Separate dlF windows per connection", 370, 7 140 155 6, tab 300
+  check "Filter channel mode changes (e.g. user limits)", 325, 7 50 155 6, tab 300
+  check "Filter channel spam", 330, 7 59 155 6, tab 300
+  check "Filter private spam", 335, 7 68 155 6, tab 300
+  check "... and /ignore spammer for 1h (asks confirmation)", 340, 15 77 146 6, tab 300
+  check "Filter channel messages with control codes (usually a bot)", 345, 7 86 155 6, tab 300
+  check "Filter channel topic messages", 350, 7 95 155 6, tab 300
+  check "Filter server responses to my requests to separate window", 355, 7 104 155 6, tab 300
+  check "Filter requests to you in PM (@yournick, !yournick)", 360, 7 113 155 6, tab 300
+  check "Separate dlF windows per connection", 365, 7 122 155 6, tab 300
+  check "Keep Filter and Ads windows active in background", 370, 7 131 155 6, tab 300
   box " Filter user events ", 375, 4 151 160 48, tab 300
   check "Joins ...", 380, 7 161 53 6, tab 300
-  check "Parts ...", 382, 61 161 53 6, tab 300
-  check "Quits ...", 384, 115 161 53 6, tab 300
+  check "Parts ...", 382, 66 161 53 6, tab 300
+  check "Quits ...", 384, 120 161 53 6, tab 300
   check "Nick changes ...", 386, 7 170 53 6, tab 300
-  check "Kicks ...", 388, 61 170 53 6, tab 300
+  check "Kicks ...", 388, 66 170 53 6, tab 300
   check "Away and thank-you messages", 390, 7 179 155 6, tab 300
   check "User mode changes", 395, 7 188 155 6, tab 300
   ; Tab Other
@@ -2444,7 +2447,7 @@ on *:dialog:DLF.Options.GUI:sclick:140: DLF.Options.SetRemoveChannelButton
 ; Channel list double click - Remove channel and put in text box for editing and re-adding.
 on *:dialog:DLF.Options.GUI:dclick:140: DLF.Options.EditChannel
 ; Per-Server options clicked
-on *:dialog:DLF.Options.GUI:sclick:370: DLF.Options.PerConnection
+on *:dialog:DLF.Options.GUI:sclick:365: DLF.Options.PerConnection
 ; Titlebar options clicked
 on *:dialog:DLF.Options.GUI:sclick:525: DLF.Options.Titlebar
 ; Select custom message type
@@ -2499,6 +2502,7 @@ alias -l DLF.Options.Initialise {
   DLF.Options.InitOption serverwin 0
   DLF.Options.InitOption private.requests 1
   DLF.Options.InitOption perconnect 1
+  DLF.Options.InitOption background 0
   ; Filter tab User events box
   DLF.Options.InitOption filter.joins 1
   DLF.Options.InitOption filter.parts 1
@@ -2559,11 +2563,29 @@ alias -l DLF.Options.InitOption {
   var %var = $+(%,DLF.,$1)
   if ( [ [ %var ] ] != $null) return
   [ [ %var ] ] = $2
+  if (%DLF.JustLoaded) set -u1 %DLF.OptionInit $true
 }
 
 alias -l DLF.Options.ToggleShowFilter {
-  DLF.Options.ToggleOption showfiltered 40
-  if (%DLF.showfiltered == 0) close -@ @dlF.Filter*
+  DLF.Options.ToggleOption showfiltered 30
+  DLF.Win.ShowHide @dlF.Filter* %DLF.showfiltered
+}
+
+alias -l DLF.Options.ToggleShowAds {
+  DLF.Options.ToggleOption serverads 40
+  DLF.Win.ShowHide @dlF.Ads.* %DLF.serverads
+}
+
+; DLF.Win.ShowHide @dlF.Filter/Ads* 1/0
+alias -l DLF.Win.ShowHide {
+  if (%DLF.background == 1) {
+    var %i = $window($1,0)
+    while (%i) {
+      window $iif($2 == 1,-w3,-h) $window($1,%i)
+      dec %i
+    }
+  }
+  elseif ($2 == 0) close -@ $1
 }
 
 alias -l DLF.Options.ToggleOption {
@@ -2585,21 +2607,22 @@ alias -l DLF.Options.Init {
     did -vo DLF.Options.GUI 20 1 Upgrade to %ver $+ +
   }
   if (%DLF.enabled == 1) did -c DLF.Options.GUI 10
-  if (%DLF.showfiltered == 1) did -c DLF.Options.GUI 40
+  if (%DLF.showfiltered == 1) did -c DLF.Options.GUI 30
   if (%DLF.update.betas == 1) did -c DLF.Options.GUI 190
   if (%DLF.filter.requests == 1) did -c DLF.Options.GUI 310
   if (%DLF.filter.ads == 1) did -c DLF.Options.GUI 315
-  if (%DLF.serverads == 1) did -c DLF.Options.GUI 320
+  if (%DLF.serverads == 1) did -c DLF.Options.GUI 40
   if (%DLF.filter.modeschan == 1) did -c DLF.Options.GUI 325
   if (%DLF.filter.spamchan == 1) did -c DLF.Options.GUI 330
   if (%DLF.filter.spampriv == 1) did -c DLF.Options.GUI 335
   else %DLF.spam.addignore = 0
   if (%DLF.spam.addignore == 1) did -c DLF.Options.GUI 340
   if (%DLF.filter.controlcodes == 1) did -c DLF.Options.GUI 345
-  if (%DLF.filter.topic == 1) did -c DLF.Options.GUI 355
-  if (%DLF.serverwin == 1) did -c DLF.Options.GUI 360
-  if (%DLF.private.requests == 1) did -c DLF.Options.GUI 365
-  if (%DLF.perconnect == 1) did -c DLF.Options.GUI 370
+  if (%DLF.filter.topic == 1) did -c DLF.Options.GUI 350
+  if (%DLF.serverwin == 1) did -c DLF.Options.GUI 355
+  if (%DLF.private.requests == 1) did -c DLF.Options.GUI 360
+  if (%DLF.perconnect == 1) did -c DLF.Options.GUI 365
+  if (%DLF.background == 1) did -c DLF.Options.GUI 370
   if (%DLF.filter.joins == 1) did -c DLF.Options.GUI 380
   if (%DLF.filter.parts == 1) did -c DLF.Options.GUI 382
   if (%DLF.filter.quits == 1) did -c DLF.Options.GUI 384
@@ -2655,20 +2678,21 @@ alias -l DLF.Options.Save {
   DLF.Chan.Set %DLF.netchans
   %DLF.enabled = $did(10).state
   DLF.Groups.Events
-  %DLF.showfiltered = $did(40).state
+  %DLF.showfiltered = $did(30).state
   %DLF.update.betas = $did(190).state
   %DLF.filter.requests = $did(310).state
   %DLF.filter.ads = $did(315).state
-  %DLF.serverads = $did(320).state
+  %DLF.serverads = $did(40).state
   %DLF.filter.modeschan = $did(325).state
   %DLF.filter.spamchan = $did(330).state
   %DLF.filter.spampriv = $did(335).state
   %DLF.spam.addignore = $did(340).state
   %DLF.filter.controlcodes = $did(345).state
-  %DLF.filter.topic = $did(355).state
-  %DLF.serverwin = $did(360).state
-  %DLF.private.requests = $did(365).state
-  %DLF.perconnect = $did(370).state
+  %DLF.filter.topic = $did(350).state
+  %DLF.serverwin = $did(355).state
+  %DLF.private.requests = $did(360).state
+  %DLF.perconnect = $did(365).state
+  %DLF.background = $did(370).state
   %DLF.filter.joins = $did(380).state
   %DLF.filter.parts = $did(382).state
   %DLF.filter.quits = $did(384).state
@@ -2745,7 +2769,8 @@ alias -l DLF.Options.Titlebar {
 
 alias -l DLF.Options.ClickOption {
   DLF.Options.Save
-  if (%DLF.showfiltered == 0) close -@ @dlF.Filter*.*
+  DLF.Win.ShowHide @dlF.Filter* %DLF.showfiltered
+  DLF.Win.ShowHide @dlF.Ads.* %DLF.serverads
   if (($did == 190) && (!$sock(DLF.Socket.Update))) DLF.Update.CheckVersions
 }
 
@@ -2808,7 +2833,7 @@ alias -l DLF.Options.SetAddChannelButton {
   if ($did(120)) did -te DLF.Options.GUI 130
   else {
     did -b DLF.Options.GUI 130
-    did -t DLF.Options.GUI 30
+    did -t DLF.Options.GUI 50
   }
 }
 
@@ -2904,7 +2929,7 @@ alias -l DLF.Options.SetAddCustomButton {
   if ($did(840)) did -te DLF.Options.GUI 850
   else {
     did -b DLF.Options.GUI 850
-    did -t DLF.Options.GUI 30
+    did -t DLF.Options.GUI 50
   }
 }
 
