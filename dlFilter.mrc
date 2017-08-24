@@ -39,9 +39,7 @@ dlFilter uses the following code from other people:
 
   Immediate TODO
         Test location and filename for oNotice log files
-        Option to trim ads for servers which have been offline for xx hours.
         Joins/Ops/Parts/Quit should update oNotice nick lists.
-        oNotice nick lists should show op chars and colours as per mIRC settings.
         Work out how to handle fileserver responses to @find (undernet#mp3servers @find mercury)
           (Might need to a. filter out "blank" lines ($crlf or all === or ---- for example), b. spot start and end lines ("QNet File Server v0.95beta search results for *mercury*" then "Use @ruprecht-search to search all lists, @ruprecht-help for more info" and c. filter everything from this user inbetween)
         On nick change rename query/dcc chat/get/send/fileserv.
@@ -68,6 +66,7 @@ dlFilter uses the following code from other people:
         Channel menu to show / hide Ads / Filter for this channel
         Merge in sbClient functionality
         Easy toggling of filtering of messages with colouring (e.g. switch on/off quiz server messages)
+        Option to trim Ads window of servers which have been offline for xx hours.
 
   1.18  Further code cleanup
         Self-update improvements
@@ -391,13 +390,13 @@ on *:close:@#*: { DLF.oNotice.Close $target }
 ; Channel user activity
 ; join, part, quit, nick changes, kick
 on ^*:join:#: {
-  DLF.@find.ColourNick 3
+  DLF.@find.ColourNick $nick 3
   if ($DLF.Chan.IsChanEvent) {
     DLF.Ads.ColourLines $event $nick $chan
     DLF.DccSend.Rejoin
     ; Wait for 1 sec for user's modes to be applied to avoid checking ops
     if ((%DLF.ops.advertpriv) && ($me isop $chan)) .timer 1 1 .signal DLF.Ops.RequestVersion $nick
-    if (%DLF.filter.joins) DLF.User.Channel $chan $iif($shortjoinsparts,Joins:) $nick $br($address) $iif(!$shortjoinsparts,has joined $chan)
+    if (%DLF.filter.joins) DLF.User.Channel $iif($shortjoinsparts,Joins:) $nick $br($address) $iif(!$shortjoinsparts,has joined $chan)
   }
 }
 
@@ -412,10 +411,10 @@ on me:*:join:#: {
 
 on ^*:part:#: {
   DLF.oNotice.DelNick
-  DLF.@find.ColourNick 14
+  DLF.@find.ColourNick $nick 14
   if ($DLF.Chan.IsChanEvent) {
     DLF.Ads.ColourLines $event $nick $chan
-    if (%DLF.filter.parts) DLF.User.Channel $chan $iif($shortjoinsparts,Parts:) $nick $br($address) $iif(!$shortjoinsparts,has left $chan) $iif($1-,$br($1-))
+    if (%DLF.filter.parts) DLF.User.Channel $iif($shortjoinsparts,Parts:) $nick $br($address) $iif(!$shortjoinsparts,has left $chan) $iif($1-,$br($1-))
   }
 }
 
@@ -425,10 +424,11 @@ on me:*:part:#: {
 }
 
 on ^*:kick:#: {
-  DLF.@find.ColourNick 14
+  DLF.oNotice.DelNick
+  DLF.@find.ColourNick $knick 14
   if ($DLF.Chan.IsChanEvent) {
     DLF.Ads.ColourLines $event $nick $chan
-    if (%DLF.filter.kicks == 1) DLF.User.Channel $chan $knick $iif(!$shortjoinsparts,$br($address($knick,5))) was kicked $iif(!$shortjoinsparts,from $chan ) by $nick $br($1-)
+    if (%DLF.filter.kicks) DLF.User.Channel $knick $iif(!$shortjoinsparts,$br($address($knick,5))) was kicked $iif(!$shortjoinsparts,from $chan ) by $nick $br($1-)
   }
 }
 
@@ -438,14 +438,9 @@ on ^*:nick: {
   if ($DLF.Chan.IsUserEvent(%DLF.filter.nicks)) DLF.User.NoChannel $newnick $nick $iif(!$shortjoinsparts,$br($address($knick,5))) is now known as $newnick
 }
 
-on me:*:nick: {
-  DLF.oNotice.NickChg
-  DLF.Ads.NickChg
-}
-
 on ^*:quit: {
-  DLF.oNotice.DelAll
-  DLF.@find.ColourNick 14
+  DLF.oNotice.DelNickAllChans
+  DLF.@find.ColourNick $nick 14
   if ($DLF.Chan.IsUserEvent) {
     DLF.Ads.ColourLines $event $nick
     if (%DLF.filter.quits) DLF.User.NoChannel $nick $iif($shortjoinsparts,Quits:) $nick $br($address) $iif(!$shortjoinsparts,Quit) $br($1-)
@@ -469,12 +464,9 @@ on ^*:ban:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$bnic
 on ^*:unban:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$bnick)) DLF.Chan.Mode $1- }
 
 on ^*:op:%DLF.channels: {
-  DLF.oNotice.AddNick
+  if ($opnick != $me) DLF.oNotice.AddNick
+  else DLF.oNotice.AddChanNicks
   if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1-
-}
-
-on me:*:op:#: {
-  DLF.oNotice.AddChanNicks
 }
 
 on ^*:deop:%DLF.channels: {
@@ -569,7 +561,7 @@ raw 421:*: {
 
 ; Adjust titlebar on window change
 on *:active:*: { DLF.Stats.Active }
-on *:connect: { DLF.Update.Check }
+on *:connect: { DLF.Net.Connect }
 
 ; Process Ctrl-C on @find window
 on *:keydown:@dlf.@find.*:*: { if ((!$keyrpt) && ($keyval == 3)) DLF.@find.CopyLines }
@@ -592,20 +584,29 @@ alias -l DLF.Groups.Events {
   else .disable #dlf_events
 }
 
+; ========== Network events ==========
+alias -l DLF.Net.Connect {
+  set -u40 [ [ $+(%,DLF.connect.,$network,.,$me) ] ] 1
+  DLF.Update.Check
+}
+
+alias DLF.Net.IsConnecting { return $iif( [ [ $+(%,DLF.connect.,$network,.,$me) ] ] = 1,$true,$false) }
+
 ; ========== Channel events ==========
 ; Channel user activity
 ; join, part, kick
 alias -l DLF.User.Channel {
-  DLF.Watch.Called DLF.User.Channel
+  DLF.Watch.Called DLF.User.Channel $nick
   if ($nick == $me) return
-  DLF.Win.Log Filter $event $1 $nick $2-
+  if ($me isin $1-) return
+  DLF.Win.Log Filter $event $chan $nick $1-
   halt
 }
 
 ; Non-channel user activity
 ; nick changes, quit
 alias -l DLF.User.NoChannel {
-  DLF.Watch.Called DLF.User.NoChannel
+  DLF.Watch.Called DLF.User.NoChannel $1
   var %dlfchan = $false
   if (%DLF.netchans != $hashtag) {
     var %i = $comchan($1,0)
@@ -620,7 +621,7 @@ alias -l DLF.User.NoChannel {
     }
   }
   if (%dlfchan) DLF.Win.Log Filter $event $hashtag $nick $2-
-  else DLF.Watch.Log Echoed to non-DLF channels
+  else DLF.Watch.Log Echoed to all $network channels
   halt
 }
 
@@ -718,8 +719,8 @@ alias -l DLF.Chan.Text {
 
   DLF.Custom.Filter $1-
   if ($hiswm(chantext.always,%txt)) DLF.Win.Filter $1-
+  if ((%DLF.filter.ads == 1) && ($hiswm(chantext.spam,%txt))) DLF.Win.Filter $1-
   if ((%DLF.filter.ads == 1) && ($hiswm(chantext.ads,%txt))) DLF.Win.Ads $1-
-  if ((%DLF.filter.ads == 1) && ($hiswm(chantext.announce,%txt))) DLF.Win.Filter $1-
   /*if (%DLF.filter.spamchan == 1) {
     ;no channel spam right now
   }
@@ -880,7 +881,7 @@ alias -l DLF.Priv.Text {
 alias -l DLF.Priv.Notice {
   DLF.Watch.Called DLF.Priv.Notice
   DLF.@find.Response $1-
-  DLF.Priv.NoticeChanserv $1-
+  DLF.Priv.NoticeServices $1-
   if ($DLF.DccSend.IsTrigger) DLF.Win.Server $1-
   DLF.Custom.Filter $1-
   DLF.Priv.QueryOpen $1-
@@ -893,12 +894,17 @@ alias -l DLF.Priv.Notice {
   halt
 }
 
-alias -l DLF.Priv.NoticeChanserv {
-  if ($nick != ChanServ) return
-  if (($left($1,2) != [#) || ($right($1,1) != ])) return
-  var %chan = $left($right($1,-1),-1)
-  DLF.Win.Echo Notice %chan $nick $1-
-  halt
+alias -l DLF.Priv.NoticeServices {
+  if ($nick !isin ChanServ NickServ) return
+  if (($nick == ChanServ) && ($left($1,2) == [#) && ($right($1,1) != ])) {
+    var %chan = $left($right($1,-1),-1)
+    DLF.Win.Echo Notice %chan $nick $1-
+    halt
+  }
+  elseif (($nick == NickServ) && ($DLF.Net.IsConnecting)) {
+    DLF.Win.Echo Notice Status $nick $1-
+    halt
+  }
 }
 
 alias -l DLF.Priv.Action {
@@ -1739,7 +1745,11 @@ alias -l DLF.Win.Format {
 alias -l DLF.Win.Echo {
   var %line = $DLF.Win.Format($1-)
   var %col = $DLF.Win.Colour($1)
-  if ($2 !isin Private @find $hashtag) {
+  if ($2 == Status) {
+    echo %col -st %line
+    DLF.Watch.Log Echoed: To Status Window
+  }
+  elseif ($2 !isin Private @find $hashtag) {
     ; mIRC does not support native options for timestamping of custom windows
     var %ts = -t
     if (@#* iswm $2) {
@@ -2226,11 +2236,12 @@ alias -l DLF.@find.ResetColours {
 }
 
 alias -l DLF.@find.ColourNick {
+  DLF.Watch.Called DLF.@find.ColourNick
   var %win = @dlF.@find. $+ $network
   if (!$window(%win)) return
-  if ($comchan($nick,0) == 0) {
-    DLF.@find.DoColourLines $1 %win $nick $+(?,$nick, *)
-    DLF.@find.DoColourLines $1 %win $nick $+(*:: Received from ,$nick)
+  if ($comchan($1,0) == 0) {
+    DLF.@find.DoColourLines $2 %win $nick $+(?,$nick, *)
+    DLF.@find.DoColourLines $2 %win $nick $+(*:: Received from ,$nick)
   }
 }
 
@@ -2359,7 +2370,7 @@ alias -l DLF.oNotice.Input {
 
 alias -l DLF.oNotice.Channel {
   if (%DLF.win-onotice.enabled != 1) return
-  DLF.Watch.Called DLF.oNotice.Channel
+  DLF.Watch.Called DLF.oNotice.Channel $1-
   var %win = $DLF.oNotice.Open(0)
   var %omsg = $1-
   var %event = $event
@@ -2368,6 +2379,7 @@ alias -l DLF.oNotice.Channel {
     %omsg = $2-
   }
   elseif ($1 == @) var %omsg = $2-
+  if (%event == notice) %event = Text
   DLF.Win.Echo %event %win $nick %omsg
   DLF.oNotice.Log %event %win $nick %omsg
   DLF.Halt oNotice sent to %win
@@ -2423,6 +2435,7 @@ alias -l DLF.oNotice.LogFile {
 
 alias -l DLF.oNotice.AddChanNicks {
   if (%DLF.win-onotice.enabled != 1) return
+  DLF.Watch.Called DLF.oNotice.AddChanNicks $chan
   var %win = $+(@,$chan,.,$network)
   if (!$window(%win)) return
   var %i = $nick($chan,0,o)
@@ -2434,41 +2447,55 @@ alias -l DLF.oNotice.AddChanNicks {
 
 alias -l DLF.oNotice.AddNick {
   if (%DLF.win-onotice.enabled != 1) return
+  var %nick = $iif($1 != $null,$1,$iif($event isin op deop,$opnick,$nick))
+  if ($1 == $null) DLF.Watch.Called DLF.oNotice.AddNick $event %nick in $chan
   var %win = $+(@,$chan,.,$network)
-  var %nick = $iif($1 != $null,$1,$nick)
   if (!$window(%win)) return
   aline -nl $DLF.Chan.NickColour($nick($chan,%nick).pnick) %win $DLF.Chan.PrefixedNick($chan,%nick)
   window -S %win
+  DLF.Watch.Log oNotice: Added %nick to oplist in %win
 }
 
 alias -l DLF.oNotice.DelNick {
   if (%DLF.win-onotice.enabled != 1) return
+  var %nick = $nick
+  if ($event isin op deop) %nick = $opnick
+  elseif ($event isin kick) %nick = $knick
   var %chan = $iif($1 != $null,$1,$chan)
   var %win = $+(@,%chan,.,$network)
+  if ($1 == $null) DLF.Watch.Called DLF.oNotice.DelNick %nick from %chan
   if (!$window(%win)) return
-  var %match = * $+ $nick
-  var %j = $fline(%win,%match,0,1)
-  while (%j) {
-    var %l = $fline(%win,%match,%j,1)
-    var %nick = $line(%win,%l,1)
-    while ($left(%nick,1) isin $prefix) %nick = $right(%nick,-1)
-    if (%nick == $nick) {
-      dline %win %l
+  if (%nick == $me) {
+    clear -l %win
+    DLF.Watch.Log oNotice: Cleared oplist in %win
+    return
+  }
+  var %match = * $+ %nick
+  var %i = $fline(%win,%match,0,1)
+  while (%i) {
+    var %l = $fline(%win,%match,%i,1)
+    var %opnick = $line(%win,%l,1)
+    while ($left(%opnick,1) isin $prefix) %opnick = $right(%opnick,-1)
+    if (%opnick == %nick) {
+      dline -l %win %l
+      DLF.Watch.Log oNotice: Removed %nick from oplist in %win
       return
     }
-    dec %j
+    dec %i
   }
 }
 
-alias -l DLF.oNotice.DelAll {
+alias -l DLF.oNotice.DelNickAllChans {
   if (%DLF.win-onotice.enabled != 1) return
+  var %nick = $iif($event isin op deop,$opnick,$nick)
+  DLF.Watch.Called DLF.oNotice.DelNickAllChans %nick
   var %match = $+(@#*.,$network)
   var %i = $window(%match,0)
   while (%i) {
     var %win = $window(%match,%i)
     if ($cid == $window(%win).cid) {
       var %chan = $right($deltok(%win,-1,$asc(.)),-1)
-      if ($nick == $me) clear -l %win
+      if (%nick == $me) clear -l %win
       else DLF.oNotice.DelNick %chan
     }
     dec %i
@@ -2477,6 +2504,7 @@ alias -l DLF.oNotice.DelAll {
 
 alias -l DLF.oNotice.NickChg {
   if (%DLF.win-onotice.enabled != 1) return
+  DLF.Watch.Called DLF.oNotice.Channel $nick => $newnick
   var %match = $+(@#*.,$network)
   var %i = $window(%match,0)
   while (%i) {
@@ -2491,10 +2519,12 @@ alias -l DLF.oNotice.NickChg {
         while ($left(%nick,1) isin $prefix) %nick = $right(%nick,-1)
         if (%nick == $nick) {
           rline -l %win %l $replace($line(%win,%l,1),$nick,$newnick)
+          DLF.Watch.Log oNotice: Renamed $nick to $newnick in oplist in %win
           break
         }
         dec %j
       }
+      window -S %win
     }
     dec %i
   }
@@ -2627,7 +2657,7 @@ on *:dialog:DLF.Options.GUI:sclick:140: DLF.Options.SetRemoveChannelButton
 ; Channel list double click - Remove channel and put in text box for editing and re-adding.
 on *:dialog:DLF.Options.GUI:dclick:140: DLF.Options.EditChannel
 ; Goto website button
-on *:dialog:DLF.Options.GUI:sclick:170: url -a https://github.com/DukeLupus/dlFilter/
+on *:dialog:DLF.Options.GUI:sclick:170: url -a https://github.com/DukeLupus/dlFilter/releases/
 ; Download update button
 on *:dialog:DLF.Options.GUI:sclick:180: DLF.Options.DownloadUpdate
 ; Per-Server option clicked
@@ -3564,140 +3594,140 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *Has The Best Servers*We have * Servers Sharing * Files*
   inc %matches $hget(DLF.chantext.ads,0).item
 
-  if ($hget(DLF.chantext.announce)) hfree DLF.chantext.announce
-  DLF.hadd chantext.announce *§ÐfíñÐ âÐÐ-øñ§*
-  DLF.hadd chantext.announce *« Ë×Çü®§îöñ »*
-  DLF.hadd chantext.announce *away*since*pager*
-  DLF.hadd chantext.announce *Back*Duration*
-  DLF.hadd chantext.announce *BJFileTracker V06 by BossJoe*
-  DLF.hadd chantext.announce *Combined channel status:*
-  DLF.hadd chantext.announce *DCC Send Failed of*to*Starting next in Que*
-  DLF.hadd chantext.announce *get - from*at*cps*complete*
-  DLF.hadd chantext.announce *HêåvêñlyAway*
-  DLF.hadd chantext.announce *has just received*for a total of*
-  DLF.hadd chantext.announce *have just finished recieving*from*I have leeched a total*
-  DLF.hadd chantext.announce *I am AWAY*Reason*I have been Away for*
-  DLF.hadd chantext.announce *I am AWAY*Reason*To page me*
-  DLF.hadd chantext.announce *I have just finished receiving*from*
-  DLF.hadd chantext.announce *I have just finished sending * to *
-  DLF.hadd chantext.announce *I have just finished receiving*from*have now received a total*
-  DLF.hadd chantext.announce *I have just received*from*for a total of*KeepTrack*
-  DLF.hadd chantext.announce *I have just received*from*leeched since*
-  DLF.hadd chantext.announce *Je viens juste de terminer de recevoir*de*Prenez-en un vite*
-  DLF.hadd chantext.announce *Just Sent To*Filename*Slots Free*Queued*
-  DLF.hadd chantext.announce *KeepTrack*by*^OmeN*
-  DLF.hadd chantext.announce *KeepTrack*de adisoru*
-  DLF.hadd chantext.announce *KiLLJarX*channel policy is that we are a*
-  DLF.hadd chantext.announce *Leaving*reason*auto away after*
-  DLF.hadd chantext.announce *Message*SysReset*
-  DLF.hadd chantext.announce *MisheBORG*SendStat*v.*
-  DLF.hadd chantext.announce *mp3 server detected*
-  DLF.hadd chantext.announce *rßPLåY2.0*
-  DLF.hadd chantext.announce *rbPlay20.mrc*
-  DLF.hadd chantext.announce *Receive Successful*Thanks for*
-  DLF.hadd chantext.announce *Received*From*Size*Speed*Time*since*
-  DLF.hadd chantext.announce *ROLL TIDE*Now Playing*mp3*
-  DLF.hadd chantext.announce *sent*to*at*total sent*files*yesterday*files*today*files*
-  DLF.hadd chantext.announce *sets away*auto idle away*since*
-  DLF.hadd chantext.announce *Thank You*for serving in*
-  DLF.hadd chantext.announce *Thanks for the +v*
-  DLF.hadd chantext.announce *Thanks for the @*
-  DLF.hadd chantext.announce *Thanks*for Supplying an server in*
-  DLF.hadd chantext.announce *Thanks*For The*@*
-  DLF.hadd chantext.announce *Thanks*For*The*Voice*
-  DLF.hadd chantext.announce * to * just got timed out*slot*Empty*
-  DLF.hadd chantext.announce *Tocmai am primit*KeepTrack*
-  DLF.hadd chantext.announce *Total Received*Files*Total Received Today*Files*
-  DLF.hadd chantext.announce *Tx TIMEOUT*
-  DLF.hadd chantext.announce Type*!*.* To Get This *
-  DLF.hadd chantext.announce *WaS auTo-VoiCeD THaNX FoR SHaRiNG HeRe iN*
-  DLF.hadd chantext.announce *We have just finished receiving*From The One And Only*
-  DLF.hadd chantext.announce *Welcome back to #* operator*.*
-  DLF.hadd chantext.announce *YAY* Another brave soldier in the war to educate the masses*Onward Comrades*
-  DLF.hadd chantext.announce *[Away]*SysReset*
-  DLF.hadd chantext.announce *[F][U][N]*
-  DLF.hadd chantext.announce Request * —I-n-v-i-s-i-o-n—
-  DLF.hadd chantext.announce *Tape*!*.mp3*
-  DLF.hadd chantext.announce *Tape*!*MB*
-  DLF.hadd chantext.announce *!*.mp3*SpR*
-  DLF.hadd chantext.announce *!*MB*Kbps*Khz*
-  DLF.hadd chantext.announce *Sent*to*OS-Limits v*
-  DLF.hadd chantext.announce *<><><*><><>*
-  DLF.hadd chantext.announce *~*~SpR~*~*
-  DLF.hadd chantext.announce *I have just finished recieving*from*I have now recieved a total of*
-  DLF.hadd chantext.announce *I have just finished sending*.mp3 to*
-  DLF.hadd chantext.announce *I have just finished sending*I have now sent a total of*files since*
-  DLF.hadd chantext.announce *I have just finished sending*to*Empty*
-  DLF.hadd chantext.announce *Random Play * Now Activated*
-  DLF.hadd chantext.announce *-SpR-*
-  DLF.hadd chantext.announce *SPr*!*.mp3*
-  DLF.hadd chantext.announce *SpR*[*mp3*]*
-  DLF.hadd chantext.announce *Tape*!* Pour Voir Vos Statistiques*
-  DLF.hadd chantext.announce *Type*!* To Get This*
-  DLF.hadd chantext.announce *Welcome * person No* to join*
-  DLF.hadd chantext.announce *'s current status * Points this WEEK * Points this MONTH*
-  DLF.hadd chantext.announce *- ??/??/????  *  Ajouté par *
-  DLF.hadd chantext.announce *Mode: Normal*
-  DLF.hadd chantext.announce Normal
-  DLF.hadd chantext.announce ø
-  DLF.hadd chantext.announce *Je Vient Juste De Reçevoir * De La Pars De * Pour Un Total De * Fichier(s)*
-  DLF.hadd chantext.announce *The fastest Average Send Speeds captured last hour are*
-  DLF.hadd chantext.announce *Todays Most Popular Servers - as of *
-  DLF.hadd chantext.announce *Todays Top Leechers - as of *
-  DLF.hadd chantext.announce *I have just voiced * for being kewl And sharing*
-  DLF.hadd chantext.announce *I-n-v-i-s-i-o-n*
-  DLF.hadd chantext.announce *¥*Mp3s*¥*
-  DLF.hadd chantext.announce *§*DCC Send Failed*to*§*
-  DLF.hadd chantext.announce *§kÎn§*ßy*§hådõ*
-  DLF.hadd chantext.announce *©§©*
-  DLF.hadd chantext.announce *« * » -*
-  DLF.hadd chantext.announce *«Scøøp MP3»*
-  DLF.hadd chantext.announce *±*
-  DLF.hadd chantext.announce *» Port «*»*
-  DLF.hadd chantext.announce *- DCC Transfer Status -*
-  DLF.hadd chantext.announce *--PepsiScript--*
-  DLF.hadd chantext.announce *-SpR skin used by PepsiScript*
-  DLF.hadd chantext.announce *.mp3*t×PLåY6*
-  DLF.hadd chantext.announce *a recu*pour un total de*fichiers*
-  DLF.hadd chantext.announce *Bandwith*Usage*Current*Record*
-  DLF.hadd chantext.announce *Control*IRC Client*CTCPSERV*
-  DLF.hadd chantext.announce *DCC GET COMPLETE*from*slot*open*
-  DLF.hadd chantext.announce *DCC SEND COMPLETE*to*slot*
-  DLF.hadd chantext.announce *DCC Send Failed of*to*
-  DLF.hadd chantext.announce *Download this exciting book*
-  DLF.hadd chantext.announce *failed*DCC Send Failed of*to*failed*
-  DLF.hadd chantext.announce *I am opening up*more slot*Taken*
-  DLF.hadd chantext.announce *I am using*SpR JUKEBOX*http://spr.darkrealms.org*
-  DLF.hadd chantext.announce *is playing*info*secs*
-  DLF.hadd chantext.announce *Je viens juste de terminer l'envoi de*Prenez-en un vite*
-  DLF.hadd chantext.announce *just left*Sending file Aborted*
-  DLF.hadd chantext.announce *left irc and didn't return in*min. Sending file Aborted*
-  DLF.hadd chantext.announce *left*and didn't return in*mins. Sending file Aborted*
-  DLF.hadd chantext.announce *Now Sending*QwIRC*
-  DLF.hadd chantext.announce *OmeNServE*©^OmeN^*
-  DLF.hadd chantext.announce *Proofpack Server*Looking for new scans to proof*@proofpack for available proofing packs*
-  DLF.hadd chantext.announce *rßP£a*sk*n*
-  DLF.hadd chantext.announce *rßPLåY*
-  DLF.hadd chantext.announce *Random Play MP3 filez Now Plugged In*
-  DLF.hadd chantext.announce *Random Play MP3*Now Activated*
-  DLF.hadd chantext.announce *Rank*~*x*~*
-  DLF.hadd chantext.announce *send - to*at*cps*complete*left*
-  DLF.hadd chantext.announce *sent*to*size*speed*time*sent*
-  DLF.hadd chantext.announce *Softwind*Softwind*
-  DLF.hadd chantext.announce *SpR JUKEBOX*filesize*
-  DLF.hadd chantext.announce *Successfully*Tx.Track*
-  DLF.hadd chantext.announce *tìnkërßëll`s collection*Love Quotes*
-  DLF.hadd chantext.announce *The Dcc Transfer to*has gone under*Transfer*
-  DLF.hadd chantext.announce *There is a Slot Opening*Grab it Fast*
-  DLF.hadd chantext.announce *There is a*Open*Say's Grab*
-  DLF.hadd chantext.announce *To serve and to be served*@*
-  DLF.hadd chantext.announce *User Slots*Sends*Queues*Next Send Available*¤UControl¤*
-  DLF.hadd chantext.announce *vient d'etre interrompu*Dcc Libre*
-  DLF.hadd chantext.announce *Welcome to #*, we have * detected servers online to serve you*
-  DLF.hadd chantext.announce *Wireless*mb*br*
-  DLF.hadd chantext.announce *[Fserve Active]*
-  DLF.hadd chantext.announce *[Mp3xBR]*
-  inc %matches $hget(DLF.chantext.announce,0).item
+  if ($hget(DLF.chantext.spam)) hfree DLF.chantext.spam
+  DLF.hadd chantext.spam *§ÐfíñÐ âÐÐ-øñ§*
+  DLF.hadd chantext.spam *« Ë×Çü®§îöñ »*
+  DLF.hadd chantext.spam *away*since*pager*
+  DLF.hadd chantext.spam *Back*Duration*
+  DLF.hadd chantext.spam *BJFileTracker V06 by BossJoe*
+  DLF.hadd chantext.spam *Combined channel status:*
+  DLF.hadd chantext.spam *DCC Send Failed of*to*Starting next in Que*
+  DLF.hadd chantext.spam *get - from*at*cps*complete*
+  DLF.hadd chantext.spam *HêåvêñlyAway*
+  DLF.hadd chantext.spam *has just received*for a total of*
+  DLF.hadd chantext.spam *have just finished recieving*from*I have leeched a total*
+  DLF.hadd chantext.spam *I am AWAY*Reason*I have been Away for*
+  DLF.hadd chantext.spam *I am AWAY*Reason*To page me*
+  DLF.hadd chantext.spam *I have just finished receiving*from*
+  DLF.hadd chantext.spam *I have just finished sending * to *
+  DLF.hadd chantext.spam *I have just finished receiving*from*have now received a total*
+  DLF.hadd chantext.spam *I have just received*from*for a total of*KeepTrack*
+  DLF.hadd chantext.spam *I have just received*from*leeched since*
+  DLF.hadd chantext.spam *Je viens juste de terminer de recevoir*de*Prenez-en un vite*
+  DLF.hadd chantext.spam *Just Sent To*Filename*Slots Free*Queued*
+  DLF.hadd chantext.spam *KeepTrack*by*^OmeN*
+  DLF.hadd chantext.spam *KeepTrack*de adisoru*
+  DLF.hadd chantext.spam *KiLLJarX*channel policy is that we are a*
+  DLF.hadd chantext.spam *Leaving*reason*auto away after*
+  DLF.hadd chantext.spam *Message*SysReset*
+  DLF.hadd chantext.spam *MisheBORG*SendStat*v.*
+  DLF.hadd chantext.spam *mp3 server detected*
+  DLF.hadd chantext.spam *rßPLåY2.0*
+  DLF.hadd chantext.spam *rbPlay20.mrc*
+  DLF.hadd chantext.spam *Receive Successful*Thanks for*
+  DLF.hadd chantext.spam *Received*From*Size*Speed*Time*since*
+  DLF.hadd chantext.spam *ROLL TIDE*Now Playing*mp3*
+  DLF.hadd chantext.spam *sent*to*at*total sent*files*yesterday*files*today*files*
+  DLF.hadd chantext.spam *sets away*auto idle away*since*
+  DLF.hadd chantext.spam *Thank You*for serving in*
+  DLF.hadd chantext.spam *Thanks for the +v*
+  DLF.hadd chantext.spam *Thanks for the @*
+  DLF.hadd chantext.spam *Thanks*for Supplying an server in*
+  DLF.hadd chantext.spam *Thanks*For The*@*
+  DLF.hadd chantext.spam *Thanks*For*The*Voice*
+  DLF.hadd chantext.spam * to * just got timed out*slot*Empty*
+  DLF.hadd chantext.spam *Tocmai am primit*KeepTrack*
+  DLF.hadd chantext.spam *Total Received*Files*Total Received Today*Files*
+  DLF.hadd chantext.spam *Tx TIMEOUT*
+  DLF.hadd chantext.spam Type*!*.* To Get This *
+  DLF.hadd chantext.spam *WaS auTo-VoiCeD THaNX FoR SHaRiNG HeRe iN*
+  DLF.hadd chantext.spam *We have just finished receiving*From The One And Only*
+  DLF.hadd chantext.spam *Welcome back to #* operator*.*
+  DLF.hadd chantext.spam *YAY* Another brave soldier in the war to educate the masses*Onward Comrades*
+  DLF.hadd chantext.spam *[Away]*SysReset*
+  DLF.hadd chantext.spam *[F][U][N]*
+  DLF.hadd chantext.spam Request * —I-n-v-i-s-i-o-n—
+  DLF.hadd chantext.spam *Tape*!*.mp3*
+  DLF.hadd chantext.spam *Tape*!*MB*
+  DLF.hadd chantext.spam *!*.mp3*SpR*
+  DLF.hadd chantext.spam *!*MB*Kbps*Khz*
+  DLF.hadd chantext.spam *Sent*to*OS-Limits v*
+  DLF.hadd chantext.spam *<><><*><><>*
+  DLF.hadd chantext.spam *~*~SpR~*~*
+  DLF.hadd chantext.spam *I have just finished recieving*from*I have now recieved a total of*
+  DLF.hadd chantext.spam *I have just finished sending*.mp3 to*
+  DLF.hadd chantext.spam *I have just finished sending*I have now sent a total of*files since*
+  DLF.hadd chantext.spam *I have just finished sending*to*Empty*
+  DLF.hadd chantext.spam *Random Play * Now Activated*
+  DLF.hadd chantext.spam *-SpR-*
+  DLF.hadd chantext.spam *SPr*!*.mp3*
+  DLF.hadd chantext.spam *SpR*[*mp3*]*
+  DLF.hadd chantext.spam *Tape*!* Pour Voir Vos Statistiques*
+  DLF.hadd chantext.spam *Type*!* To Get This*
+  DLF.hadd chantext.spam *Welcome * person No* to join*
+  DLF.hadd chantext.spam *'s current status * Points this WEEK * Points this MONTH*
+  DLF.hadd chantext.spam *- ??/??/????  *  Ajouté par *
+  DLF.hadd chantext.spam *Mode: Normal*
+  DLF.hadd chantext.spam Normal
+  DLF.hadd chantext.spam ø
+  DLF.hadd chantext.spam *Je Vient Juste De Reçevoir * De La Pars De * Pour Un Total De * Fichier(s)*
+  DLF.hadd chantext.spam *The fastest Average Send Speeds captured last hour are*
+  DLF.hadd chantext.spam *Todays Most Popular Servers - as of *
+  DLF.hadd chantext.spam *Todays Top Leechers - as of *
+  DLF.hadd chantext.spam *I have just voiced * for being kewl And sharing*
+  DLF.hadd chantext.spam *I-n-v-i-s-i-o-n*
+  DLF.hadd chantext.spam *¥*Mp3s*¥*
+  DLF.hadd chantext.spam *§*DCC Send Failed*to*§*
+  DLF.hadd chantext.spam *§kÎn§*ßy*§hådõ*
+  DLF.hadd chantext.spam *©§©*
+  DLF.hadd chantext.spam *« * » -*
+  DLF.hadd chantext.spam *«Scøøp MP3»*
+  DLF.hadd chantext.spam *±*
+  DLF.hadd chantext.spam *» Port «*»*
+  DLF.hadd chantext.spam *- DCC Transfer Status -*
+  DLF.hadd chantext.spam *--PepsiScript--*
+  DLF.hadd chantext.spam *-SpR skin used by PepsiScript*
+  DLF.hadd chantext.spam *.mp3*t×PLåY6*
+  DLF.hadd chantext.spam *a recu*pour un total de*fichiers*
+  DLF.hadd chantext.spam *Bandwith*Usage*Current*Record*
+  DLF.hadd chantext.spam *Control*IRC Client*CTCPSERV*
+  DLF.hadd chantext.spam *DCC GET COMPLETE*from*slot*open*
+  DLF.hadd chantext.spam *DCC SEND COMPLETE*to*slot*
+  DLF.hadd chantext.spam *DCC Send Failed of*to*
+  DLF.hadd chantext.spam *Download this exciting book*
+  DLF.hadd chantext.spam *failed*DCC Send Failed of*to*failed*
+  DLF.hadd chantext.spam *I am opening up*more slot*Taken*
+  DLF.hadd chantext.spam *I am using*SpR JUKEBOX*http://spr.darkrealms.org*
+  DLF.hadd chantext.spam *is playing*info*secs*
+  DLF.hadd chantext.spam *Je viens juste de terminer l'envoi de*Prenez-en un vite*
+  DLF.hadd chantext.spam *just left*Sending file Aborted*
+  DLF.hadd chantext.spam *left irc and didn't return in*min. Sending file Aborted*
+  DLF.hadd chantext.spam *left*and didn't return in*mins. Sending file Aborted*
+  DLF.hadd chantext.spam *Now Sending*QwIRC*
+  DLF.hadd chantext.spam *OmeNServE*©^OmeN^*
+  DLF.hadd chantext.spam *Proofpack Server*Looking for new scans to proof*@proofpack for available proofing packs*
+  DLF.hadd chantext.spam *rßP£a*sk*n*
+  DLF.hadd chantext.spam *rßPLåY*
+  DLF.hadd chantext.spam *Random Play MP3 filez Now Plugged In*
+  DLF.hadd chantext.spam *Random Play MP3*Now Activated*
+  DLF.hadd chantext.spam *Rank*~*x*~*
+  DLF.hadd chantext.spam *send - to*at*cps*complete*left*
+  DLF.hadd chantext.spam *sent*to*size*speed*time*sent*
+  DLF.hadd chantext.spam *Softwind*Softwind*
+  DLF.hadd chantext.spam *SpR JUKEBOX*filesize*
+  DLF.hadd chantext.spam *Successfully*Tx.Track*
+  DLF.hadd chantext.spam *tìnkërßëll`s collection*Love Quotes*
+  DLF.hadd chantext.spam *The Dcc Transfer to*has gone under*Transfer*
+  DLF.hadd chantext.spam *There is a Slot Opening*Grab it Fast*
+  DLF.hadd chantext.spam *There is a*Open*Say's Grab*
+  DLF.hadd chantext.spam *To serve and to be served*@*
+  DLF.hadd chantext.spam *User Slots*Sends*Queues*Next Send Available*¤UControl¤*
+  DLF.hadd chantext.spam *vient d'etre interrompu*Dcc Libre*
+  DLF.hadd chantext.spam *Welcome to #*, we have * detected servers online to serve you*
+  DLF.hadd chantext.spam *Wireless*mb*br*
+  DLF.hadd chantext.spam *[Fserve Active]*
+  DLF.hadd chantext.spam *[Mp3xBR]*
+  inc %matches $hget(DLF.chantext.spam,0).item
 
   if ($hget(DLF.chantext.always)) hfree DLF.chantext.always
   DLF.hadd chantext.always "find *
@@ -3716,6 +3746,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.always Sign in to turn on 1-Click ordering.
   DLF.hadd chantext.always * ::INFO:: *.*KB
   DLF.hadd chantext.always * ::INFO:: *.*MB
+  DLF.hadd chantext.always <*> *
   inc %matches $hget(DLF.chantext.always,0).item
 
   if ($hget(DLF.chantext.dlf)) hfree DLF.chantext.dlf
@@ -4005,7 +4036,7 @@ alias -l DLF.TimerAddress {
 }
 
 alias -l DLF.IsRegularUser {
-  ;if ($1 == $me) return $false
+  if ($1 == $me) return $false
   if ($1 == ChanServ) return $false
   if ($1 == NickServ) return $false
   if ($1 == MemoServ) return $false
@@ -4351,7 +4382,7 @@ alias DLF.Watch.Filter {
 }
 
 alias -l DLF.Watch.Called {
-  DLF.Watch.Log ON $upper($event) called $1-
+  DLF.Watch.Log ON $upper($event) called $1 $+ $iif($2-,: $2-)
 }
 
 alias -l DLF.Watch.Log {
