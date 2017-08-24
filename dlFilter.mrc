@@ -49,8 +49,6 @@ dlFilter uses the following code from other people:
         Do not advertise if channels list is # – and disable advertising options in this case.
         Close status window – then close matching custom windows.
         Put window renaming on nick change into separate alias.
-        Handle things that get through Regular User.
-        Handle clearing the background setting to close hidden windows.
 
   Ideas for possible future enhancements
         Implement toolbar functionality with right click menu
@@ -382,6 +380,7 @@ alias -l DLF.ctcpVersion.Reply {
   DLF.Win.Log Filter ctcpsend $1 $nick %msg
 }
 
+on *:close:Status Window: { close -x@ }
 on *:close:@#*: { DLF.oNotice.Close $target }
 
 ; ========= Events when dlFilter is enabled ==========
@@ -1760,16 +1759,20 @@ alias -l DLF.Win.Echo {
     DLF.Watch.Log Echoed: To $2
   }
   else {
-    if ($1 != ctcpreply) %line = $2 $+ : %line
+    if (($1 != ctcpreply) && ($usesinglemsg != 1)) %line = $2 $+ : %line
     var %sent = $null
     var %i = $comchan($3,0)
     if (%i == 0) {
-      if ($usesinglemsg == 1) {
+      if ($DLF.IsServiceUser($3)) {
+        echo %col -a %line
+        DLF.Watch.Log Echoed: To active window $active
+      }
+      elseif ($usesinglemsg == 1) {
         echo %col -dt %line
         DLF.Watch.Log Echoed: To single message window
       }
       else {
-        echo %col -st Private: %line
+        echo %col -st %line
         DLF.Watch.Log Echoed: To status window
       }
       return
@@ -4037,15 +4040,7 @@ alias -l DLF.TimerAddress {
 
 alias -l DLF.IsRegularUser {
   if ($1 == $me) return $false
-  if ($1 == ChanServ) return $false
-  if ($1 == NickServ) return $false
-  if ($1 == MemoServ) return $false
-  if ($1 == OperServ) return $false
-  if ($1 == BotServ) return $false
-  if ($1 == HostServ) return $false
-  if ($1 == HelpServ) return $false
-  if ($1 == GroupServ) return $false
-  if ($1 == InfoServ) return $false
+  if ($DLF.IsServiceUser($1)) return $false
   var %i = $comchan($1,0)
   while (%i) {
     var %chan = $comchan($1,%i)
@@ -4056,6 +4051,19 @@ alias -l DLF.IsRegularUser {
     dec %i
   }
   return $true
+}
+
+alias -l DLF.IsServiceUser {
+  if ($1 == ChanServ) return $true
+  if ($1 == NickServ) return $true
+  if ($1 == MemoServ) return $true
+  if ($1 == OperServ) return $true
+  if ($1 == BotServ) return $true
+  if ($1 == HostServ) return $true
+  if ($1 == HelpServ) return $true
+  if ($1 == GroupServ) return $true
+  if ($1 == InfoServ) return $true
+  return $false
 }
 
 alias -l DLF.IsOpCommon {
