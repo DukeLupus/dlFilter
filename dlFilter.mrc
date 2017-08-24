@@ -896,7 +896,7 @@ alias -l DLF.Priv.Notice {
 
 alias -l DLF.Priv.NoticeServices {
   if ($nick !isin ChanServ NickServ) return
-  if (($nick == ChanServ) && ($left($1,2) == [#) && ($right($1,1) != ])) {
+  if (($nick == ChanServ) && ($left($1,2) == [#) && ($right($1,1) == ])) {
     var %chan = $left($right($1,-1),-1)
     DLF.Win.Echo Notice %chan $nick $1-
     halt
@@ -4376,7 +4376,6 @@ alias DLF.Watch.Filter {
     tokenize $asc($space)) $1 $3-
   }
   if (($2 == PING) || ($2 == PONG)) return $null
-  if (($left($3,1) == $hashtag) && (!$DLF.Chan.IsDlfChan($3))) return $null
   DLF.Watch.Log %text
   return $null
 }
