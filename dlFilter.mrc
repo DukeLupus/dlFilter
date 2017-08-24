@@ -39,15 +39,10 @@ dlFilter uses the following code from other people:
 
   Immediate TODO
         Test location and filename for oNotice log files
-        Joins/Ops/Parts/Quit should update oNotice nick lists.
         Work out how to handle fileserver responses to @find (undernet#mp3servers @find mercury)
           (Might need to a. filter out "blank" lines ($crlf or all === or ---- for example), b. spot start and end lines ("QNet File Server v0.95beta search results for *mercury*" then "Use @ruprecht-search to search all lists, @ruprecht-help for more info" and c. filter everything from this user inbetween)
-        On nick change rename query/dcc chat/get/send/fileserv.
-        oNotice needs nicklist menu.
         Distinguish between manual and advertising VERSION requests – and display manual responses.
-        Nick changes not appearing in oNotice window.
         Do not advertise if channels list is # – and disable advertising options in this case.
-        Close status window – then close matching custom windows.
         Put window renaming on nick change into separate alias.
 
   Ideas for possible future enhancements
@@ -2521,7 +2516,7 @@ alias -l DLF.oNotice.NickChg {
         var %nick = $line(%win,%l,1)
         while ($left(%nick,1) isin $prefix) %nick = $right(%nick,-1)
         if (%nick == $nick) {
-          rline -l %win %l $replace($line(%win,%l,1),$nick,$newnick)
+          rline -l $line(%win,%l,1).color %win %l $replace($line(%win,%l,1),$nick,$newnick)
           DLF.Watch.Log oNotice: Renamed $nick to $newnick in oplist in %win
           break
         }
