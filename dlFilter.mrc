@@ -2354,7 +2354,8 @@ alias -l DLF.oNotice.Input {
     %omsg = $2-
   }
   if ($me isop %chan) {
-    if (%event == Normal) .msg @ $+ %chan $1-
+    ; FUTURE - switch to msg once this version has reasonable penetration
+    if (%event == Normal) .notice @ $+ %chan $1-
     else .describe @ $+ %chan $2-
     DLF.oNotice.Log %event $active $me %omsg
   }
