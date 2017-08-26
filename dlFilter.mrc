@@ -39,8 +39,6 @@ dlFilter uses the following code from other people:
 
   Immediate TODO
         Test location and filename for oNotice log files
-        Work out how to handle fileserver responses to @find (undernet#mp3servers @find mercury)
-          (Might need to a. filter out "blank" lines ($crlf or all === or ---- for example), b. spot start and end lines ("QNet File Server v0.95beta search results for *mercury*" then "Use @ruprecht-search to search all lists, @ruprecht-help for more info" and c. filter everything from this user inbetween)
         Distinguish between manual and advertising VERSION requests – and display manual responses.
         Do not advertise if channels list is # – and disable advertising options in this case.
         Put window renaming on nick change into separate alias.
@@ -889,13 +887,13 @@ alias -l DLF.Priv.Notice {
 }
 
 alias -l DLF.Priv.NoticeServices {
-  if ($nick !isin ChanServ NickServ) return
+  if ($nick !isin ChanServ NickServ HostServ) return
   if (($nick == ChanServ) && ($left($1,2) == [#) && ($right($1,1) == ])) {
     var %chan = $left($right($1,-1),-1)
     DLF.Win.Echo Notice %chan $nick $1-
     halt
   }
-  elseif (($nick == NickServ) && ($DLF.Net.IsConnecting)) {
+  elseif (($nick isin NickServ HostServ) && ($DLF.Net.IsConnecting)) {
     DLF.Win.Echo Notice Status $nick $1-
     halt
   }
@@ -1049,7 +1047,7 @@ alias -l DLF.Stats.Titlebar {
 
 ; ========== Ops advertising ==========
 alias -l DLF.Ops.AdvertsEnable {
-  if (%DLF.ops.advertchan == 1) .timerDLF.Adverts -o 0 300 .signal DLF.Ops.AdvertChan
+  if (%DLF.ops.advertchan == 1) .timerDLF.Adverts -io 0 $calc(%DLF.ops.advertchan.period * 60) .signal DLF.Ops.AdvertChan
   else .timerDLF.Adverts off
 }
 
@@ -1075,23 +1073,24 @@ alias -l DLF.Ops.AdvertChan {
   var %i = $scon(0)
   while (%i) {
     scid $scon(%i)
+    dec %i
+    if ($server == $null) continue
     var %j = $chan(0)
     while (%j) {
       var %c = $chan(%j)
+      dec %j
       ; skip advertising if another user has advertised in the channel
       if ([ [ $+(%,DLF.opsnochanads.,$network,$chan) ] ] != $null) {
         unset [ $+(%,DLF.opsnochanads.,$network,$chan) ]
         continue
       }
-      if ((($istok(%DLF.netchans,$+($network,%c),$asc($space))) || ($istok(%DLF.netchans,%c,$asc($space)))) $&
+      if ((($istok(%DLF.netchans,$+($network,%c),$asc($comma))) || ($istok(%DLF.netchans,%c,$asc($comma)))) $&
         && ($me isop %c)) {
         var %msg = $c(1,9,$DLF.logo Are the responses to your requests getting lost in the crowd? Are your @find responses spread about? If you are using mIRC as your IRC client, then download dlFilter from $u($c(2,https://github.com/DukeLupus/dlFilter/releases)) and make your time in %c less stressful.)
         DLF.msg %c %msg
         DLF.Win.Log Filter text %c $me %msg
       }
-      dec %j
     }
-    dec %i
   }
 }
 
@@ -1743,6 +1742,22 @@ alias -l DLF.Win.Echo {
     echo %col -st %line
     DLF.Watch.Log Echoed: To Status Window
   }
+  elseif ($2 == @find) {
+    var %chans = $DLF.@find.IsResponse
+    var %i = $numtok(%chans,$asc($space))
+    while (%i) {
+      var %chan = $gettok(%chans,%i,$asc($space))
+      if ($nick(%chan,$3)) echo %col -t %chan $iif($1 != ctcpreply,$2 $+ :) %line
+      else $deltok(%chans,%i,$asc($space))
+      dec %i
+    }
+    if (%chans != $null) DLF.Watch.Log Echoed: To @find channels with $3 $+ : %chans
+    else {
+      echo %col -st $iif($1 != ctcpreply,$2 $+ :) %line
+      DLF.Watch.Log Echoed: To status window
+    }
+    return
+  }
   elseif ($2 !isin Private @find $hashtag) {
     ; mIRC does not support native options for timestamping of custom windows
     var %ts = -t
@@ -1754,27 +1769,26 @@ alias -l DLF.Win.Echo {
     DLF.Watch.Log Echoed: To $2
   }
   else {
-    if (($1 != ctcpreply) && ($usesinglemsg != 1)) %line = $2 $+ : %line
     var %sent = $null
     var %i = $comchan($3,0)
     if (%i == 0) {
       if ($DLF.IsServiceUser($3)) {
-        echo %col -a %line
+        echo %col -a $iif($1 != ctcpreply,$2 $+ :) %line
         DLF.Watch.Log Echoed: To active window $active
       }
       elseif ($usesinglemsg == 1) {
-        echo %col -dt %line
+        echo %col -dt $iif(($2 != Private) && ($1 != ctcpreply),$2 $+ :) %line
         DLF.Watch.Log Echoed: To single message window
       }
       else {
-        echo %col -st %line
+        echo %col -st $iif($1 != ctcpreply,$2 $+ :) %line
         DLF.Watch.Log Echoed: To status window
       }
       return
     }
     while (%i) {
       var %chan = $comchan($3,%i)
-      echo %col -t %chan %line
+      echo %col -t %chan $iif($1 != ctcpreply,$2 $+ :) %line
       %sent = $addtok(%sent,%chan,$asc($comma))
       dec %i
     }
@@ -2048,16 +2062,17 @@ alias -l DLF.@find.Request {
 alias -l DLF.@find.IsResponse {
   var %net = $network $+ *, %ln = - $+ $len($network)
   var %n = $hfind(DLF.@find.requests,%net,0,w).item
+  var %chans
   while (%n) {
     var %netchan = $hfind(DLF.@find.requests,%net,%n,w).item
     var %chan = $right(%netchan,%ln)
     if (($left(%chan,1) isin $chantypes) && ($nick ison %chan)) {
       DLF.Watch.Log @find.IsResponse: %chan
-      return $true
+      %chans = %chan %chans
     }
     dec %n
   }
-  return $false
+  return %chans
 }
 
 alias -l DLF.@find.Response {
@@ -2667,6 +2682,8 @@ on *:dialog:DLF.Options.GUI:sclick:365: DLF.Options.Background
 on *:dialog:DLF.Options.GUI:sclick:525: DLF.Options.Titlebar
 ; oNotice option clicked
 on *:dialog:DLF.Options.GUI:sclick:715: DLF.Options.oNotice
+; Advertising period changed
+on *:dialog:DLF.Options.GUI:edit:765: DLF.Options.Save
 ; Select custom message type
 on *:dialog:DLF.Options.GUI:sclick:830: DLF.Options.SetCustomType
 ; Enable / disable Add custom message button
@@ -2943,6 +2960,7 @@ alias -l DLF.Options.Save {
 alias -l DLF.Options.OpsTab {
   ; Disable Ops Tab if all ops options are off and not ops in any dlF channels
   did $iif($DLF.Options.IsOp,-e,-b) DLF.Options.GUI 715,725,730,760,765,770,780
+  if (%DLF.netchans == $hashtag) did -b DLF.Options.GUI 760,765,770,780
 }
 
 alias -l DLF.Options.IsOp {
@@ -3978,6 +3996,12 @@ alias -l DLF.CreateHashTables {
   DLF.hadd find.fileserv *found * matches* on my fserve*
   DLF.hadd find.fileserv [*] Matches found in [*] Trigger..::/ctcp *
   DLF.hadd find.fileserv *: (* *.*B)
+  DLF.hadd find.fileserv ================================================================================
+  DLF.hadd find.fileserv --------------------------------------------------------------------------------
+  DLF.hadd find.fileserv QNet File Server * search results for *
+  DLF.hadd find.fileserv Found * matches in *:
+  DLF.hadd find.fileserv \*\*
+  DLF.hadd find.fileserv Use @* to search *
   inc %matches $hget(DLF.find.fileserv,0).item
 
   if ($hget(DLF.find.headregex)) hfree DLF.find.headregex
@@ -4292,26 +4316,26 @@ alias -l DLF.Raw005.Name { return $+(%,DLF.TargetLimited.,$network) }
 
 alias -l DLF.msg {
   var %c = $DLF.IsOpCommon($1)
-  if (($DLF.Raw005.hasCops($1)) && (%c)) CPRIVMSG %c $1-
+  if (($DLF.Raw005.hasCops($1)) && (%c)) CPRIVMSG $1 %c $2-
   else msg $1-
 }
 alias -l DLF.describe { DLF.ctcp $1 Action $2- }
 
 alias -l DLF.notice {
   var %c = $DLF.IsOpCommon($1)
-  if (($DLF.Raw005.hasCops($1)) && (%c)) CNOTICE %c $1-
+  if (($DLF.Raw005.hasCops($1)) && (%c)) CNOTICE $1 %c $2-
   else notice $1-
 }
 
 alias -l DLF.ctcp {
   var %c = $DLF.IsOpCommon($1)
-  if (($DLF.Raw005.hasCops($1)) && (%c)) CPRIVMSG %c $1 $DLF.ctcpEncode($upper($2) $3-)
+  if (($DLF.Raw005.hasCops($1)) && (%c)) CPRIVMSG $1 %c $DLF.ctcpEncode($upper($2) $3-)
   else ctcp $1-
 }
 
 alias -l DLF.ctcpreply {
   var %c = $DLF.IsOpCommon($1)
-  if (($DLF.Raw005.hasCops($1)) && (%c)) CNOTICE %c $1 $DLF.ctcpEncode($2-)
+  if (($DLF.Raw005.hasCops($1)) && (%c)) CNOTICE $1 %c $DLF.ctcpEncode($2-)
   else ctcpreply $1-
 }
 
