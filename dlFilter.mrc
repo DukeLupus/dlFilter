@@ -39,7 +39,6 @@ dlFilter uses the following code from other people:
 
   Immediate TODO
         Test location and filename for oNotice log files
-        Put window renaming on nick change into separate alias.
 
   Ideas for possible future enhancements
         Implement toolbar functionality with right click menu
@@ -321,55 +320,18 @@ menu channel {
 ; ============================== Event catching ==============================
 
 ; ========= Always events ==========
-ctcp ^*:FINGER*:#: { DLF.ctcpBlock.Chan $1- }
-ctcp ^*:TIME*:#: { DLF.ctcpBlock.Chan $1- }
-ctcp ^*:PING*:#: { DLF.ctcpBlock.Chan $1- }
+ctcp ^*:FINGER*:#: { DLF.Chan.ctcpBlock $1- }
+ctcp ^*:TIME*:#: { DLF.Chan.ctcpBlock $1- }
+ctcp ^*:PING*:#: { DLF.Chan.ctcpBlock $1- }
 ctcp ^*:VERSION*:#: {
-  if (($nick isop $chan) && ($DLF.Chan.IsDlfChan($chan))) DLF.ctcpVersion.Reply $chan
-  else DLF.ctcpBlock.Chan $1-
+  if (($nick isop $chan) && ($DLF.Chan.IsDlfChan($chan))) DLF.Priv.ctcpreplyVersion
+  else DLF.Chan.ctcpBlock $1-
 }
 
-alias -l DLF.ctcpBlock.Chan {
-  if ($nick isop $chan) return
-  DLF.Win.Echo Blocked $chan $nick Channel ctcp $1 from $nick
-  if ($DLF.Chan.IsDlfChan($chan)) {
-    DLF.Stats.Count $chan Total
-    DLF.Win.Log Filter ctcp $chan $nick $1-
-  }
-  DLF.Halt Channel $1-2 blocked
-}
-
-ctcp ^*:FINGER*:?: { DLF.ctcpBlock.Priv $1- }
-ctcp ^*:TIME*:?: { DLF.ctcpBlock.Priv $1- }
-ctcp ^*:PING*:?: { DLF.ctcpBlock.Priv $1- }
-ctcp ^*:VERSION*:?: { DLF.ctcpBlock.Priv $1- }
-
-alias -l DLF.ctcpBlock.Priv {
-  DLF.Win.Log Filter ctcp Private $nick $1-
-  var %comchan = $comchan($nick,0)
-  ; Block finger requests
-  if (($1 == FINGER) && (%DLF.nofingers == 1)) {
-    while (%comchan) {
-      DLF.Win.Echo Blocked $comchan($nick,%i) $nick ctcp finger
-      dec %comchan
-    }
-    DLF.Status Blocked: ctcp finger from $nick
-    DLF.Halt Halted: ctcp finger blocked
-  }
-  ; dlFilter ctcp response only to people who are in a common channel or in chat
-  if (($query($nick)) || ($chat($nick,0)) || (%comchan > 0)) {
-    if ($1 == VERSION) DLF.ctcpVersion.Reply Private
-    return
-  }
-  DLF.Watch.Log Blocked: ctcp $1 from $nick with no common dlF channel or chat
-  DLF.Win.Filter $1-
-}
-
-alias -l DLF.ctcpVersion.Reply {
-  var %msg = $nick VERSION $c(1,9,$DLF.logo Version $DLF.SetVersion by DukeLupus & Sophist.) $+ $c(1,15,$space $+ Get it from $c(12,15,$u(https://github.com/DukeLupus/dlFilter/releases)))
-  .ctcpreply %msg
-  DLF.Win.Log Filter ctcpsend $1 $nick %msg
-}
+ctcp ^*:FINGER*:?: { DLF.Priv.ctcpBlock $1- }
+ctcp ^*:TIME*:?: { DLF.Priv.ctcpBlock $1- }
+ctcp ^*:PING*:?: { DLF.Priv.ctcpBlock $1- }
+ctcp ^*:VERSION*:?: { DLF.Priv.ctcpBlock $1- }
 
 on *:close:Status Window: { close -x@ }
 on *:close:@#*: { DLF.oNotice.Close $target }
@@ -380,73 +342,25 @@ on *:close:@#*: { DLF.oNotice.Close $target }
 ; Channel user activity
 ; join, part, quit, nick changes, kick
 on ^*:join:#: {
-  DLF.@find.ColourNick $nick 3
-  if ($DLF.Chan.IsChanEvent) {
-    DLF.Ads.ColourLines $event $nick $chan
-    DLF.DccSend.Rejoin
-    ; Wait for 1 sec for user's modes to be applied to avoid checking ops
-    if ((%DLF.ops.advertpriv) && ($me isop $chan)) .timer 1 1 .signal DLF.Ops.RequestVersion $nick
-    if (%DLF.filter.joins) DLF.User.Channel $iif($shortjoinsparts,Joins:) $nick $br($address) $iif(!$shortjoinsparts,has joined $chan)
-  }
+  DLF.Event.Join $iif($shortjoinsparts,Joins:) $nick $br($address) $iif(!$shortjoinsparts,has joined $chan $+ $iif($1-,: $1-))
 }
-
-on me:*:join:#: {
-  ; Delay to allow channel nicks to be populated
-  .timer 1 1 DLF.@find.ColourMeTimer $event $chan
-  if ($DLF.Chan.IsDlfChan($chan)) {
-    .timer 1 2 DLF.Ads.ColourLines $event $nick $chan
-    DLF.Update.Announce
-  }
-}
-
+on me:*:join:#: { DLF.Event.MeJoin }
 on ^*:part:#: {
-  DLF.oNotice.DelNick
-  DLF.@find.ColourNick $nick 14
-  if ($DLF.Chan.IsChanEvent) {
-    DLF.Ads.ColourLines $event $nick $chan
-    if (%DLF.filter.parts) DLF.User.Channel $iif($shortjoinsparts,Parts:) $nick $br($address) $iif(!$shortjoinsparts,has left $chan) $iif($1-,$br($1-))
-  }
+  DLF.Event.Part $iif($shortjoinsparts,Parts:) $nick $br($address) $iif(!$shortjoinsparts,has left $chan) $iif($1-,$br($1-))
 }
-
-on me:*:part:#: {
-  DLF.@find.ColourMe $event $chan
-  if ($DLF.Chan.IsDlfChan($chan)) DLF.Ads.ColourLines $event $nick $chan
-}
-
+on me:*:part:#: { DLF.Event.MePart }
 on ^*:kick:#: {
-  DLF.oNotice.DelNick
-  DLF.@find.ColourNick $knick 14
-  if ($DLF.Chan.IsChanEvent) {
-    DLF.Ads.ColourLines $event $nick $chan
-    if (%DLF.filter.kicks) DLF.User.Channel $knick $iif(!$shortjoinsparts,$br($address($knick,5))) was kicked $iif(!$shortjoinsparts,from $chan ) by $nick $br($1-)
-  }
+  DLF.Event.Kick $knick $iif(!$shortjoinsparts,$br($address($knick,5))) was kicked $iif(!$shortjoinsparts,from $chan ) by $nick $br($1-)
 }
-
 on ^*:nick: {
-  DLF.oNotice.NickChg
-  DLF.Ads.NickChg
-  if ($DLF.Chan.IsUserEvent(%DLF.filter.nicks)) DLF.User.NoChannel $newnick $nick $iif(!$shortjoinsparts,$br($address($knick,5))) is now known as $newnick
+  DLF.Event.Nick $nick $iif(!$shortjoinsparts,$br($address($knick,5))) is now known as $newnick
 }
-
 on ^*:quit: {
-  DLF.oNotice.DelNickAllChans
-  DLF.@find.ColourNick $nick 14
-  if ($DLF.Chan.IsUserEvent) {
-    DLF.Ads.ColourLines $event $nick
-    if (%DLF.filter.quits) DLF.User.NoChannel $nick $iif($shortjoinsparts,Quits:) $nick $br($address) $iif(!$shortjoinsparts,Quit) $br($1-)
-  }
+  DLF.Event.Quit $nick $iif($shortjoinsparts,Quits:) $nick $br($address) $iif(!$shortjoinsparts,Quit) $br($1-)
 }
-
-on me:*:quit: {
-  DLF.@find.ColourMe $event
-  DLF.Ads.ColourLines $event $nick
-}
-
-on *:disconnect: {
-  DLF.@find.ColourMe $event
-  DLF.Ads.ColourLines $event $nick
-  DLF.Raw005.Reset
-}
+on me:*:quit: { DLF.Event.MeQuit }
+on *:connect: { DLF.Event.MeConnect }
+on *:disconnect: { DLF.Event.MeDisconnect }
 
 ; User mode changes
 ; ban, unban, op, deop, voice, devoice etc.
@@ -551,7 +465,6 @@ raw 421:*: {
 
 ; Adjust titlebar on window change
 on *:active:*: { DLF.Stats.Active }
-on *:connect: { DLF.Net.Connect }
 
 ; Process Ctrl-C on @find window
 on *:keydown:@dlf.@find.*:*: { if ((!$keyrpt) && ($keyval == 3)) DLF.@find.CopyLines }
@@ -574,13 +487,91 @@ alias -l DLF.Groups.Events {
   else .disable #dlf_events
 }
 
-; ========== Network events ==========
-alias -l DLF.Net.Connect {
+; ========== Event splitters ==========
+; Requeue until channel nicks have populated
+on *:signal:DLF.Event.WaitForWho: DLF.Event.WaitForWho $1-
+alias -l DLF.Event.WaitForWho {
+  if (($event != Signal) || ($chan($1).inwho)) .timer 1 1 .signal DLF.Event.WaitForWho $1-
+  else $2-
+}
+
+alias -l DLF.Event.Join {
+  DLF.@find.ColourNick $nick 3
+  if ($DLF.Chan.IsChanEvent) {
+    DLF.Ads.ColourLines $event $nick $chan
+    DLF.DccSend.Rejoin
+    ; Wait for 1 sec for user's modes to be applied to avoid checking ops
+    if ((%DLF.ops.advertpriv) && ($me isop $chan)) .timer 1 1 .signal DLF.Ops.RequestVersion $nick
+    if (%DLF.filter.joins) DLF.User.Channel $1-
+  }
+}
+
+alias -l DLF.Event.MeJoin {
+  ; Delay to allow channel nicks to be populated
+  DLF.Event.WaitForWho $chan DLF.@find.ColourMe $event $chan
+  if ($DLF.Chan.IsDlfChan($chan)) {
+    DLF.Event.WaitForWho $chan DLF.Ads.ColourLines $event $nick $chan
+    DLF.Update.Announce
+  }
+}
+
+alias -l DLF.Event.Part {
+  DLF.oNotice.DelNick
+  DLF.@find.ColourNick $nick 14
+  if ($DLF.Chan.IsChanEvent) {
+    DLF.Ads.ColourLines $event $nick $chan
+    if (%DLF.filter.parts) DLF.User.Channel $1-
+  }
+}
+
+alias -l DLF.Event.MePart {
+  DLF.@find.ColourMe $event $chan
+  if ($DLF.Chan.IsDlfChan($chan)) DLF.Ads.ColourLines $event $nick $chan
+}
+
+alias -l DLF.Event.Kick {
+  DLF.oNotice.DelNick
+  DLF.@find.ColourNick $knick 14
+  if ($DLF.Chan.IsChanEvent) {
+    DLF.Ads.ColourLines $event $nick $chan
+    if (%DLF.filter.kicks) DLF.User.Channel $1-
+  }
+}
+
+alias -l DLF.Event.Nick {
+  DLF.oNotice.NickChg $1-
+  DLF.Ops.NickChg
+  DLF.Ads.NickChg
+  DLF.Win.NickChg
+  if ($DLF.Chan.IsUserEvent(%DLF.filter.nicks)) DLF.User.NoChannel $newnick $1-
+}
+
+alias -l DLF.Event.Quit {
+  DLF.oNotice.DelNickAllChans
+  DLF.@find.ColourNick $nick 14
+  if ($DLF.Chan.IsUserEvent) {
+    DLF.Ads.ColourLines $event $nick
+    if (%DLF.filter.quits) DLF.User.NoChannel $1-
+  }
+}
+
+alias -l DLF.Event.MeQuit {
+  DLF.@find.ColourMe $event
+  DLF.Ads.ColourLines $event $nick
+}
+
+alias -l DLF.Event.MeConnect {
   set -u40 [ [ $+(%,DLF.connect.,$network,.,$me) ] ] 1
   DLF.Update.Check
 }
 
-alias DLF.Net.IsConnecting { return $iif( [ [ $+(%,DLF.connect.,$network,.,$me) ] ] = 1,$true,$false) }
+alias DLF.Event.IsConnecting { return $iif( [ [ $+(%,DLF.connect.,$network,.,$me) ] ] = 1,$true,$false) }
+
+alias -l DLF.Event.MeDisconnect {
+  DLF.@find.ColourMe $event
+  DLF.Ads.ColourLines $event $nick
+  DLF.Raw005.Reset
+}
 
 ; ========== Channel events ==========
 ; Channel user activity
@@ -698,7 +689,7 @@ alias -l DLF.Chan.Text {
   var %txt = $strip($1-)
   if ($hiswm(chantext.dlf,%txt)) {
     ; Someone else is sending channel ads - reset timer to prevent multiple ops flooding the channel
-    set $+(-eu,$calc(%DLF.ops.advertchan.period * 60)) [ [ $+(%,DLF.opsnochanads.,$network,$chan) ] ] 1
+    set $+(-eu,$calc($timer(dlf.advert).secs + 30)) [ $+(%,DLF.opsnochanads.,$network,$chan) ] 1
     DLF.Win.Ads $1-
   }
   if (($me isop $chan) && (%DLF.ops.advertpriv == 1)) {
@@ -850,6 +841,16 @@ alias -l DLF.Chan.EditSend {
   [ $+(.timer,%t) ] 1 %secs editbox $1 %existing
 }
 
+alias -l DLF.Chan.ctcpBlock {
+  if ($nick isop $chan) return
+  DLF.Win.Echo Blocked $chan $nick Channel ctcp $1 from $nick
+  if ($DLF.Chan.IsDlfChan($chan)) {
+    DLF.Stats.Count $chan Total
+    DLF.Win.Log Filter ctcp $chan $nick $1-
+  }
+  DLF.Halt Channel $1-2 blocked
+}
+
 ; ========== Private messages ==========
 alias -l DLF.Priv.Text {
   DLF.Watch.Called DLF.Priv.Text
@@ -891,7 +892,7 @@ alias -l DLF.Priv.NoticeServices {
     DLF.Win.Echo Notice %chan $nick $1-
     halt
   }
-  elseif (($nick isin NickServ HostServ) && ($DLF.Net.IsConnecting)) {
+  elseif (($nick isin NickServ HostServ) && ($DLF.Event.IsConnecting)) {
     DLF.Win.Echo Notice Status $nick $1-
     halt
   }
@@ -959,7 +960,7 @@ alias -l DLF.Priv.CommonChan {
 alias -l DLF.Priv.QueryOpen {
   if ((%DLF.private.query == 1) && ($query($nick)) && ($event != open)) {
     DLF.Win.Echo $event $nick $nick $1-
-    DLF.Halt Echoed to query window
+    halt
   }
 }
 
@@ -1004,6 +1005,33 @@ alias -l DLF.Priv.RegularUser {
       DLF.Win.Filter $2-
     }
   }
+}
+
+alias -l DLF.Priv.ctcpBlock {
+  DLF.Win.Log Filter ctcp Private $nick $1-
+  var %comchan = $comchan($nick,0)
+  ; Block finger requests
+  if (($1 == FINGER) && (%DLF.nofingers == 1)) {
+    while (%comchan) {
+      DLF.Win.Echo Blocked $comchan($nick,%i) $nick ctcp finger
+      dec %comchan
+    }
+    DLF.Status Blocked: ctcp finger from $nick
+    DLF.Halt Halted: ctcp finger blocked
+  }
+  ; dlFilter ctcp response only to people who are in a common channel or in chat
+  if (($query($nick)) || ($chat($nick,0)) || (%comchan > 0)) {
+    if ($1 == VERSION) DLF.Priv.ctcpreplyVersion
+    return
+  }
+  DLF.Watch.Log Blocked: ctcp $1 from $nick with no common dlF channel or chat
+  DLF.Win.Filter $1-
+}
+
+alias -l DLF.Priv.ctcpreplyVersion {
+  var %msg = $nick VERSION $c(1,9,$DLF.logo Version $DLF.SetVersion by DukeLupus & Sophist.) $+ $c(1,15,$space $+ Get it from $c(12,15,$u(https://github.com/DukeLupus/dlFilter/releases)))
+  .ctcpreply %msg
+  DLF.Win.Log Filter ctcpsend $DLF.chan $nick %msg
 }
 
 ; ========== away responses ==========
@@ -1090,6 +1118,15 @@ alias -l DLF.Ops.AdvertChan {
       }
     }
   }
+}
+
+alias -l DLF.Ops.NickChg {
+  if (%DLF.ops.advertpriv == 0) return
+  if ($1 == $me) return
+  var %idx = $+($network,@,$nick)
+  if (!$hfind(DLF.ops.verRequested,%idx)) return
+  DLF.Watch.Called DLF.Ops.NickChg
+
 }
 
 on *:signal:DLF.Ops.RequestVersion: { DLF.Ops.RequestVersion $1- }
@@ -1798,6 +1835,34 @@ alias -l DLF.Win.Echo {
   }
 }
 
+alias -l DLF.Win.NickChg {
+  if ($query($nick)) {
+    DLF.Watch.Log Renaming query window from $nick to $newnick
+    queryrn $nick $newnick
+  }
+  if ($chat($nick)) DLF.Ads.NickChgDCC chat -c $nick $newnick
+  if ($send($nick)) DLF.Ads.NickChgDCC send -s $nick $newnick
+  if ($get($nick)) DLF.Ads.NickChgDCC get -g $nick $newnick
+  if ($fserve($nick)) DLF.Ads.NickChgDCC fserve -f $nick $newnick
+}
+
+alias -l DLF.Win.NickChgDCC {
+  DLF.Watch.Log Renaming DCC $1 window from $3 to $4
+  dcc nick $2-
+}
+
+; DLF.Win.ShowHide @dlF.Filter/Ads* 1/0
+alias -l DLF.Win.ShowHide {
+  if (%DLF.background == 1) {
+    var %i = $window($1,0)
+    while (%i) {
+      window $iif($2 == 1,-w3,-h) $window($1,%i)
+      dec %i
+    }
+  }
+  elseif ($2 == 0) close -@ $1
+}
+
 ; ========== Ads Window ==========
 menu @dlF.Ads.* {
   dclick: DLF.Ads.GetList $1
@@ -1944,8 +2009,6 @@ alias -l DLF.Ads.GetList {
 }
 
 alias -l DLF.Ads.NickChg {
-  if ($query($nick)) queryrn $nick $newnick
-  if ($chat($nick)) dcc nick -c $nick $newnick
   var %win = $DLF.Win.WinName(Ads)
   if (!$window(%win)) return
   var %match = $+([,$iif(%DLF.perconnect == 0,$network),*]*<*,$nick,>*)
@@ -2271,13 +2334,7 @@ alias -l DLF.@find.DoColourLines {
   }
 }
 
-; Requeue timer if inwho
-alias -l DLF.@find.ColourMeTimer {
-  if ($chan($2).inwho) .timer 1 1 DLF.@find.ColourMeTimer $1-2
-  else DLF.@find.ColourMe $1-2
-}
-
-; DLF.@find.ColourMe colour event chan
+; DLF.@find.ColourMe event chan
 alias -l DLF.@find.ColourMe {
   var %win = @dlF.@find. $+ $network
   if (!$window(%win)) return
@@ -2292,7 +2349,7 @@ alias -l DLF.@find.ColourMe {
       if ($nick($2,%nick) == $null) continue
       %c = 3
     }
-    elseif ($1 == part) {
+    else {
       if ($comchan(%nick,0) > 1) continue
       if (($comchan(%nick,0) == 1) && ($nick($2,%nick) == $null)) continue
     }
@@ -2578,7 +2635,7 @@ dialog -l DLF.Options.GUI {
   check "Show/hide server ads", 40, 65 205 60 11, push
   button "Close", 50, 129 205 37 11, ok default flat
   ; tab Channels
-  text "List the channels you want dlFilter to operate on. Use # by itself to make dlFilter work on all networks and channels.",105, 5 25 160 12, tab 100 multi
+  text "List the channels you want dlFilter to filter messages in. Use # by itself to make it filter all channels on all networks.",105, 5 25 160 12, tab 100 multi
   text "Channel to add (select dropdown / type #chan or net#chan):", 110, 5 40 160 7, tab 100
   combo 120, 4 48 160 6, tab 100 drop edit
   button "Add", 130, 5 61 76 11, tab 100 flat disable
@@ -2639,7 +2696,7 @@ dialog -l DLF.Options.GUI {
   check "On private spam, oNotify if you are op in a common channel", 730, 7 66 155 6, tab 700
   box " dlFilter promotion ", 755, 4 77 160 29, tab 700
   check "Advertise dlFilter in channels every", 760, 7 87 93 6, tab 700
-  edit "60", 765, 101 85 12 10, tab 700 right
+  edit "60", 765, 101 85 12 10, tab 700 right limit 2
   text "mins", 770, 115 86 47 7, tab 700
   check "Prompt individual existing dlFilter users to upgrade", 780, 7 96 155 6, tab 700
   ; tab Custom
@@ -2685,7 +2742,7 @@ on *:dialog:DLF.Options.GUI:sclick:525: DLF.Options.Titlebar
 ; oNotice option clicked
 on *:dialog:DLF.Options.GUI:sclick:715: DLF.Options.oNotice
 ; Advertising period changed
-on *:dialog:DLF.Options.GUI:edit:765: DLF.Options.Save
+on *:dialog:DLF.Options.GUI:edit:765: DLF.Options.OpsAdPeriod
 ; Select custom message type
 on *:dialog:DLF.Options.GUI:sclick:830: DLF.Options.SetCustomType
 ; Enable / disable Add custom message button
@@ -2806,18 +2863,6 @@ alias -l DLF.Options.ToggleShowFilter {
 alias -l DLF.Options.ToggleShowAds {
   DLF.Options.ToggleOption serverads 40
   DLF.Win.ShowHide @dlF.Ads.* %DLF.serverads
-}
-
-; DLF.Win.ShowHide @dlF.Filter/Ads* 1/0
-alias -l DLF.Win.ShowHide {
-  if (%DLF.background == 1) {
-    var %i = $window($1,0)
-    while (%i) {
-      window $iif($2 == 1,-w3,-h) $window($1,%i)
-      dec %i
-    }
-  }
-  elseif ($2 == 0) close -@ $1
 }
 
 alias -l DLF.Options.ToggleOption {
@@ -2952,6 +2997,8 @@ alias -l DLF.Options.Save {
   %DLF.opwarning.spampriv = $did(730).state
   %DLF.ops.advertchan = $did(760).state
   %DLF.ops.advertchan.period = $did(765)
+  if (%DLF.ops.advertchan.period == $null) %DLF.ops.advertchan.period = 5
+  elseif (%DLF.ops.advertchan.period == 0) %DLF.ops.advertchan.period = 1
   %DLF.ops.advertpriv = $did(780).state
   DLF.Ops.AdvertsEnable
   %DLF.custom.enabled = $did(810).state
@@ -3002,6 +3049,16 @@ alias -l DLF.Options.Background {
 alias -l DLF.Options.Titlebar {
   DLF.Options.Save
   DLF.Stats.Active
+}
+
+alias -l DLF.Options.OpsAdPeriod {
+  var %period = $did(765)
+  if (%period !isnum 1-99) {
+    %period = $regsubex(DLF.Options.OpsAdPeriod,%period,/([^0-9]+)/g,$null)
+    did -ra DLF.Options.GUI 765 %period
+    return
+  }
+  DLF.Options.Save
 }
 
 alias -l DLF.Options.oNotice {
