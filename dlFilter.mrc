@@ -39,8 +39,6 @@ dlFilter uses the following code from other people:
 
   Immediate TODO
         Test location and filename for oNotice log files
-        Distinguish between manual and advertising VERSION requests – and display manual responses.
-        Do not advertise if channels list is # – and disable advertising options in this case.
         Put window renaming on nick change into separate alias.
 
   Ideas for possible future enhancements
@@ -703,11 +701,11 @@ alias -l DLF.Chan.Text {
     set $+(-eu,$calc(%DLF.ops.advertchan.period * 60)) [ [ $+(%,DLF.opsnochanads.,$network,$chan) ] ] 1
     DLF.Win.Ads $1-
   }
-  if (($me isop $chan) && (%DLF.ops.advertpriv == 1) && (@find * iswm %txt)) DLF.Ops.Advert@find $1-
-  elseif (($me isop $chan) && (%DLF.ops.advertpriv == 1) && ($left(%txt,1) == @) $&
-    && ($left(%txt,7) == @search)) DLF.Ops.Advert@search $1-
-  elseif (($me isop $chan) && (%DLF.ops.advertpriv == 1) && ($left(%txt,1) == @) $&
-    && ($numtok(%txt,$asc($space)) == 1) && ($right($gettok(%txt,1,$asc(-)),-1) ison $chan)) DLF.Ops.Advert@search $1-
+  if (($me isop $chan) && (%DLF.ops.advertpriv == 1)) {
+    if (@find * iswm %txt) DLF.Ops.Advert@find $1-
+    ;elseif ($left(%txt,7) == @search) DLF.Ops.Advert@search $1-
+    ;elseif (($numtok(%txt,$asc($space)) == 1) && ($left(%txt,1) == @) && ($right($gettok(%txt,1,$asc(-)),-1) ison $chan)) DLF.Ops.Advert@search $1-
+  }
 
   DLF.Custom.Filter $1-
   if ($hiswm(chantext.always,%txt)) DLF.Win.Filter $1-
@@ -1096,16 +1094,17 @@ alias -l DLF.Ops.AdvertChan {
 
 on *:signal:DLF.Ops.RequestVersion: { DLF.Ops.RequestVersion $1- }
 alias -l DLF.Ops.RequestVersion {
+  if (%DLF.ops.advertpriv == 0) return
   if ($1 == $me) return
   if ($DLF.IsRegularUser($1) == $false) return
   DLF.Watch.Called DLF.Ops.RequestVersion
-  if (%DLF.ops.advertpriv == 0) return
   var %idx = $+($network,@,$1)
-  if ($hfind(DLF.ops.verRequested,%idx)) DLF.Watch.Log dlF status already checked
-  elseif ($hfind(DLF.ops.mircUsers,%idx)) DLF.Watch.log SPOOKY: mircUsers without verRequested
-  elseif ($hfind(DLF.ops.dlfUsers,%idx)) DLF.Watch.log SPOOKY: dlfUsers without verRequested
-  elseif ($hfind(DLF.ops.sbcUsers,%idx)) DLF.Watch.log SPOOKY: sbcUsers without verRequested
+  if ($hfind(DLF.ops.verRequested,%idx)) DLF.Watch.Log OpsAdvert: version already checked
+  elseif ($hfind(DLF.ops.mircUsers,%idx)) DLF.Watch.log OpsAdvert: SPOOKY: mircUsers without verRequested
+  elseif ($hfind(DLF.ops.dlfUsers,%idx)) DLF.Watch.log OpsAdvert: SPOOKY: dlfUsers without verRequested
+  elseif ($hfind(DLF.ops.sbcUsers,%idx)) DLF.Watch.log OpsAdvert: SPOOKY: sbcUsers without verRequested
   else {
+    hadd -mz DLF.ops.verRequests %idx $DLF.RequestPeriod
     hadd -mz DLF.ops.verRequested %idx $DLF.RequestPeriod
     DLF.ctcp $1 VERSION
     DLF.Win.Log Filter ctcpsend Private $1 VERSION
@@ -1143,7 +1142,10 @@ alias -l DLF.Ops.VersionReply {
     }
     else DLF.Watch.Log mirc version already known
   }
-  DLF.Win.Filter $1-
+  if ($hfind(DLF.verRequests,%idx)) {
+    .hdel DLF.verRequests %idx
+    DLF.Win.Filter $1-
+  }
 }
 
 on *:signal:DLF.Ops.AdvertPrivDLF: { DLF.Ops.AdvertPrivDLF $1- }
@@ -1328,7 +1330,7 @@ alias -l DLF.DccSend.FileRcvd {
   DLF.Watch.Called DLF.DccSend.FileRcvd: %fn
   var %req = $DLF.DccSend.GetRequest(%fn)
   if (%req == $null) return
-  .hdel -s DLF.dccsend.requests %req
+  .hdel DLF.dccsend.requests %req
   var %chan = $gettok(%req,2,$asc(|))
   var %dur = $get(-1).secs
   var %trig = $gettok(%req,3,$asc(|))
