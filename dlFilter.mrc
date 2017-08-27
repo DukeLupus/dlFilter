@@ -37,118 +37,118 @@ dlFilter uses the following code from other people:
 
 /* CHANGE LOG
 
-Immediate TODO
-Test location and filename for oNotice log files
-Add channel menus to toggle visibility of Ads and Filter windows.
+  Immediate TODO
+        Test location and filename for oNotice log files
+        Stop private adds after manual Version e.g. check that user is in a DLF channel that you are op in.
 
-Ideas for possible future enhancements
-Implement toolbar functionality with right click menu
-Check mIRC security settings not too lax
-Manage filetype ignore list like trust list i.e. temp add for requested filetypes.
-Advertising for sbClient for @search + option (await sbClient remediation).
-Better icon file
-Right click channel line menu-items for adding to custom filter (if possible since not a list window)
-More menu options equivalent to dialog options
-Make it work on AdiIRC and update version check handle AdiIRC.
-Channel menu to add all open channels to DLF channel list.
-Menus to show / hide Ads / Filter
-Channel menu to show / hide Ads / Filter
-Merge in sbClient functionality
-Easy toggling of filtering of messages with colouring (e.g. switch on/off quiz server messages)
-Option to trim Ads window of servers which have been offline for xx hours.
-Configurable F1 etc. aliases to toggle Options, Ads, Filters, Catch-all by F key or other keys.
-(Use On Keydown to capture and check keystrokes, have a key field for each of the options to toggle.)
+  Ideas for possible future enhancements
+        Implement toolbar functionality with right click menu
+        Check mIRC security settings not too lax
+        Manage filetype ignore list like trust list i.e. temp add for requested filetypes.
+        Advertising for sbClient for @search + option (await sbClient remediation).
+        Better icon file
+        Right click channel line menu-items for adding to custom filter (if possible since not a list window)
+        More menu options equivalent to dialog options
+        Make it work on AdiIRC and update version check handle AdiIRC.
+        Channel menu to add all open channels to DLF channel list.
+        Menus to show / hide Ads / Filter
+        Channel menu to show / hide Ads / Filter
+        Merge in sbClient functionality
+        Easy toggling of filtering of messages with colouring (e.g. switch on/off quiz server messages)
+        Option to trim Ads window of servers which have been offline for xx hours.
+        Configurable F1 etc. aliases to toggle Options, Ads, Filters, Catch-all by F key or other keys.
+          (Use On Keydown to capture and check keystrokes, have a key field for each of the options to toggle.)
 
-1.18  Further code cleanup
-Self-update improvements
-Option to update to beta versions
-Track minimum mIRC version for web update and not offer update if mirc needs upgrade
-dlFilter reinitialised after update.
-On download of new version, rename old version to .vxxx so user can recover if they have issues with the new version.
-Disable rather than unload script if mIRC version is too low
-Support for multi-server access
-Channel names can now be network#channel as well as #channel (any network)
-Further dialog improvements
-All dialog option changes now take effect immediately
-Subsidiary check-boxes now enable / disable with parent
-New Channels tab using list rather than edit box with ability to select from list of joined channels
-New Ops tab
-New About tab
-Channels / custom filters list - double click to edit.
-Menu and events broken out into aliases
-Added extra options for windows for Server Ads and per connection
-Added extra option to check @find result trigger matches nickname sending them
-Added extra option to auto-accept requested files
-Added option to auto-resend the file request up to 3 times if the send was incomplete.
-Added option to rename file back to original name if server has changed it (unless mIRC DCC Get Options will run a command on the file).
-Added option to filter any line from regular user containing control codes (as likely to be unknown spam)
-Removed New Release filters
-Improved DLF.Debug code
-Created toolbar gif file from embedded data without needing to download it.
-(And code to turn gif into compressed encoded embedded data.)
-Double-click in find results window to download the file
-Search in Filter window now retains line colours
-Restricted ctcp Version responses to people in common channel or PM
-DLF.Watch now displays custom debug window filtered to dlF channels with halt reasons
-Only add *'s around custom filters if user hasn't explicitly included a *
-Multi-server support - option for for custom windows per connection.
-Use hash tables for custom filters
-Colour server nicks now overrides colours set using generic colouring rules which are not based on user modes etc.
-Added window description to title bar for all custom windows.
-@find windows per connection.
-Handle @find results from normal users rather than give error.
-Own file requests are tracked and matching DCC Sends not halted regardless of whether server is regular user or not.
-Added dynamic titlebar to show channel dlF filtering statistics
-Added Ops channel advertising option - an op can advertise dlFilter once every x minutes.
-Added Ops private advertising option which:
-Version checks users as they join and if they are a mIRC user reminds them to install or upgrade dlF.
-Send advert to users doing @find.
-@find results from ps2 are treated as server responses and no longer give regular user warnings
-Lines in @find / Ads windows change colour as user or servers join/part/quit/disconnect.
-"Regular user tried to" warning messages sent to appropriate channels
-Resend requests if server rejoins the channel (in case it has been restarted and request was lost).
-Block channel-wide ctcp requests for VERSION, FINGER, TIME & PING if not from op.
-(Channel-wide ctcp requests are not sensible, and could be for hacking purposes to see who is vulnerable.)
-Added option to block private Finger requests which are not commonly used and could leak personal information.
-Auto-accept @+user / @search response files if they are:
-1. File type .txt or .zip or .rar, and filename starts-with sending nick; and
-2. Either sending nick matches trigger (or if trigger has hyphen up to hyphen).
-DCC Send/Get functionality now acts like firewall - with blocking rules.
-Move ignore spammer functionality to timer because error on $input because it can't run in event
-Added option to accept private messages from user with a query window open.
-Chanserv channel welcome notices now directed to correct window.
-Added filtering of topic changes
-Added release update comment display
-Made filter / watch window size limiting automated and removed limit options.
-Added Search for Watch window
-Added dynamic update for filter/server/watch search windows
-Added ability to report false positive server ads
-Added Ctrl-C to copy lines in @find windows
-When loading, only show options dialog if new variable has been set
-Added option to load Filter/Ads windows in the background
-Improved oNotice functionality - use notice @#chan, populate user lists comprehensively
+  1.18  Further code cleanup
+        Self-update improvements
+          Option to update to beta versions
+          Track minimum mIRC version for web update and not offer update if mirc needs upgrade
+          dlFilter reinitialised after update.
+          On download of new version, rename old version to .vxxx so user can recover if they have issues with the new version.
+          Disable rather than unload script if mIRC version is too low
+        Support for multi-server access
+          Channel names can now be network#channel as well as #channel (any network)
+        Further dialog improvements
+          All dialog option changes now take effect immediately
+          Subsidiary check-boxes now enable / disable with parent
+          New Channels tab using list rather than edit box with ability to select from list of joined channels
+          New Ops tab
+          New About tab
+          Channels / custom filters list - double click to edit.
+        Menu and events broken out into aliases
+        Added extra options for windows for Server Ads and per connection
+        Added extra option to check @find result trigger matches nickname sending them
+        Added extra option to auto-accept requested files
+        Added option to auto-resend the file request up to 3 times if the send was incomplete.
+        Added option to rename file back to original name if server has changed it (unless mIRC DCC Get Options will run a command on the file).
+        Added option to filter any line from regular user containing control codes (as likely to be unknown spam)
+        Removed New Release filters
+        Improved DLF.Debug code
+        Created toolbar gif file from embedded data without needing to download it.
+          (And code to turn gif into compressed encoded embedded data.)
+        Double-click in find results window to download the file
+        Search in Filter window now retains line colours
+        Restricted ctcp Version responses to people in common channel or PM
+        DLF.Watch now displays custom debug window filtered to dlF channels with halt reasons
+        Only add *'s around custom filters if user hasn't explicitly included a *
+        Multi-server support - option for for custom windows per connection.
+        Use hash tables for custom filters
+        Colour server nicks now overrides colours set using generic colouring rules which are not based on user modes etc.
+        Added window description to title bar for all custom windows.
+        @find windows per connection.
+        Handle @find results from normal users rather than give error.
+        Own file requests are tracked and matching DCC Sends not halted regardless of whether server is regular user or not.
+        Added dynamic titlebar to show channel dlF filtering statistics
+        Added Ops channel advertising option - an op can advertise dlFilter once every x minutes.
+        Added Ops private advertising option which:
+          Version checks users as they join and if they are a mIRC user reminds them to install or upgrade dlF.
+          Send advert to users doing @find.
+        @find results from ps2 are treated as server responses and no longer give regular user warnings
+        Lines in @find / Ads windows change colour as user or servers join/part/quit/disconnect.
+        "Regular user tried to" warning messages sent to appropriate channels
+        Resend requests if server rejoins the channel (in case it has been restarted and request was lost).
+        Block channel-wide ctcp requests for VERSION, FINGER, TIME & PING if not from op.
+          (Channel-wide ctcp requests are not sensible, and could be for hacking purposes to see who is vulnerable.)
+        Added option to block private Finger requests which are not commonly used and could leak personal information.
+        Auto-accept @+user / @search response files if they are:
+          1. File type .txt or .zip or .rar, and filename starts-with sending nick; and
+          2. Either sending nick matches trigger (or if trigger has hyphen up to hyphen).
+        DCC Send/Get functionality now acts like firewall - with blocking rules.
+        Move ignore spammer functionality to timer because error on $input because it can't run in event
+        Added option to accept private messages from user with a query window open.
+        Chanserv channel welcome notices now directed to correct window.
+        Added filtering of topic changes
+        Added release update comment display
+        Made filter / watch window size limiting automated and removed limit options.
+        Added Search for Watch window
+        Added dynamic update for filter/server/watch search windows
+        Added ability to report false positive server ads
+        Added Ctrl-C to copy lines in @find windows
+        When loading, only show options dialog if new variable has been set
+        Added option to load Filter/Ads windows in the background
+        Improved oNotice functionality - use notice @#chan, populate user lists comprehensively
 
-1.17  Update opening comments and add change log
-Use custom identifiers for creating bold, colour etc.
-Use custom identifiers instead of $chr(xx)
-Use alias for status messages
-Hash tables for message matching instead of lists of ifs
-Options dialog layout improvements
-Enable / disable now global
-Custom filter Add / Remove button enable / disable
-Custom filter list multi-select
-Menu code cleanup
-Add generic sockets code
-Use GitHub for version check
-Download button to update from GitHub
-Use script groups to enable / disable DLF event handling
-Allow msgs from Chanserv etc. and self
-Cleanup menu code
-Files now always accepted from Regular users who are in DCC Trust List
-Allow user to choose whether to delete configuration variables on unload
-Limit load/start/connect update check to once per 7 days.
-(Options update check still runs every time options dialog is loaded.)
-Most aliases and dialogs local (-l flag)
+  1.17  Update opening comments and add change log
+        Use custom identifiers for creating bold, colour etc.
+        Use custom identifiers instead of $chr(xx)
+        Use alias for status messages
+        Hash tables for message matching instead of lists of ifs
+        Options dialog layout improvements
+          Enable / disable now global
+          Custom filter Add / Remove button enable / disable
+          Custom filter list multi-select
+        Menu code cleanup
+        Add generic sockets code
+        Use GitHub for version check
+        Download button to update from GitHub
+        Use script groups to enable / disable DLF event handling
+        Allow msgs from Chanserv etc. and self
+        Cleanup menu code
+        Files now always accepted from Regular users who are in DCC Trust List
+        Allow user to choose whether to delete configuration variables on unload
+        Limit load/start/connect update check to once per 7 days.
+          (Options update check still runs every time options dialog is loaded.)
+        Most aliases and dialogs local (-l flag)
 */
 
 alias -l DLF.SetVersion {
@@ -298,11 +298,21 @@ on *:unload: {
 ; ========== Main popup menus ==========
 menu menubar {
   dlFilter
+  .$iif(%DLF.filter.controlcodes,Don't filter,Filter) coloured messages: DLF.Options.ToggleOption filter.controlcodes 345
   .$iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Options.ToggleShowFilter
+  .$iif(%DLF.serverads,Hide,Show) ads window(s): DLF.Options.ToggleShowAds
   .Options: DLF.Options.Show
   .Visit filter website: .url -a https://github.com/DukeLupus/dlFilter/
   .-
   .Unload dlFilter: if ($?!="Do you want to unload dlFilter?" == $true) .unload -rs $qt($script)
+}
+
+menu status {
+  dlFilter
+  .$iif(%DLF.filter.controlcodes,Don't filter,Filter) coloured messages: DLF.Options.ToggleOption filter.controlcodes 345
+  .$iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Options.ToggleShowFilter
+  .$iif(%DLF.serverads,Hide,Show) ads window(s): DLF.Options.ToggleShowAds
+  .Options: DLF.Options.Show
 }
 
 menu channel {
@@ -316,7 +326,9 @@ menu channel {
     DLF.StatusAll $c(6,Channels set to $c(4,$hashtag))
   }
   .-
+  .$iif(%DLF.filter.controlcodes,Don't filter,Filter) coloured messages: DLF.Options.ToggleOption filter.controlcodes 345
   .$iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Options.ToggleShowFilter
+  .$iif(%DLF.serverads,Hide,Show) ads window(s): DLF.Options.ToggleShowAds
   .Options: DLF.Options.Show
 }
 
@@ -476,7 +488,7 @@ on *:keydown:@dlf.@find.*:*: { if ((!$keyrpt) && ($keyval == 3)) DLF.@find.CopyL
 
 ; Following is just in case groups get reset to default...
 ; Primarily for developers when e.g. script is reloaded on change by authors autoreload script
-#dlf_bootstrap off
+#dlf_bootstrap on
 on *:text:*:*: { DLF.Groups.Bootstrap }
 alias -l DLF.Groups.Bootstrap {
   if (%DLF.enabled != $null) DLF.Groups.Events
@@ -895,7 +907,7 @@ alias -l DLF.Priv.NoticeServices {
     DLF.Win.Echo Notice %chan $nick $1-
     halt
   }
-  elseif (($nick isin NickServ HostServ) && ($DLF.Event.IsConnecting)) {
+  elseif (($nick isin NickServ HostServ Global) && ($DLF.Event.IsConnecting)) {
     DLF.Win.Echo Notice Status $nick $1-
     halt
   }
@@ -1218,7 +1230,7 @@ alias -l DLF.Ops.AdvertPrivDLF {
       DLF.notice $1 %msg
       DLF.Win.Log Filter notice Private $1 %msg
     }
-    if (($false) && (%sbcVer == $null) && ($nopath($script(1) != sbclient.mrc)) {
+    if (($false) && (%sbcVer == $null) && ($nopath($script(1) != sbclient.mrc))) {
       DLF.Watch.Log Advertised sbc via notice.
       if (%msg == $null) %msg = I see you are running mIRC. Have you considered
       else %msg = You may also want to consider
@@ -1383,10 +1395,10 @@ alias -l DLF.DccSend.FileRcvd {
   ; But we cannot rename if Options / DCC / Folders / Command is set
   ; because it would run after this using the wrong filename
   if ((%origfn != $null) && $&
-    (%fn != %origfn) && $&
-    ($DLF.DccSend.IsNotGetCommand(%fn)) && $&
-    ($left(%trig,1) == !) && $&
-    (. isin $gettok(%origfn,-1,$asc($space)))) {
+      (%fn != %origfn) && $&
+      ($DLF.DccSend.IsNotGetCommand(%fn)) && $&
+      ($left(%trig,1) == !) && $&
+      (. isin $gettok(%origfn,-1,$asc($space)))) {
     var %oldfn = $qt($filename)
     var %newfn = $qt($+($noqt($nofile($filename)),%origfn))
     DLF.Watch.Log Renaming %oldfn to %newfn
@@ -1601,9 +1613,9 @@ menu @dlF.Filter.* {
   $iif(%DLF.win-filter.wrap == 1,$style(1)) Wrap lines: DLF.Options.ToggleOption filtered.wrap
   $iif(%DLF.win-filter.log == 1,$style(1)) Log: DLF.Options.ToggleOption filtered.log
   -
+  $iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Options.ToggleShowFilter
   Clear: clear
   Options: DLF.Options.Show
-  Hide filter window: DLF.Options.ToggleShowFilter
   -
 }
 
@@ -1873,9 +1885,9 @@ menu @dlF.Ads.* {
   -
   $iif($DLF.Win.IsInvalidSelection,$style(2)) Report line(s) which shouldn't be considered ads: DLF.Ads.ReportFalseAd
   -
+  .$iif(%DLF.serverads,Hide,Show) ads window(s): DLF.Options.ToggleShowAds
   Clear: clear
   Options: DLF.Options.Show
-  Hide: DLF.Options.ToggleShowAds
   -
 }
 
@@ -4138,15 +4150,20 @@ alias -l DLF.IsRegularUser {
 }
 
 alias -l DLF.IsServiceUser {
-  if ($1 == ChanServ) return $true
-  if ($1 == NickServ) return $true
-  if ($1 == MemoServ) return $true
-  if ($1 == OperServ) return $true
   if ($1 == BotServ) return $true
-  if ($1 == HostServ) return $true
-  if ($1 == HelpServ) return $true
+  if ($1 == ChanServ) return $true
   if ($1 == GroupServ) return $true
+  if ($1 == HelpServ) return $true
+  if ($1 == HostServ) return $true
   if ($1 == InfoServ) return $true
+  if ($1 == MemoServ) return $true
+  if ($1 == NickServ) return $true
+  if ($1 == OperServ) return $true
+  if ($1 == RootServ) return $true
+  if ($1 == TimeServ) return $true
+  if ($1 == UserServ) return $true
+  if ($1 == WebServ) return $true
+  if ($1 == Global) return $true
   return $false
 }
 
@@ -4168,8 +4185,8 @@ alias -l DLF.GetFileName {
   while ($numtok(%txt,$asc($space))) {
     var %last = $gettok(%txt,-1,$asc($space))
     if (($+($lbr,*,$rbr) iswm %last) $&
-      || ($+(CRC,$lbr,*,$rbr) iswm %last) $&
-      || (%last isnum)) %txt = $deltok(%txt,-1,$asc($space))
+     || ($+(CRC,$lbr,*,$rbr) iswm %last) $&
+     || (%last isnum)) %txt = $deltok(%txt,-1,$asc($space))
     else break
   }
   %txt = $noqt(%txt)
