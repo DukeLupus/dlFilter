@@ -576,7 +576,7 @@ alias -l DLF.Event.MeQuit {
 }
 
 alias -l DLF.Event.MeConnect {
-  set -u40 [ [ $+(%,DLF.connect.,$network,.,$me) ] ] 1
+  set -ez [ [ $+(%,DLF.connect.,$network,.,$me) ] ] 40
   DLF.Update.Check
 }
 
@@ -1793,7 +1793,7 @@ alias -l DLF.Win.Format {
   elseif ($1 == warning) return $c(1,9,$DLF.logo Warning: $4-)
   elseif ($1 == blocked) return $c(1,9,$DLF.logo Blocked: $4-)
   elseif ($1 == session) return $4-
-  else return * $4-
+  else return * $4- $br($1)
 }
 
 alias -l DLF.Win.Echo {
@@ -2809,7 +2809,7 @@ alias -l DLF.Options.Initialise {
   DLF.Options.InitOption filter.spamchan 1
   DLF.Options.InitOption filter.spampriv 1
   DLF.Options.InitOption spam.addignore 0
-  DLF.Options.InitOption filter.controlcodes 1
+  DLF.Options.InitOption filter.controlcodes 0
   DLF.Options.InitOption filter.topic 0
   DLF.Options.InitOption serverwin 0
   DLF.Options.InitOption private.requests 1
@@ -3033,8 +3033,8 @@ alias -l DLF.Options.Save {
 
 alias -l DLF.Options.OpsTab {
   ; Disable Ops Tab if all ops options are off and not ops in any dlF channels
-  did $iif($DLF.Options.IsOp,-e,-b) DLF.Options.GUI 715,725,730,760,765,770,790
-  if (%DLF.netchans == $hashtag) did -b DLF.Options.GUI 760,765,770,790
+  did $iif($DLF.Options.IsOp,-e,-b) DLF.Options.GUI 715,725,730,760,765,770,780,790
+  if (%DLF.netchans == $hashtag) did -b DLF.Options.GUI 760,765,770,780,790
 }
 
 alias -l DLF.Options.IsOp {
