@@ -701,7 +701,7 @@ alias -l DLF.Chan.Text {
   DLF.Watch.Called DLF.Chan.Text
   ; Remove leading and double spaces
   tokenize $asc($space) $replace($1-,$nbsp,$space)
-  var %txt = $strip($1-)
+  var %txt = $trim($strip($1-))
   if ($hiswm(chantext.dlf,%txt)) {
     ; Someone else is sending channel ads - reset timer to prevent multiple ops flooding the channel
     set $+(-eu,$calc($timer(dlf.advert).secs + 30)) [ $+(%,DLF.opsnochanads.,$network,$chan) ] 1
@@ -1088,7 +1088,11 @@ alias -l DLF.Stats.Titlebar {
 
 ; ========== Ops advertising ==========
 alias -l DLF.Ops.AdvertsEnable {
-  if (%DLF.ops.advertchan == 1) .timerDLF.Adverts -io 0 $calc(%DLF.ops.advertchan.period * 60) .signal DLF.Ops.AdvertChan
+  if (%DLF.ops.advertchan == 1) {
+    var %secs = $calc(%DLF.ops.advertchan.period * 60)
+    ; only reissue timer if it has changed to avoid cancelling partial countdown and starting it again every time you save options
+    if ($timer(DLF.adverts).secs != %secs) .timerDLF.Adverts -io 0 %secs .signal DLF.Ops.AdvertChan
+  }
   else .timerDLF.Adverts off
 }
 
@@ -4209,6 +4213,8 @@ alias -l IdentifierCalledAsAlias {
   echo $colour(Info) -s * Identifier $+($iif($left($1,1) != $,$),$1) called as alias in $nopath($script)
   halt
 }
+
+alias -l trim { return $1- }
 
 alias -l uniquetok {
   if (!$isid) IdentifierCalledAsAlias uniquetok
