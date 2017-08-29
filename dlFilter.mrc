@@ -334,18 +334,15 @@ menu channel {
 
 ; ============================== Event catching ==============================
 ; ========= Always events ==========
-ctcp ^*:FINGER*:#: { DLF.Chan.ctcpBlock $1- }
-ctcp ^*:TIME*:#: { DLF.Chan.ctcpBlock $1- }
-ctcp ^*:PING*:#: { DLF.Chan.ctcpBlock $1- }
 ctcp ^*:VERSION*:#: {
   if (($nick isop $chan) && ($DLF.Chan.IsDlfChan($chan))) DLF.Priv.ctcpreplyVersion
-  else DLF.Chan.ctcpBlock $1-
+  elseif (%DLF.enabled) DLF.Chan.ctcpBlock $1-
 }
 
-ctcp ^*:FINGER*:?: { DLF.Priv.ctcpBlock $1- }
-ctcp ^*:TIME*:?: { DLF.Priv.ctcpBlock $1- }
-ctcp ^*:PING*:?: { DLF.Priv.ctcpBlock $1- }
-ctcp ^*:VERSION*:?: { DLF.Priv.ctcpBlock $1- }
+ctcp ^*:VERSION*:?: {
+  if (($query($nick)) || ($chat($nick,0)) || (%comchan > 0)) DLF.Priv.ctcpreplyVersion
+  elseif (%DLF.enabled) DLF.Priv.ctcpBlock $1-
+}
 
 on *:close:Status Window: { close -x@ }
 on *:close:@#*: { DLF.oNotice.Close $target }
@@ -459,9 +456,15 @@ on ^*:action:*:?: { DLF.Priv.Action $1- }
 on ^*:open:?:*: { DLF.Priv.Text $1- }
 
 ; ctcp
-ctcp *:PING *:%DLF.channels: { if ($DLF.Chan.IsChanEvent) DLF.Halt Halted: ping in dlF channel }
-ctcp *:DCC CHAT*:?: { DLF.DccChat.Chat $1- }
-ctcp *:DCC SEND*:?: { DLF.DccSend.Send $1- }
+ctcp ^*:FINGER*:#: { DLF.Chan.ctcpBlock $1- }
+ctcp ^*:TIME*:#: { DLF.Chan.ctcpBlock $1- }
+ctcp ^*:PING*:#: { DLF.Chan.ctcpBlock $1- }
+ctcp ^*:FINGER*:?: { DLF.Priv.ctcpBlock $1- }
+ctcp ^*:TIME*:?: { DLF.Priv.ctcpBlock $1- }
+ctcp ^*:PING*:?: { DLF.Priv.ctcpBlock $1- }
+
+ctcp *:DCC CHAT *:?: { DLF.DccChat.Chat $1- }
+ctcp *:DCC SEND *:?: { DLF.DccSend.Send $1- }
 ctcp *:*:?: { DLF.Priv.ctcp $1- }
 ctcp *:*:%DLF.channels: { if ($DLF.Chan.IsChanEvent) DLF.Chan.ctcp $1- }
 on *:ctcpreply:VERSION *: {
@@ -1042,10 +1045,7 @@ alias -l DLF.Priv.ctcpBlock {
     DLF.Halt Halted: ctcp finger blocked
   }
   ; dlFilter ctcp response only to people who are in a common channel or in chat
-  if (($query($nick)) || ($chat($nick,0)) || (%comchan > 0)) {
-    if ($1 == VERSION) DLF.Priv.ctcpreplyVersion
-    return
-  }
+  if (($query($nick)) || ($chat($nick,0)) || (%comchan > 0)) return
   DLF.Watch.Log Blocked: ctcp $1 from $nick with no common dlF channel or chat
   DLF.Win.Filter $1-
 }
