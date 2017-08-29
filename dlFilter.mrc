@@ -39,7 +39,7 @@ dlFilter uses the following code from other people:
 
   Immediate TODO
         Test location and filename for oNotice log files
-        Stop private adds after manual Version e.g. check that user is in a DLF channel that you are op in.
+        Test window highlighting (flashing etc.) - define rules.
 
   Ideas for possible future enhancements
         Implement toolbar functionality with right click menu
@@ -340,7 +340,7 @@ ctcp ^*:VERSION*:#: {
 }
 
 ctcp ^*:VERSION*:?: {
-  if (($query($nick)) || ($chat($nick,0)) || (%comchan > 0)) DLF.Priv.ctcpreplyVersion
+  if (($query($nick)) || ($chat($nick,0)) || ($comchan($nick,0) > 0)) DLF.Priv.ctcpreplyVersion
   elseif (%DLF.enabled) DLF.Priv.ctcpBlock $1-
 }
 
