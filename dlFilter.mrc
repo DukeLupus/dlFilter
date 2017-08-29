@@ -4323,11 +4323,11 @@ alias -l c {
   if ($0 < 2) DLF.Error $ $+ c: Insufficient parameters to colour text
   elseif ($1 !isnum 0-15) DLF.Error $ $+ c: Colour value invalid: $1
   elseif (($0 >= 3) && ($2 isnum 0-15)) {
-    %code = $+($chr(3),$1,$comma,$2)
+    %code = $+($chr(3),$right(0 $+ $1,2),$comma,$right(0 $+ $2,2))
     %text = $3-
   }
   else {
-    %code = $+($chr(3),$1)
+    %code = $+($chr(3),$right(0 $+ $1,2))
     %text = $2-
   }
   %text = $replace(%text,$chr(15),%code)
