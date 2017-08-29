@@ -333,7 +333,6 @@ menu channel {
 }
 
 ; ============================== Event catching ==============================
-
 ; ========= Always events ==========
 ctcp ^*:FINGER*:#: { DLF.Chan.ctcpBlock $1- }
 ctcp ^*:TIME*:#: { DLF.Chan.ctcpBlock $1- }
@@ -350,6 +349,13 @@ ctcp ^*:VERSION*:?: { DLF.Priv.ctcpBlock $1- }
 
 on *:close:Status Window: { close -x@ }
 on *:close:@#*: { DLF.oNotice.Close $target }
+
+; Send SNOTICES always to Status
+on ^*:snotice:*: {
+  echo $color(Notice) -st $+(-,$nick,-) $1-
+  halt
+}
+
 
 ; ========= Events when dlFilter is enabled ==========
 #dlf_events on
@@ -472,7 +478,11 @@ raw 005:*: { DLF.Raw005.Check $1- }
 ; Filter away messages
 raw 301:*: { DLF.Away.Filter $1- }
 
-; Show Unknown Command messages in active window (rather than hidden in status)
+; Show "Unknown command" / "No such nick/channel" messages in active window (rather than hidden in status)
+raw 401:*: {
+  echo -a $2-
+  halt
+}
 raw 421:*: {
   echo -a $2-
   halt
@@ -576,11 +586,12 @@ alias -l DLF.Event.MeQuit {
 }
 
 alias -l DLF.Event.MeConnect {
+  DLF.Watch.Called DLF.Event.MeConnect
   set -ez [ [ $+(%,DLF.connect.,$network,.,$me) ] ] 40
   DLF.Update.Check
 }
 
-alias DLF.Event.IsConnecting { return $iif( [ [ $+(%,DLF.connect.,$network,.,$me) ] ] = 1,$true,$false) }
+alias DLF.Event.IsConnecting { return $iif( [ [ $+(%,DLF.connect.,$network,.,$me) ] ] != $null,$true,$false) }
 
 alias -l DLF.Event.MeDisconnect {
   DLF.@find.ColourMe $event
@@ -905,10 +916,6 @@ alias -l DLF.Priv.NoticeServices {
   if (($nick == ChanServ) && ($left($1,2) == [#) && ($right($1,1) == ])) {
     var %chan = $left($right($1,-1),-1)
     DLF.Win.Echo Notice %chan $nick $1-
-    halt
-  }
-  elseif (($nick isin NickServ HostServ Global) && ($DLF.Event.IsConnecting)) {
-    DLF.Win.Echo Notice Status $nick $1-
     halt
   }
 }
@@ -1832,18 +1839,18 @@ alias -l DLF.Win.Echo {
   else {
     var %sent = $null
     var %i = $comchan($3,0)
-    if (%i == 0) {
-      if ($DLF.IsServiceUser($3)) {
+    if ((%i == 0) || ($3 == $me)) {
+      if (($window($active).type !isin custom listbox) && ((($DLF.IsServiceUser($3)) && (!$DLF.Event.IsConnecting)) || ($3 == $me))) {
         echo %col -a $iif($1 != ctcpreply,$2 $+ :) %line
         DLF.Watch.Log Echoed: To active window $active
       }
-      elseif ($usesinglemsg == 1) {
-        echo %col -dt $iif(($2 != Private) && ($1 != ctcpreply),$2 $+ :) %line
-        DLF.Watch.Log Echoed: To single message window
+      elseif (($usesinglemsg == 0) || ($DLF.IsServiceUser($3))) {
+        echo %col -st $iif(($1 != ctcpreply) && ($2 != Private),$2 $+ :) %line
+        DLF.Watch.Log Echoed: To status window
       }
       else {
-        echo %col -st $iif($1 != ctcpreply,$2 $+ :) %line
-        DLF.Watch.Log Echoed: To status window
+        echo %col -dt $iif(($1 != ctcpreply) && ($2 != Private),$2 $+ :) %line
+        DLF.Watch.Log Echoed: To single message window
       }
       return
     }
