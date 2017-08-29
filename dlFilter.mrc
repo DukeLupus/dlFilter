@@ -1782,8 +1782,8 @@ alias -l DLF.Win.Colour return $color($DLF.Win.MsgType($1))
 
 alias -l DLF.Win.Format {
   tokenize $asc($space) $1-
-  if (($1 isin Normal Text) && ($3 == $me) && ($prefixown == 0)) return > $4-
-  elseif ($1 isin Normal Text) return $tag($DLF.Chan.MsgNick($2,$3)) $4-
+  if (($1 isin Normal Text Open) && ($3 == $me) && ($prefixown == 0)) return > $4-
+  elseif ($1 isin Normal Text Open) return $tag($DLF.Chan.MsgNick($2,$3)) $4-
   elseif ($1 == Action) return * $3-
   elseif ($1 == Notice) return $+(-,$3,-) $4-
   elseif (($1 == ctcp) && ($4 == DCC)) return $4-
@@ -1793,7 +1793,7 @@ alias -l DLF.Win.Format {
   elseif ($1 == warning) return $c(1,9,$DLF.logo Warning: $4-)
   elseif ($1 == blocked) return $c(1,9,$DLF.logo Blocked: $4-)
   elseif ($1 == session) return $4-
-  else return * $4- $br($1)
+  else return * $4-
 }
 
 alias -l DLF.Win.Echo {
