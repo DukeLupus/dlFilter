@@ -17,9 +17,6 @@ This version is a significant upgrade from the previous major release 1.16 with 
 
 It is our future intent to merge this script with sbClient to create sbFilter as functionality is synergistic.
 
-Download: https://github.com/DukeLupus/dlFilter/ - update regularly to handle new forms of message.
-Feedback: https://gitreports.com/issue/DukeLupus/dlFilter/
-
 To load: use /load -rs dlFilter.mrc
 
 Note that dlFilter loads itself automatically as a first script (or second if you are also running sbClient). This avoids problems where other scripts halt events preventing this scripts events from running.
@@ -2838,7 +2835,11 @@ dialog -l DLF.Options.GUI {
   button "Remove", 860, 86 51 76 11, tab 8 flat disable
   list 870, 4 64 160 135, tab 8 hsbar vsbar size sort extsel
   ; tab About
-  edit "", 920, 3 25 162 175, multi read vsbar tab 9
+  edit "", 920, 3 25 162 158, multi read vsbar tab 9
+  text "Download:", 980, 5 185 35 7, tab 9
+  link "https://github.com/DukeLupus/dlFilter/", 985, 45 185 120 7, tab 9
+  text "Report issues:", 990, 5 192 35 7, tab 9
+  link "https://gitreports.com/issue/DukeLupus/dlFilter/", 995, 45 192 120 7, tab 9
 }
 
 alias -l DLF.Options.SetLinkedFields {
