@@ -357,11 +357,12 @@ on ^*:snotice:*: {
 on ^*:join:#: {
   DLF.Event.Join $iif($shortjoinsparts,Joins:) $nick $br($address) $iif(!$shortjoinsparts,has joined $chan $+ $iif($1-,: $1-))
 }
-on me:*:join:#: { DLF.Event.MeJoin }
+on me:*:join:#: { DLF.Event.MeJoin $1- }
+raw 366:*: { DLF.Event.MeJoinComplete $1- }
 on ^*:part:#: {
   DLF.Event.Part $iif($shortjoinsparts,Parts:) $nick $br($address) $iif(!$shortjoinsparts,has left $chan) $iif($1-,$br($1-))
 }
-on me:*:part:#: { DLF.Event.MePart }
+on me:*:part:#: { DLF.Event.MePart $1- }
 on ^*:kick:#: {
   DLF.Event.Kick $knick $iif(!$shortjoinsparts,$br($address($knick,5))) was kicked $iif(!$shortjoinsparts,from $chan ) by $nick $br($1-)
 }
@@ -371,9 +372,9 @@ on ^*:nick: {
 on ^*:quit: {
   DLF.Event.Quit $nick $iif($shortjoinsparts,Quits:) $nick $br($address) $iif(!$shortjoinsparts,Quit) $br($1-)
 }
-on me:*:quit: { DLF.Event.MeQuit }
-on *:connect: { DLF.Event.MeConnect }
-on *:disconnect: { DLF.Event.MeDisconnect }
+on me:*:quit: { DLF.Event.MeQuit $1- }
+on *:connect: { DLF.Event.MeConnect $1- }
+on *:disconnect: { DLF.Event.MeDisconnect $1- }
 
 ; User mode changes
 ; ban, unban, op, deop, voice, devoice etc.
@@ -511,21 +512,8 @@ alias -l DLF.Groups.Events {
 }
 
 ; ========== Event splitters ==========
-; Requeue until channel nicks have populated
-on *:signal:DLF.Event.WaitForWho: DLF.Event.WaitForWho $1-
-alias -l DLF.Event.WaitForWho {
-  if (($event != Signal) || ($chan($1).inwho)) {
-    if ($event != Signal) DLF.Watch.Called DLF.Event.WaitForWho Waiting for $1 nicks to be populated: $2-
-    ; mIRC does not set inWho to true during join - so setting delay to 10s instead of 1s
-    .timer 1 10 .signal DLF.Event.WaitForWho $1-
-  }
-  else {
-    DLF.Watch.Called DLF.Event.WaitForWho Executing: $2-
-    $2-
-  }
-}
-
 alias -l DLF.Event.Join {
+  DLF.Watch.Called DLF.Event.Join $1-
   DLF.@find.ColourNick $nick 3
   if ($DLF.Chan.IsChanEvent) {
     DLF.Ads.ColourLines $event $nick $chan
@@ -537,15 +525,18 @@ alias -l DLF.Event.Join {
 }
 
 alias -l DLF.Event.MeJoin {
-  ; Delay to allow channel nicks to be populated
-  DLF.Event.WaitForWho $chan DLF.@find.ColourMe $event $chan
-  if ($DLF.Chan.IsDlfChan($chan)) {
-    DLF.Event.WaitForWho $chan DLF.Ads.ColourLines $event $nick $chan
-    DLF.Update.Announce
-  }
+  DLF.Watch.Called DLF.Event.MeJoin $1-
+  if ($DLF.Chan.IsDlfChan($chan)) DLF.Update.Announce
+}
+
+alias -l DLF.Event.MeJoinComplete {
+  DLF.Watch.Called DLF.Event.MeJoinComplete $1-
+  DLF.@find.ColourMe Join $2
+  if ($DLF.Chan.IsDlfChan($2)) DLF.Ads.ColourLines Join $1-2
 }
 
 alias -l DLF.Event.Part {
+  DLF.Watch.Called DLF.Event.Part $1-
   DLF.oNotice.DelNick
   DLF.@find.ColourNick $nick 14
   if ($DLF.Chan.IsChanEvent) {
@@ -555,11 +546,13 @@ alias -l DLF.Event.Part {
 }
 
 alias -l DLF.Event.MePart {
+  DLF.Watch.Called DLF.Event.MePart $1-
   DLF.@find.ColourMe $event $chan
   if ($DLF.Chan.IsDlfChan($chan)) DLF.Ads.ColourLines $event $nick $chan
 }
 
 alias -l DLF.Event.Kick {
+  DLF.Watch.Called DLF.Event.Kick $1-
   DLF.oNotice.DelNick
   DLF.@find.ColourNick $knick 14
   if ($DLF.Chan.IsChanEvent) {
@@ -569,6 +562,7 @@ alias -l DLF.Event.Kick {
 }
 
 alias -l DLF.Event.Nick {
+  DLF.Watch.Called DLF.Event.Nick $1-
   DLF.oNotice.NickChg $1-
   DLF.Ops.NickChg
   DLF.Ads.NickChg
@@ -577,6 +571,7 @@ alias -l DLF.Event.Nick {
 }
 
 alias -l DLF.Event.Quit {
+  DLF.Watch.Called DLF.Event.Quit $1-
   DLF.oNotice.DelNickAllChans
   DLF.@find.ColourNick $nick 14
   if ($DLF.Chan.IsUserEvent) {
@@ -586,20 +581,21 @@ alias -l DLF.Event.Quit {
 }
 
 alias -l DLF.Event.MeQuit {
+  DLF.Watch.Called DLF.Event.MeQuit $1-
   DLF.@find.ColourMe $event
   DLF.Ads.ColourLines $event $nick
 }
 
 alias -l DLF.Event.MeConnect {
-  DLF.Watch.Called DLF.Event.MeConnect
-  set -ez [ [ $+(%,DLF.CONNECT.,$network,.,$me) ] ] 40
+  DLF.Watch.Called DLF.Event.MeConnect $1-
+  set -ez [ [ $+(%,DLF.CONNECT.CID,$cid) ] ] 40
   DLF.Update.Check
 }
 
-alias DLF.Event.IsConnecting { return $iif( [ [ $+(%,DLF.CONNECT.,$network,.,$me) ] ] != $null,$true,$false) }
+alias -l DLF.Event.JustConnected { return $iif( [ [ $+(%,DLF.CONNECT.CID,$cid) ] ] != $null,$true,$false) }
 
 alias -l DLF.Event.MeDisconnect {
-  DLF.Watch.Called DLF.Event.MeDisconnect
+  DLF.Watch.Called DLF.Event.MeDisconnect $1-
   DLF.@find.ColourMe $event
   DLF.Ads.ColourLines $event $nick
   DLF.iSupport.Disconnect
@@ -778,7 +774,8 @@ alias -l DLF.Chan.Text {
   var %txt = $trim($strip($1-))
   if ($hiswm(chantext.dlf,%txt)) {
     ; Someone else is sending channel ads - reset timer to prevent multiple ops flooding the channel
-    set $+(-eu,$calc($timer(dlf.advert).secs + 30)) [ $+(%,DLF.opsnochanads.,$network,$chan) ] 1
+    var %secs = $timer(dlf.advert).secs + 30
+    set $+(-eu,%secs) [ $+(%,DLF.opsnochanads.,$network,$chan) ] 1
     DLF.Win.Ads $1-
   }
   if (($me isop $chan) && (%DLF.ops.advertpriv == 1)) {
@@ -1118,7 +1115,8 @@ alias -l DLF.Stats.Active {
   var %total = $DLF.Stats.Get($active,Total)
   var %filter = $DLF.Stats.Get($active,Filter)
   if (($DLF.Chan.IsDlfChan($active)) && (%total != $null) && (%filter != $null)) {
-    var %percent = $calc(%filter / %total * 100)
+    var %percent = %filter / %total
+    %percent = %percent * 100
     if (%percent < 99) %percent = $round(%percent,1)
     elseif ((%percent < 100) && ($regex(DLF.Stats.Display,%percent,/([0-9]*\.9*[0-8])/) > 0)) %percent = $regml(DLF.Stats.Display,1)
     DLF.Stats.Titlebar $active $DLF.Stats.TitleText(%percent)
@@ -1141,7 +1139,7 @@ alias -l DLF.Stats.Titlebar {
 ; ========== Ops advertising ==========
 alias -l DLF.Ops.AdvertsEnable {
   if (%DLF.ops.advertchan == 1) {
-    var %secs = $calc(%DLF.ops.advertchan.period * 60)
+    var %secs = %DLF.ops.advertchan.period * 60
     ; only reissue timer if it has changed to avoid cancelling partial countdown and starting it again every time you save options
     if ($timer(DLF.Adverts).delay != %secs) .timerDLF.Adverts -io 0 %secs .signal DLF.Ops.AdvertChan
   }
@@ -1326,7 +1324,9 @@ alias -l DLF.DccSend.GetRequest {
   if (%req) return %req
   if (*_results_for__*.txt.zip iswm %fn) {
     var %srch = $gettok(%fn,1,$asc(.))
-    var %srch = $right(%srch,$calc(- $pos(%srch,__,1) - 1))
+    var %pos = 0 - $pos(%srch,__,1)
+    dec %pos
+    var %srch = $right(%srch,%pos)
     var %req = $hfind(DLF.dccsend.requests,$+($network,|*|@search*|,%srch,|*),1,w).item
     if (%req) return %req
   }
@@ -1438,7 +1438,7 @@ alias -l DLF.DccSend.Receiving {
   var %chan = $gettok(%req,2,$asc(|))
   var %origfn = $decode($gettok(%req,5,$asc(|)))
   if (%origfn == $null) %origfn = $1-
-  var %secs = $calc(86400 - $hget(DLF.dccsend.requests,%req))
+  var %secs = 86400 - $hget(DLF.dccsend.requests,%req)
   DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick starting $br(waited $duration(%secs,3))
 }
 
@@ -1460,7 +1460,8 @@ alias -l DLF.DccSend.FileRcvd {
   if (%origfn == $null) %origfn = %fn
   var %hash = $encode(%trig %origfn)
   if ($hget(DLF.dccsend.retries,%hash)) .hdel DLF.dccsend.retries %hash
-  DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick complete $br($duration(%dur,3) $bytes($calc($get(-1).rcvd / %dur)).suf $+ /Sec)
+  var %bytes = $get(-1).rcvd / %dur
+  DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick complete $br($duration(%dur,3) $bytes(%bytes).suf $+ /Sec)
   ; Some servers change spaces to underscores
   ; But we cannot rename if Options / DCC / Folders / Command is set
   ; because it would run after this using the wrong filename
@@ -1488,7 +1489,8 @@ alias -l DLF.DccSend.IsNotGetCommand {
     if (%p == 0) continue
     var %p = $poscs(%get,EXTDIR:,1)
     if (%p == $null) continue
-    var %match = $left(%get,$calc(%p - 1))
+    dec %p
+    var %match = $left(%get,%p)
     var %j = $numtok(%match,$asc($comma))
     while (%j) {
       if ($gettok(%match,%j,$asc($comma)) iswm $1-) return $false
@@ -1525,7 +1527,8 @@ alias -l DLF.DccSend.GetFailed {
       .hinc DLF.dccsend.retries %hash
     }
   }
-  DLF.Win.Log Server ctcp %chan $nick DCC Get of %origfn from $nick incomplete $br($duration(%dur,3) $bytes($calc($get(-1).rcvd / $get(-1).secs)).suf $+ /Sec) $iif(%retry,- $c(3,retrying))
+  var %bytes = $get(-1).rcvd / $get(-1).secs
+  DLF.Win.Log Server ctcp %chan $nick DCC Get of %origfn from $nick incomplete $br($duration(%dur,3) $bytes(%bytes).suf $+ /Sec) $iif(%retry,- $c(3,retrying))
   if (%retry) DLF.Chan.EditSend %chan %trig $decode($gettok(%req,5,$asc(|)))
 }
 
@@ -1581,8 +1584,10 @@ alias DLF.Requests {
   %list = $sorttok(%list,$asc(|),nr)
   %i = $numtok(%list,$asc(|))
   while (%i) {
-    %item = $gettok(%list,%i,$asc(|))
-    echo -a $asctime($calc($ctime - 86400 + $gettok(%item,1,$asc($space))),$timestampfmt) $gettok(%item,2-,$asc($space))
+    var %item = $gettok(%list,%i,$asc(|))
+    var %time = $ctime - 86400
+    %time = %time + $gettok(%item,1,$asc($space))
+    echo -a $asctime(%time,$timestampfmt) $gettok(%item,2-,$asc($space))
     dec %i
   }
 }
@@ -1762,10 +1767,7 @@ alias -l DLF.Win.Log {
   }
   elseif (%type == Server) %tb = Server response
   var %win = $DLF.Win.WinOpen(%type,-k0nw,%log,%show,%tb $DLF.Win.TbMsg)
-
-  ; If user has scrolled up from the bottom of custom window, mIRC does not delete excess lines
-  ; Since user can leave these windows scrolled up, they would grow uncontrollably unless we prune them manually.
-  if (($window(%win).type == custom) && ($line(%win,0) >= $calc($windowbuffer * 1.2))) dline %win $+(1-,$calc($line(%win,0) - $int($windowbuffer * 1.1)))
+  DLF.Win.CustomTrim %win
   if (%ts == 1) %line = $timestamp %line
   if (%strip == 1) %line = $strip(%line)
   if (%wrap == 1) aline -pi %col %win %line
@@ -1900,7 +1902,7 @@ alias -l DLF.Win.Echo {
     var %sent = $null
     var %i = $comchan($3,0)
     if ((%i == 0) || ($3 == $me)) {
-      if (($window($active).type !isin custom listbox) && ((($DLF.IsServiceUser($3)) && (!$DLF.Event.IsConnecting)) || ($3 == $me))) {
+      if (($window($active).type !isin custom listbox) && ((($DLF.IsServiceUser($3)) && (!$DLF.Event.JustConnected)) || ($3 == $me))) {
         echo %col -a $iif($1 != ctcpreply,$2 $+ :) %line
         DLF.Watch.Log Echoed: To active window $active
       }
@@ -1996,7 +1998,7 @@ alias -l DLF.Ads.Add {
   %line = $gettok(%line,1,$asc($space)) $tab $+ $gettok(%line,2,$asc($space)) $tab $+ %ad
   var %srch = $replace($gettok($strip(%line),1-7,$asc($space)),$tab,$null)
   %srch = $puttok(%srch,$DLF.Win.NickFromTag($gettok(%srch,2,$asc($space))),2,$asc($space))
-  var %ln = $calc($line(%win,0) + 1)
+  var %ln = $line(%win,0) + 1
   var %match = $+([,$iif(%DLF.perconnect == 0,$network),$chan,]*,$tag($DLF.Chan.MsgNick($chan,$nick)),*)
   var %i = $fline(%win,%match,0)
   if (%i == 0) {
@@ -2030,7 +2032,8 @@ alias -l DLF.Ads.Add {
     DLF.Watch.Log Advert: $nick prepended
   }
   window -b %win
-  titleBar %win -=- $calc($line(%win,0) - 5) %tb
+  var %ads = $line(%win,0) - 5
+  titleBar %win -=- %ads %tb
 }
 
 alias -l DLF.Ads.ReportFalseAd {
@@ -2332,11 +2335,14 @@ alias -l DLF.@find.Results {
   if ($left(%trig,1) = !) {
     var %rest = $strip(%rest)
     var %fn = $DLF.GetFilename(%rest)
-    %rest = $right(%rest,$calc(- $len(%fn) - 1))
+    var %len = 0 - $len(%fn)
+    dec %len
+    %rest = $right(%rest,%len)
     if ($gettok(%rest,1,$asc($space)) == ::INFO::) {
       %rest = :: Size: $gettok(%rest,2-,$asc($space))
+      var %left = $pos(%rest,+,1) - 1
       if ($pos(%rest,+,0) > 0) $&
-        %rest = $left(%rest,$calc($pos(%rest,+,1) - 1))
+        %rest = $left(%rest,%left)
     }
     %rest = %fn $c(14,%rest)
   }
@@ -2371,7 +2377,8 @@ alias -l DLF.@find.Results {
   iline -hn $iif($left(%msg,1) == @,2,3) %win %i %msg
   window -b %win
   if ($timer($+($active,.Titlebar))) [ $+(.timer,$active,.Titlebar) ] off
-  titlebar %win -=- $calc($line(%win,0) - 6) @find results from $network so far -=- Right-click for options or double-click to download
+  var %results = $line(%win,0) - 6
+  titlebar %win -=- %results @find results from $network so far -=- Right-click for options or double-click to download
   DLF.Halt @find result: Result for %trig added to %win
 }
 
@@ -2471,7 +2478,8 @@ alias -l DLF.@find.ColourMe {
       if ($comchan(%nick,0) > 1) continue
       if (($comchan(%nick,0) == 1) && ($nick($2,%nick) == $null)) continue
     }
-    cline %c %win $calc(%i + 1)
+    var %line = %i + 1
+    cline %c %win %line
   }
 }
 
@@ -2487,7 +2495,7 @@ alias -l DLF.@find.SendToAutoGet {
   var %j = 0
   while (%i <= %lines) {
     var %temp = $MTlisttowaiting($replace($sline(%win,%i),$nbsp,$space))
-    var %j = $calc(%j + $gettok(%temp,1,$asc($space)))
+    var %j = %j + $gettok(%temp,1,$asc($space))
     if ($sbClient.Online($sline($active,%i)) == 1) cline 10 $active $sline($active,%i).ln
     else cline 6 $active $sline($active,%i).ln
     inc %i
@@ -2522,7 +2530,8 @@ alias -l DLF.@find.SendTovPowerGet {
 alias -l DLF.@find.SaveResults {
   var %fn = $sfile($sysdir(downloads),Save @find results as a text file,Save)
   if (!%fn) return
-  %fn = $qt($gettok(%fn,$+(1-,$calc($numtok(%fn,$asc(.)) - 1)),$asc(.)) $+ .txt)
+  var %tok =
+  %fn = $qt($deltok(%fn,-1,$asc(.)) $+ .txt)
   savebuf $active %fn
 }
 
@@ -3423,7 +3432,9 @@ alias -l DLF.Options.Error {
 ; ========== Check version for updates ==========
 ; Check once per week for normal releases and once per day if user is wanting betas
 alias -l DLF.Update.Check {
-  var %days = $calc($int(($ctime - %DLF.update.lastcheck) / 60 / 60 / 24))
+  var %days = $ctime - %DLF.update.lastcheck
+  var %days = %days / 86400
+  var %days = $int(%days)
   if ((%days >= 7) || ((%DLF.update.betas) && (%days >= 1))) DLF.Update.Run
 }
 
@@ -4276,7 +4287,7 @@ alias -l DLF.IsRegularUser {
     DLF.Watch.Log Not regular user: %log
     return $false
   }
-  DLF.Watch.Log Is regular user…
+  DLF.Watch.Log $1 is regular user…
   return $true
 }
 
@@ -4322,14 +4333,10 @@ alias -l DLF.GetFileName {
     else break
   }
   %txt = $noqt(%txt)
-  var %dots = $numtok(%txt,$asc(.))
-  while (%dots > 1) {
-    var %type = $gettok($gettok(%txt,%dots,$asc(.)),1,$asc($space))
-    if (%type isalnum) {
-      var %name = $gettok(%txt,$+(1-,$calc(%dots - 1)),$asc(.))
-      return $+(%name,.,%type)
-    }
-    dec %dots
+  while ($numtok(%txt,$asc(.)) > 1) {
+    var %type = $gettok($gettok(%txt,-1,$asc(.)),1,$asc($space))
+    %txt = $deltok(%txt,-1,$asc(.))
+    if (%type isalnum) return $+(%txt,.,%type)
   }
   return $null
 }
@@ -4348,7 +4355,8 @@ alias -l uniquetok {
   if (%i < 2) return $1
   var %tok = $1
   while (%i >= 2) {
-    if ($istok($gettok(%tok,$+(1-,$calc(%i - 1)),$2),$gettok(%tok,%i,$2),$2)) %tok = $deltok(%tok,%i,$2)
+    var %j = %i - 1
+    if ($istok($gettok(%tok,$+(1-,%j),$2),$gettok(%tok,%i,$2),$2)) %tok = $deltok(%tok,%i,$2)
     dec %i
   }
   return %tok
@@ -4405,24 +4413,24 @@ alias -l func {
   return $(%p,2)
 }
 
-; /ctimems : set ms offset values (max 1 second mIRC pause during this processing)
-; $ctimems : returns $ctime with 3 digit ms decimal place ( max 1 second delay if no /ctimems call is made prior to this $identifier being used)
-alias -l ctimems {
-  if (!$var(%DLF.ctimems.ticks,0) || !$var(%DLF.ctimems.ctime,0) || (!$isid)) {
-    var %ctime = $calc($ctime + 1), %ticks
+; /timestampms : set ms offset values (max 1 second mIRC pause during this processing)
+; $timestampms : returns $timestamp with 3 digit ms decimal place appended to secs (max 1 sec delay if first call)
+alias timestampms {
+  if (!$var(%DLF.timestampms.ticks,0) || (!$isid)) {
+    var %ctime = $ctime + 1
+    var %ticks = $ticks
     while (%ctime > $ctime) %ticks = $ticks
-    set -e %DLF.ctimems.ticks %ticks
-    set -e %DLF.ctimems.ctime $ctime
+    ; Ticks increment by 15 or 16 - avoid boundary issues at $ctime clickover by making $tick straddle cick-over
+    %ticks = %ticks + 8
+    %ticks = %ticks % 1000
+    set -e %DLF.timestampms.ticks %ticks
   }
-  return $left($calc(%DLF.ctimems.ctime + (($ticks - %DLF.ctimems.ticks) / 1000) + .0001),-1)
-}
-
-alias -l timestampms {
   var %tsfmt = $timestampfmt
   if (s isin %tsfmt) {
     %tsfmt = $replacex(%tsfmt,ss,ss.xxx,s,s.xxx)
-    var %ct = $ctimems
-    return $replacex($asctime(%ct,%tsfmt),.xxx,$right(%ct,4))
+    var %ticks = $ticks - %DLF.timestampms.ticks
+    %ticks = %ticks % 1000
+    return $replacex($asctime($ctime,%tsfmt),xxx,$base(%ticks,10,10,3))
   }
   else return $timestamp
 }
@@ -4672,7 +4680,21 @@ alias DLF.Watch.Filter {
 }
 
 alias -l DLF.Watch.Called {
-  DLF.Watch.Log $iif($event != $null,ON $upper($event),User action) called $1 $+ $iif($2-,: $2-)
+  if ($event == $null) var %event = User action
+  elseif ($event isnum) var %event = RAW $event
+  else var %event = ON $upper($event)
+  DLF.Watch.Log %event called $1 $+ $iif($2-,: $2-)
+}
+
+; If user has scrolled up from the bottom of custom window, mIRC does not delete excess lines
+; Since user can leave these windows scrolled up, they would grow uncontrollably unless we prune them manually.
+alias -l DLF.Win.CustomTrim {
+  if ($window($1).type !isin custom listbox) return
+  var %buf = $windowbuffer
+  var %max = %buf * 1.2
+  var %del = %buf * 1.1
+  var %del = $line($1,0) - $int(%del)
+  if ($line($1,0) >= %max) dline $1 $+(1-,%del)
 }
 
 alias -l DLF.Watch.Log {
@@ -4682,7 +4704,7 @@ alias -l DLF.Watch.Log {
   else {
     ; If user has scrolled up from the bottom of custom window, mIRC does not delete excess lines
     ; Since user can leave these windows scrolled up, they would grow uncontrollably unless we prune them manually.
-    if (($window($debug).type == custom) && ($line($debug,0) >= $calc($windowbuffer * 1.2))) dline $debug $+(1-,$calc($line($debug,0) - $int($windowbuffer * 1.1)))
+    DLF.Win.CustomTrim $debug
     var %c
     if ($1 == <-) %c = 1
     elseif ($1 == ->) %c = 12
