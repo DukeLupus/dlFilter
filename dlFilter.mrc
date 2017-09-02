@@ -4528,22 +4528,21 @@ alias -l func {
 
 ; /timestampms : set ms offset values (max 1 second mIRC pause during this processing)
 ; $timestampms : returns $timestamp with 3 digit ms decimal place appended to secs (max 1 sec delay if first call)
+; NOTE: $ticks are not an accurate timekeeper and the offset drifts over time
+; However it is useful to give an indication of ms elapsed time in DLF.Watch windows
 alias timestampms {
+  var %ticks = $ticks
   if (!$var(%DLF.timestampms.ticks,0) || (!$isid)) {
-    var %ctime = $ctime + 1
-    var %ticks = $ticks
-    while (%ctime > $ctime) %ticks = $ticks
-    ; Ticks increment by 15 or 16 - avoid boundary issues at $ctime clickover by making $tick straddle cick-over
-    %ticks = %ticks + 8
-    %ticks = %ticks % 1000
     set -e %DLF.timestampms.ticks %ticks
+    if (!$isid) return
   }
   var %tsfmt = $timestampfmt
   if (s isin %tsfmt) {
-    %tsfmt = $replacex(%tsfmt,ss,ss.xxx,s,s.xxx)
-    var %ticks = $ticks - %DLF.timestampms.ticks
+    %tsfmt = $replacex(%tsfmt,ss,ss+x,s,s+x)
+    var %ticks = %ticks - %DLF.timestampms.ticks
     %ticks = %ticks % 1000
-    return $replacex($asctime($ctime,%tsfmt),xxx,$base(%ticks,10,10,3))
+    var %ctime = $ctime
+    return $replacex($asctime(%ctime,%tsfmt),x,$base(%ticks,10,10,3))
   }
   else return $timestamp
 }
@@ -4833,6 +4832,7 @@ alias -l DLF.Watch.Log {
     elseif ($1 == ->) %c = 12
     elseif ($1 == Halted:) %c = 4
     else %c = 3
+    if ($1 isin <->) timestampms
     var %l = $timestampms $1-
     aline -pi %c $debug %l
     DLF.Search.Add $debug 1 %c %l
