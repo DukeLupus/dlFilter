@@ -37,6 +37,7 @@ dlFilter uses the following code from other people:
   Immediate TODO
         Test location and filename for oNotice log files
         Test window highlighting (flashing etc.) - define rules.
+        On connect and perconnect, close non-matching @dlf windows.
 
   Ideas for possible future enhancements
         Implement toolbar functionality with right click menu
@@ -704,7 +705,7 @@ alias -l DLF.Chan.AddRemove {
   DLF.Watch.Called DLF.Chan.AddRemove $1-
   if (!$DLF.Chan.IsDlfChan($chan,$false)) DLF.Chan.Add $chan $network
   else DLF.Chan.Remove $chan $network
-  if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 6 1 %DLF.netchans
+  if ($dialog(DLF.Options.GUI)) DLF.Options.InitChannelList
 }
 
 alias -l DLF.Chan.Add {
@@ -1464,6 +1465,7 @@ alias -l DLF.DccSend.Send {
     if ((%DLF.dccsend.nocomchan == 1) && ($comchan($nick,0) == 0)) DLF.DccSend.Block the user is not in a common channel
     if ((%DLF.dccsend.regular == 1) && ($DLF.IsRegularUser($nick)) DLF.DccSend.Block the user is a regular user
   }
+  else DLF.Watch.Log User is already in your DCC trust list
   DLF.Watch.Log DCC Send accepted
   DLF.DccSend.Receiving %fn
 }
@@ -1494,7 +1496,7 @@ alias -l DLF.DccSend.Taskbar {
 alias -l DLF.DccSend.FileRcvd {
   DLF.DccSend.Taskbar
   var %fn $nopath($filename)
-  DLF.Watch.Called DLF.DccSend.FileRcvd: %fn
+  DLF.Watch.Called DLF.DccSend.FileRcvd %fn
   var %req $DLF.DccSend.GetRequest(%fn)
   if (%req == $null) return
   .hdel DLF.dccsend.requests %req
@@ -3186,7 +3188,7 @@ alias -l DLF.Options.Init {
 }
 
 alias -l DLF.Options.LinkedFields {
-  var %state $did($abs($1)).state
+  var %state $did(DLF.Options.GUI,$abs($1)).state
   if ($1 < 0) %state = 1 - %state
   if (%state) var %flags -cb
   else var %flags -e
@@ -3195,58 +3197,58 @@ alias -l DLF.Options.LinkedFields {
 
 alias -l DLF.Options.Save {
   DLF.Chan.Set %DLF.netchans
-  %DLF.enabled = $did(10).state
+  %DLF.enabled = $did(DLF.Options.GUI,10).state
   DLF.Groups.Events
-  %DLF.showfiltered = $did(30).state
-  %DLF.update.betas = $did(190).state
-  %DLF.filter.requests = $did(310).state
-  %DLF.filter.ads = $did(315).state
-  %DLF.serverads = $did(40).state
-  %DLF.filter.modeschan = $did(325).state
-  %DLF.filter.spamchan = $did(330).state
-  %DLF.filter.spampriv = $did(335).state
-  %DLF.spam.addignore = $did(340).state
-  %DLF.filter.controlcodes = $did(345).state
-  %DLF.filter.topic = $did(350).state
-  %DLF.serverwin = $did(355).state
-  %DLF.private.requests = $did(360).state
-  %DLF.perconnect = $did(365).state
-  %DLF.background = $did(370).state
-  %DLF.filter.joins = $did(380).state
-  %DLF.filter.parts = $did(382).state
-  %DLF.filter.quits = $did(384).state
-  %DLF.filter.nicks = $did(386).state
-  %DLF.filter.kicks = $did(388).state
-  %DLF.filter.aways = $did(390).state
-  %DLF.filter.modesuser = $did(395).state
-  %DLF.filter.regular = $did(397).state
-  %DLF.searchresults = $did(510).state
-  %DLF.titlebar.stats = $did(525).state
-  %DLF.colornicks = $did(530).state
-  %DLF.dccsend.autoaccept = $did(540).state
-  %DLF.dccsend.requested = $did(550).state
-  %DLF.dccsend.dangerous = $did(550).state
-  %DLF.dccsend.nocomchan = $did(555).state
-  %DLF.dccsend.untrusted = $did(560).state
-  %DLF.dccsend.regular = $did(565).state
-  %DLF.serverretry = $did(570).state
-  %DLF.checksecurity = $did(610).state
-  %DLF.private.query = $did(615).state
-  %DLF.private.nocomchan = $did(620).state
-  %DLF.private.regular = $did(625).state
-  %DLF.chanctcp = $did(655).state
-  %DLF.nofingers = $did(660).state
-  %DLF.win-onotice.enabled = $did(715).state
-  %DLF.opwarning.spamchan = $did(725).state
-  %DLF.opwarning.spampriv = $did(730).state
-  %DLF.ops.advertchan = $did(760).state
-  %DLF.ops.advertchan.period = $did(765)
+  %DLF.showfiltered = $did(DLF.Options.GUI,30).state
+  %DLF.update.betas = $did(DLF.Options.GUI,190).state
+  %DLF.filter.requests = $did(DLF.Options.GUI,310).state
+  %DLF.filter.ads = $did(DLF.Options.GUI,315).state
+  %DLF.serverads = $did(DLF.Options.GUI,40).state
+  %DLF.filter.modeschan = $did(DLF.Options.GUI,325).state
+  %DLF.filter.spamchan = $did(DLF.Options.GUI,330).state
+  %DLF.filter.spampriv = $did(DLF.Options.GUI,335).state
+  %DLF.spam.addignore = $did(DLF.Options.GUI,340).state
+  %DLF.filter.controlcodes = $did(DLF.Options.GUI,345).state
+  %DLF.filter.topic = $did(DLF.Options.GUI,350).state
+  %DLF.serverwin = $did(DLF.Options.GUI,355).state
+  %DLF.private.requests = $did(DLF.Options.GUI,360).state
+  %DLF.perconnect = $did(DLF.Options.GUI,365).state
+  %DLF.background = $did(DLF.Options.GUI,370).state
+  %DLF.filter.joins = $did(DLF.Options.GUI,380).state
+  %DLF.filter.parts = $did(DLF.Options.GUI,382).state
+  %DLF.filter.quits = $did(DLF.Options.GUI,384).state
+  %DLF.filter.nicks = $did(DLF.Options.GUI,386).state
+  %DLF.filter.kicks = $did(DLF.Options.GUI,388).state
+  %DLF.filter.aways = $did(DLF.Options.GUI,390).state
+  %DLF.filter.modesuser = $did(DLF.Options.GUI,395).state
+  %DLF.filter.regular = $did(DLF.Options.GUI,397).state
+  %DLF.searchresults = $did(DLF.Options.GUI,510).state
+  %DLF.titlebar.stats = $did(DLF.Options.GUI,525).state
+  %DLF.colornicks = $did(DLF.Options.GUI,530).state
+  %DLF.dccsend.autoaccept = $did(DLF.Options.GUI,540).state
+  %DLF.dccsend.requested = $did(DLF.Options.GUI,550).state
+  %DLF.dccsend.dangerous = $did(DLF.Options.GUI,550).state
+  %DLF.dccsend.nocomchan = $did(DLF.Options.GUI,555).state
+  %DLF.dccsend.untrusted = $did(DLF.Options.GUI,560).state
+  %DLF.dccsend.regular = $did(DLF.Options.GUI,565).state
+  %DLF.serverretry = $did(DLF.Options.GUI,570).state
+  %DLF.checksecurity = $did(DLF.Options.GUI,610).state
+  %DLF.private.query = $did(DLF.Options.GUI,615).state
+  %DLF.private.nocomchan = $did(DLF.Options.GUI,620).state
+  %DLF.private.regular = $did(DLF.Options.GUI,625).state
+  %DLF.chanctcp = $did(DLF.Options.GUI,655).state
+  %DLF.nofingers = $did(DLF.Options.GUI,660).state
+  %DLF.win-onotice.enabled = $did(DLF.Options.GUI,715).state
+  %DLF.opwarning.spamchan = $did(DLF.Options.GUI,725).state
+  %DLF.opwarning.spampriv = $did(DLF.Options.GUI,730).state
+  %DLF.ops.advertchan = $did(DLF.Options.GUI,760).state
+  %DLF.ops.advertchan.period = $did(DLF.Options.GUI,765)
   if (%DLF.ops.advertchan.period == $null) %DLF.ops.advertchan.period = 5
   elseif (%DLF.ops.advertchan.period == 0) %DLF.ops.advertchan.period = 1
-  %DLF.ops.advertchan.filter = $did(780).state
-  %DLF.ops.advertpriv = $did(790).state
+  %DLF.ops.advertchan.filter = $did(DLF.Options.GUI,780).state
+  %DLF.ops.advertpriv = $did(DLF.Options.GUI,790).state
   DLF.Ops.AdvertsEnable
-  %DLF.custom.enabled = $did(810).state
+  %DLF.custom.enabled = $did(DLF.Options.GUI,810).state
   saveini
   DLF.Options.SetLinkedFields
 }
@@ -3298,7 +3300,7 @@ alias -l DLF.Options.Titlebar {
 }
 
 alias -l DLF.Options.OpsAdPeriod {
-  var %period $did(765)
+  var %period $did(DLF.Options.GUI,765)
   if (%period !isnum 1-99) {
     %period = $regsubex(DLF.Options.OpsAdPeriod,%period,/([^0-9]+)/g,$null)
     did -ra DLF.Options.GUI 765 %period
@@ -3376,7 +3378,7 @@ alias -l DLF.Options.InitChannelList {
 }
 
 alias -l DLF.Options.SetAddChannelButton {
-  if ($did(120)) did -te DLF.Options.GUI 130
+  if ($did(DLF.Options.GUI,120)) did -te DLF.Options.GUI 130
   else {
     did -b DLF.Options.GUI 130
     did -t DLF.Options.GUI 50
@@ -3384,7 +3386,7 @@ alias -l DLF.Options.SetAddChannelButton {
 }
 
 alias -l DLF.Options.SetRemoveChannelButton {
-  if ($did(140,0).sel > 0) did -te DLF.Options.GUI 135
+  if ($did(DLF.Options.GUI,140,0).sel > 0) did -te DLF.Options.GUI 135
   else {
     did -b DLF.Options.GUI 135
     DLF.Options.SetAddChannelButton
@@ -3392,7 +3394,7 @@ alias -l DLF.Options.SetRemoveChannelButton {
 }
 
 alias -l DLF.Options.AddChannel {
-  var %chan $did(120).text
+  var %chan $did(DLF.Options.GUI,120).text
   if ($pos(%chan,$hashtag,0) == 0) %chan = $hashtag $+ %chan
   if (($scon(0) == 1) && ($left(%chan,1) == $hashtag)) %chan = $network $+ %chan
   DLF.Chan.Add %chan
@@ -3401,9 +3403,9 @@ alias -l DLF.Options.AddChannel {
 }
 
 alias -l DLF.Options.RemoveChannel {
-  var %i $did(140,0).sel
+  var %i $did(DLF.Options.GUI,140,0).sel
   while (%i) {
-    DLF.Chan.Remove $did(140,$did(140,%i).sel).text
+    DLF.Chan.Remove $did(DLF.Options.GUI,140,$did(DLF.Options.GUI,140,%i).sel).text
     dec %i
   }
   did -b DLF.Options.GUI 135
@@ -3411,8 +3413,8 @@ alias -l DLF.Options.RemoveChannel {
 }
 
 alias -l DLF.Options.EditChannel {
-  if ($did(140,0).sel == 1 ) {
-    var %chan $did(140,$did(140,1).sel).text
+  if ($did(DLF.Options.GUI,140,0).sel == 1 ) {
+    var %chan $did(DLF.Options.GUI,140,$did(DLF.Options.GUI,140,1).sel).text
     DLF.Options.RemoveChannel
     DLF.Options.InitChannelList
     did -o DLF.Options.GUI 120 0 %chan
@@ -3458,7 +3460,7 @@ alias -l DLF.Options.About {
 }
 
 alias -l DLF.Options.SetCustomType {
-  var %selected $replace($did(830).seltext,$nbsp,$space)
+  var %selected $replace($did(DLF.Options.GUI,830).seltext,$nbsp,$space)
   did -r DLF.Options.GUI 870
   if (%selected == Channel text) didtok DLF.Options.GUI 870 44 %DLF.custom.chantext
   elseif (%selected == Channel action) didtok DLF.Options.GUI 870 44 %DLF.custom.chanaction
@@ -3472,7 +3474,7 @@ alias -l DLF.Options.SetCustomType {
 }
 
 alias -l DLF.Options.SetAddCustomButton {
-  if ($did(840)) did -te DLF.Options.GUI 850
+  if ($did(DLF.Options.GUI,840)) did -te DLF.Options.GUI 850
   else {
     did -b DLF.Options.GUI 850
     did -t DLF.Options.GUI 50
@@ -3480,7 +3482,7 @@ alias -l DLF.Options.SetAddCustomButton {
 }
 
 alias -l DLF.Options.SetRemoveCustomButton {
-  if ($did(870,0).sel > 0) did -te DLF.Options.GUI 860
+  if ($did(DLF.Options.GUI,870,0).sel > 0) did -te DLF.Options.GUI 860
   else {
     did -b DLF.Options.GUI 860
     DLF.Options.SetAddCustomButton
@@ -3488,8 +3490,8 @@ alias -l DLF.Options.SetRemoveCustomButton {
 }
 
 alias -l DLF.Options.AddCustom {
-  var %selected $did(830).seltext
-  var %new $did(840).text
+  var %selected $did(DLF.Options.GUI,830).seltext
+  var %new $did(DLF.Options.GUI,840).text
   if (* !isin %new) var %new $+(*,%new,*)
   DLF.Custom.Add %selected %new
   ; Clear edit field, list selection and disable add button
@@ -3499,10 +3501,10 @@ alias -l DLF.Options.AddCustom {
 }
 
 alias -l DLF.Options.RemoveCustom {
-  var %selected $did(830).seltext
-  var %i $did(870,0).sel
+  var %selected $did(DLF.Options.GUI,830).seltext
+  var %i $did(DLF.Options.GUI,870,0).sel
   while (%i) {
-    DLF.Custom.Remove %selected $did(870,$did(870,%i).sel).text
+    DLF.Custom.Remove %selected $did(DLF.Options.GUI,870,$did(DLF.Options.GUI,870,%i).sel).text
     dec %i
   }
   did -b DLF.Options.GUI 860
@@ -3511,8 +3513,8 @@ alias -l DLF.Options.RemoveCustom {
 }
 
 alias -l DLF.Options.EditCustom {
-  if ($did(870,0).sel == 1 ) {
-    did -o DLF.Options.GUI 840 1 $did(870,$did(870,1).sel).text
+  if ($did(DLF.Options.GUI,870,0).sel == 1 ) {
+    did -o DLF.Options.GUI 840 1 $did(DLF.Options.GUI,870,$did(DLF.Options.GUI,870,1).sel).text
     DLF.Options.RemoveCustom
     DLF.Options.SetAddCustomButton
   }
