@@ -37,12 +37,12 @@ dlFilter uses the following code from other people:
   Immediate TODO
         Test location and filename for oNotice log files
         Test window highlighting (flashing etc.) - define rules.
-        On connect and perconnect, close non-matching @dlf windows.
         Nick change should also remove adverts already existing for new nick.
         Nick change should move adverts for renamed nick to correct sort position.
           (Perhaps by removing and then re-adding.)
         Remove Filter wrap lines options and switch to listbox and add right click functions to generate
           gitreports for false positive filters (with summary of filter settings).
+        Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
 
   Ideas for possible future enhancements
         Implement toolbar functionality with right click menu
@@ -354,7 +354,7 @@ ctcp ^*:VERSION*:?: {
   elseif (%DLF.enabled) DLF.Priv.ctcpBlock $1-
 }
 
-on *:close:Status Window: { close -x@ }
+on *:close:Status Window: { DLF.Win.CloseServer }
 on *:close:@#*: { DLF.oNotice.Close $target }
 
 ; Send SNOTICES always to Status
@@ -637,7 +637,22 @@ alias -l DLF.Event.MeQuit {
 alias -l DLF.Event.MeConnect {
   DLF.Watch.Called DLF.Event.MeConnect $1-
   set -ez [ [ $+(%,DLF.CONNECT.CID,$cid) ] ] 40
+  DLF.Win.CloseServer
   DLF.Update.Check
+}
+
+alias -l DLF.Win.CloseServer {
+  if (($event == connect) && (%DLF.perconnect == 0)) return
+  DLF.Watch.Called DLF.Win.CloseServer
+  var %i $window(@DLF.*,0)
+  while (%i) {
+    var %win $window(@DLF.*,%i)
+    if ($window(%win).cid == $cid) {
+      if (($event == close) && ($gettok(%win,-1,$asc(.)) == $network)) close -@ %win
+      elseif (($event == connect) && ($gettok(%win,-1,$asc(.)) != $network)) close -@ %win
+    }
+    dec %i
+  }
 }
 
 alias -l DLF.Event.JustConnected {
@@ -902,7 +917,10 @@ alias -l DLF.Chan.IsCmd {
     if ($left($1,7) == @search) return $true
     if ($left($1,5) == @find) return $true
     ; Missed @
-    if ($left($1,4) == find) return $true
+    if ($1 == find) return $true
+    ; @ space find/search
+    if (($1 == @) && ($2 == find)) return $true
+    if (($1 == @) && ($left($1,6) == search)) return $true
     ; Mistyped @
     if (($mid($1,2,6) == search) && ($right($1,-1) ison $chan)) return $true
     if ($mid($1,2,4) == find) return $true
