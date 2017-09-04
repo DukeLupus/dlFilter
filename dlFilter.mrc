@@ -371,7 +371,7 @@ on ^*:join:#: {
   if ($1-) %txt = : $1-
   if ($shortjoinsparts) %joins = Joins:
   else %joined = has joined $chan $+ %txt
-  DLF.Event.Join %joins $nick $br($address) %joined
+  DLF.Event.Join %joins $nick $br($address) %joined %txt
 }
 on me:*:join:#: { DLF.Event.MeJoin $1- }
 raw 366:*: { DLF.Event.MeJoinComplete $1- }
@@ -380,7 +380,7 @@ on ^*:part:#: {
   if ($1-) %txt = $br($1-)
   if ($shortjoinsparts) %parts = Parts:
   else %hasleft = has left $chan %txt
-  DLF.Event.Part %parts $nick $br($address) %hasleft
+  DLF.Event.Part %parts $nick $br($address) %hasleft %txt
 }
 on me:*:part:#: { DLF.Event.MePart $1- }
 on ^*:kick:#: {
@@ -4154,6 +4154,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.always #find *
   DLF.hadd chantext.always quit
   DLF.hadd chantext.always exit
+  DLF.hadd chantext.always *- * bytes
   DLF.hadd chantext.always *- *.?? K
   DLF.hadd chantext.always *- *.?? M
   DLF.hadd chantext.always *- *.?? KB
