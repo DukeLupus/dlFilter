@@ -37,9 +37,6 @@ dlFilter uses the following code from other people:
   Immediate TODO
         Test location and filename for oNotice log files
         Test window highlighting (flashing etc.) - define rules.
-        Nick change should also remove adverts already existing for new nick.
-        Nick change should move adverts for renamed nick to correct sort position.
-          (Perhaps by removing and then re-adding.)
         Remove Filter wrap lines options and switch to listbox and add right click functions to generate
           gitreports for false positive filters (with summary of filter settings).
         Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
@@ -1289,9 +1286,11 @@ alias -l DLF.Ops.NickChg {
   while (%i) {
     var %hash $+(DLF.ops.,$gettok(%tables,%i,$asc($space)))
     var %value $hget(%hash,%oldidx)
-    var %unset $hget(%hash,%oldidx).unset
     if (%value) {
-      var %sw $+(-m,$iif(%value == %unset,z),u,%unset)
+      var %unset $hget(%hash,%oldidx).unset
+      var %sw -m
+      if (%value == %unset) var %sw = %sw $+ z
+      if (%unset) var %sw = $+(%sw,u,%unset)
       hadd %sw %hash %newidx %value
       hdel %hash %oldidx
     }
@@ -1906,19 +1905,25 @@ alias -l DLF.Win.MinSelectLine {
 }
 
 alias -l DLF.Win.NickFromTag {
-  var %nick $replace($1,$tab,$null)
+  var %nick $replace($strip($1),$tab,$null)
   if ($left(%nick,1) == $lt) %nick = $right(%nick,-1)
   if ($right(%nick,1) == $gt) %nick = $left(%nick,-1)
   while ($left(%nick,1) isin $prefix) %nick = $right(%nick,-1)
   return %nick
 }
 
-alias -l DLF.Win.TbMsg return {
+alias -l DLF.Win.TbMsg {
   if (%DLF.perconnect) var %per the $network network
   else var %per all networks
   return messages from %per -=- Right-click for options
 }
-alias -l DLF.Win.WinName return $+(@dlF.,$1,.,$iif(%DLF.perconnect,$network,All))
+
+alias -l DLF.Win.WinName {
+  var %net All
+  if (%DLF.perconnect) %net = $network
+  return $+(@dlF.,$1,.,%net)
+}
+
 alias -l DLF.Win.LogName {
   var %lfn $mklogfn($1)
   if (%DLF.perconnect == 0) %lfn = $nopath(%lfn)
@@ -2074,7 +2079,7 @@ menu @dlF.Ads.* {
   dclick: DLF.Ads.GetList $1
   $iif($DLF.Win.IsInvalidSelection,$style(2)) Get list of files from selected servers: DLF.Ads.GetListMulti
   -
-  $iif($DLF.Win.IsInvalidSelection,$style(2)) Report line(s) which shouldn't be considered ads: DLF.Ads.ReportFalseAd
+  $iif($DLF.Win.IsInvalidSelection,$style(2)) Report line(s) which shouldn't be considered ads: DLF.Ads.ReportFalse
   -
   .$iif(%DLF.serverads,Hide,Show) ads window(s): DLF.Options.ToggleShowAds
   Clear: clear
@@ -2085,7 +2090,6 @@ menu @dlF.Ads.* {
 alias -l DLF.Ads.Add {
   if ((%DLF.serverads == 0) && (%DLF.background == 0)) return
   DLF.Watch.Called DLF.Ads.Add
-  var %tb server advertising $DLF.Win.TbMsg
   if (%DLF.perconnect == 1) var %tabs -t20,40
   else var %tabs -t30,55
   var %win $DLF.Win.WinOpen(Ads,-k0nwl %tabs,0,%DLF.serverads,0 %tb)
@@ -2110,53 +2114,78 @@ alias -l DLF.Ads.Add {
     %ad = $reptok(%ad,%tok,$b(%tok),$asc($space))
   }
   %line = $gettok(%line,1,$asc($space)) $tab $+ $gettok(%line,2,$asc($space)) $tab $+ %ad
-  var %srch $replace($gettok($strip(%line),1-7,$asc($space)),$tab,$null)
-  %srch = $puttok(%srch,$DLF.Win.NickFromTag($gettok(%srch,2,$asc($space))),2,$asc($space))
-  var %ln $line(%win,0) + 1
   var %nc $chan
   if (%DLF.perconnect == 0) %nc = $+($network,$chan)
-  var %match $+([,%nc,]*,$tag(* $+ $DLF.Chan.MsgNick($chan,$nick)),*)
-  var %i $fline(%win,%match,0)
-  if (%i == 0) {
-    %match = $+([,$iif(%DLF.perconnect == 0,$network),$chan,]*)
-    %i = $fline(%win,%match,0)
+  DLF.Ads.AddLine %win %nc $nick %line
+}
+
+; DLF.Ads.AddLine win netchan nick line
+alias -l DLF.Ads.AddLine {
+  if ($fline($1,$4-,0) > 0) {
+    DLF.Watch.Log Advert: Identical to existing
+    ;return
   }
+  var %srch $DLF.Ads.SearchText($4-)
+  var %match $+([,$2,]*,$tag(* $+ $3),*)
+  var %i $fline($1,%match,0)
+  if (%i == 0) {
+    %match = $+([,$2,]*)
+    %i = $fline($1,%match,0)
+}
   if (%i == 0) {
     %match = [*]*
-    %i = $fline(%win,%match,0)
+    %i = $fline($1,%match,0)
   }
+  var %ln $line($1,0) + 1
   while (%i) {
-    var %ln $fline(%win,%match,%i)
-    var %l $gettok($strip($replace($line(%win,%ln),$tab,$null)),1-7,$asc($space))
-    %l = $puttok(%l,$DLF.Win.NickFromTag($gettok(%l,2,$asc($space))),2,$asc($space))
-    if (%l == %srch) {
-      if ($gettok(%line,3-,$asc($space)) != $gettok($line(%win,%ln),3-,$asc($space))) {
-        var %state
-        if ($line(%win,%ln).state) %state = -a
-        rline %state 3 %win %ln %line
+    var %ln $fline($1,%match,%i)
+    var %l $line($1,%ln)
+    var %s $DLF.Ads.SearchText(%l)
+  DLF.Watch.Log AddLine Try: %ln %s Srch %srch
+    if (%s == %srch) {
+      if (%line != %l) {
+        var %selected
+        if ($line(%win,%ln).state) %selected = -a
+        rline %selected 3 $1 %ln $4-
+        DLF.Watch.Log Advert: Replaced
       }
-      DLF.Watch.Log Advert: $nick replaced
+      else DLF.Watch.Log Advert: Not replaced
       break
     }
-    elseif (%l < %srch) {
+    elseif (%s < %srch) {
       inc %ln
-      iline 3 %win %ln %line
-      DLF.Watch.Log Advert: $nick inserted
+      iline 3 $1 %ln $4-
+      DLF.Watch.Log Advert: Inserted
       break
     }
     dec %i
   }
   if (%i == 0) {
-    iline 3 %win %ln %line
+    iline 3 $1 %ln $4-
     DLF.Watch.Log Advert: $nick prepended
   }
-  window -b %win
-  var %ads $line(%win,0) - 5
-  titleBar %win -=- %ads %tb
+  window -b $1
+  var %ads $line($1,0) - 5
+  var %tb server advertising $DLF.Win.TbMsg
+  titleBar $1 -=- %ads %tb
 }
 
-alias -l DLF.Ads.ReportFalseAd {
-  DLF.Watch.Called DLF.Ads.ReportFalseAd
+alias -l DLF.Ads.SearchText {
+  var %s = $strip($1-)
+  while ($wildtok(%s,!*,0,$asc($space))) {
+    var %tok $wildtok(%s,!*,1,$asc($space))
+    %s = $remtok(%s,%tok,0,$asc($space))
+  }
+  while ($wildtok(%s,@*,0,$asc($space))) {
+    var %tok $wildtok(%s,@*,1,$asc($space))
+    %s = $remtok(%s,%tok,0,$asc($space))
+  }
+  %s = $replace($gettok(%s,1-7,$asc($space)),$tab,$null)
+  return $puttok(%s,$DLF.Win.NickFromTag($gettok(%s,2,$asc($space))),2,$asc($space))
+}
+
+alias -l DLF.Ads.ReportFalse {
+  DLF.Watch.Called DLF.Ads.ReportFalse
   var %min $DLF.Win.MinSelectLine
   var %n = $sline($active,0), %i 1, %body
   while (%i <= %n) {
@@ -2227,27 +2256,42 @@ alias -l DLF.Ads.GetList {
   }
 }
 
+alias -l DLF.Ads.NickChgMatch {
+  var %m $+([,$network,*]*<*,$1,>*)
+  if (%DLF.perconnect) %m = $+([*]*<*,$1,>*)
+  return %m
+}
+
 alias -l DLF.Ads.NickChg {
-  DLF.Watch.Called DLF.Ads.NickChg
   var %win $DLF.Win.WinName(Ads)
   if (!$window(%win)) return
-  var %match $+([,$iif(%DLF.perconnect == 0,$network),*]*<*,$nick,>*)
+  DLF.Watch.Called DLF.Ads.NickChg
+  ; Delete any existing lines for $newnick
+  var %match $DLF.Ads.NickChgMatch($newnick)
+  while (%i) {
+    var %ln $fline(%win,%match,%i)
+    dec %i
+    var %l $line(%win,%ln)
+    if ($DLF.Win.NickFromTag($gettok(%l,2,$asc($space))) == $nick) dline %win %ln
+  }
+  var %match $DLF.Ads.NickChgMatch($nick)
   var %i = $fline(%win,%match,0), %nl $len($network)
   while (%i) {
-    var %l $strip($fline(%win,%match,%i).text)
-    var %nick $DLF.Win.NickFromTag($gettok(%l,2,$asc($space)))
-    if (%nick != $nick) {
-      dec %i
-      continue
-    }
-    var %netchan $left($right($gettok(%l,1,$asc($space)),-1),-1)
-    if ((%DLF.perconnect == 1) || (($left(%nc,%nl) == $network) && ($left($right(%nc,- $+ %nl),1) isin $chantypes))) {
-      var %ln $fline(%win,%match,%i)
-      var %l $line(%win,%ln)
-      DLF.Watch.Log Renaming Ad line $nick -> $newnick : %l
-      rline 3 %win %ln $puttok(%l,$replace($gettok(%l,2,$asc($space)),$nick,$newnick),2,$asc($space))
-    }
+    var %ln $fline(%win,%match,%i)
     dec %i
+    var %l $line(%win,%ln)
+    if ($DLF.Win.NickFromTag($gettok(%l,2,$asc($space))) != $nick) continue
+    var %nc $left($right($gettok(%l,1,$asc($space)),-1),-1)
+    var %chan %nc
+    if (%DLF.perconnect == 0) %chan = $right(%nc,- $+ %nl)
+    if ((%DLF.perconnect == 1) || (($left(%nc,%nl) == $network) && ($left(%chan,1) isin $chantypes))) {
+      var %l $line(%win,%ln)
+      %l = $puttok(%l,$tab $+ $tag($DLF.Chan.MsgNick(%chan,$newnick)),2,$asc($space))
+      DLF.Watch.Log Renaming Ad line $nick -> $newnick : %l
+      ; Delete and re-add to ensure in the correct sort order
+      dline %win %ln
+      DLF.Ads.AddLine %win %nc $newnick %l
+    }
   }
 }
 
@@ -2256,8 +2300,12 @@ alias -l DLF.Ads.ColourLines {
   DLF.Watch.Called DLF.Ads.ColourLines $1-
   var %win $DLF.Win.WinName(Ads)
   if (!$window(%win)) return
-  if (($1 == quit) || ($1 == disconnect)) var %match $+([,$iif(%DLF.perconnect == 0,$network),*]*)
-  else var %match $+([,$iif(%DLF.perconnect == 0,$network),$3,]*)
+  var %match $+([,$network,$3,]*)
+  if (%DLF.perconnect) %match = $+([,$3,]*)
+  if (($1 == quit) || ($1 == disconnect)) {
+    var %match $+([,$network,*]*)
+    if (%DLF.perconnect) %match = [*]*
+  }
   if ($2 != $me) %match = $+(%match,<*,$2,>*)
   var %i $fline(%win,%match,0)
   var %ln - $+ $len($network)
@@ -2754,7 +2802,9 @@ alias -l DLF.oNotice.Open {
   }
   DLF.Watch.Called DLF.oNotice.Open
   DLF.oNotice.Log Session %win $me ----- Session started -----
-  window $+(-el12mS,$iif($1 == 0,n)) %win
+  var %flags -el12mS
+  if ($1 == 0) %flags = -el12mSn
+  window %flags %win
   var %log $DLF.oNotice.LogFile(%chan)
   if ((%DLF.win-onotice.log == 1) && ($isfile(%log))) .loadbuf $windowbuffer -rpi %win %log
   titlebar %win -=- Chat window for ops in $chan on $network
@@ -4115,8 +4165,8 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.always ---*MB*s*
   DLF.hadd chantext.always 2find *
   DLF.hadd chantext.always Sign in to turn on 1-Click ordering.
-  DLF.hadd chantext.always * ::INFO:: *.*KB
-  DLF.hadd chantext.always * ::INFO:: *.*MB
+  DLF.hadd chantext.always *::INFO:: *.*KB
+  DLF.hadd chantext.always *::INFO:: *.*MB
   DLF.hadd chantext.always <*> *
   inc %matches $hget(DLF.chantext.always,0).item
 
