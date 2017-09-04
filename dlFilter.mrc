@@ -2141,7 +2141,6 @@ alias -l DLF.Ads.AddLine {
     var %ln $fline($1,%match,%i)
     var %l $line($1,%ln)
     var %s $DLF.Ads.SearchText(%l)
-  DLF.Watch.Log AddLine Try: %ln %s Srch %srch
     if (%s == %srch) {
       if (%line != %l) {
         var %selected
