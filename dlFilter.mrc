@@ -4009,10 +4009,10 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads @ --*
   DLF.hadd chantext.ads @ Use @*
   DLF.hadd chantext.ads *QNet Advanced DCC File Server*Sharing *B of stuff!*
-  DLF.hadd chantext.ads *Has The Best Servers*We have * Servers Sharing * Files*
   inc %matches $hget(DLF.chantext.ads,0).item
 
   if ($hget(DLF.chantext.spam)) hfree DLF.chantext.spam
+  DLF.hadd chantext.spam *Has The Best Servers*We have * Servers Sharing * Files*
   DLF.hadd chantext.spam *§ÐfíñÐ âÐÐ-øñ§*
   DLF.hadd chantext.spam *« Ë×Çü®§îöñ »*
   DLF.hadd chantext.spam *away*since*pager*
