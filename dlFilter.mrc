@@ -9,17 +9,23 @@ This script filters out the crud, leaving only the useful messages displayed in 
 
 • For file sharing channels, filter other peoples messages, server adverts and spam
 • Collect @find results from file sharing channels into a custom window
-• Limit DCC Sends from other users, but automatically accept files you have explicitly requested
+• Protect your computer from DCC Sends from other users, except those you have explicitly requested - and these should be accepted automatically
 • Limit private messages of all types from other users
 • If you are a channel op, provide a separate chat window for operators
 
-This version is a significant upgrade from the previous major release 1.16 with significant new functionality. Feedback is appreciated.
+This version is a significant upgrade from the previous major release 1.16 with significant new functionality. which we hope will encourage strong take-up.
 
-It is our future intent to merge this script with sbClient to create sbFilter as functionality is synergistic.
+Feedback on this new version is appreciated. dlFilter is now also an Open Source project, hosted on Github, and we welcome contributions of bug fixes and further improvement from the community.
 
 To load: use /load -rs dlFilter.mrc
 
 Note that dlFilter loads itself automatically as a first script (or second if you are also running sbClient). This avoids problems where other scripts halt events preventing this scripts events from running.
+
+Roadmap
+=======
+• Improve the ability of users to report issues (e.g. channel messages handled incorrectly) directly from dlFilter popup menus via GitReports.
+• Option to filter trivia-games channel messages.
+• Integrate sbClient functionality and rename to sbFilter.
 
 Acknowledgements
 ================
@@ -728,8 +734,13 @@ alias -l DLF.Chan.AddRemove {
 
 alias -l DLF.Chan.Add {
   DLF.Watch.Called DLF.Chan.Add $1-
-  if ($1) var %netchan $+($2,$1)
-  else var %netchan $+($network,$chan)
+  if ($1) var %nc $+($2,$1), %chan $1
+  else var %nc $+($network,$chan), %chan $chan
+  if ($DLF.Chan.IsDlfChan(%chan),$false) {
+    DLF.Watch.Log AddChan: %chan already filtered.
+    return
+  }
+  if ($chan(%chan)) echo 4 -t %chan $c(1,4,Channel %chan added to dlFilter list)
   %DLF.netchans = $remtok(%DLF.netchans,$chan,0,$asc($comma))
   if (%DLF.netchans != $hashtag) DLF.Chan.Set $addtok(%DLF.netchans,%netchan,$asc($comma))
   else DLF.Chan.Set %netchan
@@ -737,11 +748,13 @@ alias -l DLF.Chan.Add {
 
 alias -l DLF.Chan.Remove {
   DLF.Watch.Called DLF.Chan.Remove $1-
-  if ($0 >= 2) var %net $2
-  else var %net $network
-  if ($0 >= 1) var %chan $1
-  else var %chan $chan
-  var %netchan $+(%net,%chan)
+  if ($1) var %nc $+($2,$1), %chan $1
+  else var %nc $+($network,$chan), %chan $chan
+  if (!$DLF.Chan.IsDlfChan(%chan),$false) {
+    DLF.Watch.Log RemoveChan: %chan already not filtered.
+    return
+  }
+  if ($chan(%chan)) echo 4 -t %chan $c(1,4,Channel %chan removed from dlFilter list)
   if ($istok(%DLF.netchans,%netchan,$asc($comma))) DLF.Chan.Set $remtok(%DLF.netchans,$+(%net,%chan),0,$asc($comma))
   else DLF.Chan.Set $remtok(%DLF.netchans,%chan,0,$asc($comma))
 }
@@ -2018,24 +2031,24 @@ alias -l DLF.Win.Echo {
     var %i $comchan($3,0)
     if ((%i == 0) || ($3 == $me)) {
       if (($window($active).type !isin custom listbox) && ((($DLF.IsServiceUser($3)) && (!$DLF.Event.JustConnected)) || ($3 == $me))) {
-        echo -ac %col %dol2 %line
+        echo -atc %col %pref %line
         DLF.Watch.Log Echoed: To active window $active
       }
       elseif (($usesinglemsg == 0) || ($DLF.IsServiceUser($3))) {
-        if ($2 == Private) %dol2 = $null
-        echo -stc %col %dol2 %line
+        if ($2 == Private) %pref = $null
+        echo -stc %col %pref %line
         DLF.Watch.Log Echoed: To status window
       }
       else {
-        if ($2 == Private) %dol2 = $null
-        echo -dtc %col %dol %line
+        if ($2 == Private) %pref = $null
+        echo -dtc %col %pref %line
         DLF.Watch.Log Echoed: To single message window
       }
       return
     }
     while (%i) {
       var %chan $comchan($3,%i)
-      echo -tc %col %chan %dol2 %line
+      echo -tc %col %chan %pref %line
       %sent = $addtok(%sent,%chan,$asc($comma))
       dec %i
     }
@@ -2142,9 +2155,9 @@ alias -l DLF.Ads.AddLine {
     var %l $line($1,%ln)
     var %s $DLF.Ads.SearchText(%l)
     if (%s == %srch) {
-      if (%line != %l) {
+      if ($4- != %l) {
         var %selected
-        if ($line(%win,%ln).state) %selected = -a
+        if ($line($1,%ln).state) %selected = -a
         rline %selected 3 $1 %ln $4-
         DLF.Watch.Log Advert: Replaced
       }
@@ -2194,11 +2207,14 @@ alias -l DLF.Ads.ReportFalse {
     var %line $strip($line($active,%ln))
     if (%DLF.perconnect == 1) $&
       %line = $puttok(%line,$+([,$network,$right($left($gettok(%line,1,$asc($space)),-1),-1),]),1,$asc($space))
-    var %body %body $+ $urlencode($+($crlf,$crlf,```,%line,```))
-    if ($len(%body) > 1900) return $input(Too many lines selected. $+ $crlf $+ Please select fewer lines and retry.,o,Too many lines)
+     var %len $len(%body) + $len(%line)
+    if (%len > 4000) break
+    %body = $+(%body,$crlf,$crlf,```,%line,```))
   }
-  %body = $right(%body,-12)
-  url -a https://gitreports.com/issue/DukeLupus/dlFilter/?issue_title=False%20Positive%20Ads&details= $+ %body
+  var %url $DLF.GitReports(False Positive Ads,$right(%body,-4))
+
+  if (!%url) DLF.Alert Too many lines selected. $+ $crlf $+ You have selected too many lines. Please select fewer lines and try again.
+  url -an %url
 }
 
 alias -l DLF.Ads.GetListMulti {
@@ -2230,7 +2246,7 @@ alias -l DLF.Ads.GetList {
           var %c $right(%chan,- $+ %ln)
           if ($left(%c,1) isin $chantypes) {
             if ($me ison %c)) {
-              DLF.Chan.EditSend %chan %trig
+              DLF.Chan.EditSend %c %trig
               scon -r
               return
             }
@@ -2242,16 +2258,16 @@ alias -l DLF.Ads.GetList {
       }
       scon -r
       if (%notnet) {
-        if (%notchan) return $input(The server list cannot be retrieved because, whilst you are connected to %notnet you are no longer on %notchan $+ .,o,Not on %notnet $+ %notchan)
-        else return $input(The server list cannot be retrieved because, whilst you have a server window open for %notnet you are no longer connected to a server.,o,Not on %notnet)
+        if (%notchan) DLF.Alert Not on channel %notchan $cr $+ The server list cannot be retrieved. Whilst you are connected to %notnet you are no longer on channel %notchan $+ .
+        else DLF.Alert Not connected to %notnet $+ The server list cannot be retrieved. Whilst you have a server window open for %notnet you are disconnected.
       }
-      else return $input(The server list cannot be retrieved because you are no longer connected to %notnet $+ .,o,Not on %notnet)
+      else DLF.Alert Not connected to %notnet $cr $+ The server list cannot be retrieved. You are no longer connected to %notnet $+ .
     }
     ; Use editbox not msg so other scripts (like sbClient) get On Input event
-    elseif (%net != $network) return $input(The server list cannot be retrieved from %net because this window is now set to $network $+ .,o,Not on %net)
+    elseif (%net != $network) DLF.Alert Not connected to $network $ $cr $+ The server list cannot be retrieved from %net because this window is connected to $network instead.
     elseif (%nick ison %chan) DLF.Chan.EditSend %chan %trig
-    elseif ($server) return $input(The server list cannot be retrieved because you are no longer on %chan $+ .,o,Not on %chan)
-    else return $input(The server list cannot be retrieved because you are no longer connected to a %net server.,o,Not on %net)
+    elseif ($server) DLF.Alert Not on channel %chan $cr $+ The server list cannot be retrieved because you are no longer on %chan $+ .
+    else DLF.Alert Not connected to $network $+ The server list cannot be retrieved. Whilst you have a server window open for $network you are disconnected.
   }
 }
 
@@ -4438,6 +4454,56 @@ alias -l DLF.Error {
   DLF.StatusAll $c(4,$b(Error:)) $1-
   halt
 }
+alias -l DLF.Alert {
+  var %txt $replace($1-,$crlf,$cr,$lf,$cr), %title %txt
+  if ($cr isin %txt) {
+    %title = $gettok(%txt,1,$asc($cr))
+    %txt = $gettok(%txt,2-,$asc($cr))
+  }
+  DLF.Watch.Log Alert: %title
+  halt $input($replace(%txt,$cr,$crlf),ow,$replace(%title,$cr,$crlf))
+}
+
+; $DLF.GitReportsAlert(alert,title,details)
+; Returns $false if resulting URL is too long
+alias DLF.GitReportsAlert {
+  if ($0 < 2) DLF.Alert $1
+  var %txt $replace($1,$crlf,$cr,$lf,$cr), %title %txt
+  if ($cr isin %txt) {
+    %title = $gettok(%txt,1,$asc($cr))
+    %txt = $gettok(%txt,2-,$asc($cr))
+  }
+  DLF.Watch.Log GitReportsAlert: %title
+  var %url $DLF.GitReports($2,$3), %type oq
+  if (%url) %type = yq
+  var %yn $input($replace(%txt,$cr,$crlf),%type,$replace(%title,$cr,$crlf))
+  if (%yn) {
+    if (%url) {
+      url -an %url
+      DLF.Watch.Log GitReportsAlert: URL loaded: %url
+    }
+    else DLF.Alert Unable to launch GitReports in your browser window.
+  }
+  halt
+}
+
+; $DLF.GitReports(title,details)
+; Returns $false if resulting URL is too long
+alias -l DLF.GitReports {
+  if ($0 < 1) return $false
+  var %url https://gitreports.com/issue/DukeLupus/dlFilter/?
+  if ($1 != $null) %url = $+(%url,issue_title=,$urlencode($1))
+  if ($2 != $null) %url = $+(%url,&details=,$urlencode($2))
+  if ($len(%url) <= 2048) return %url
+  echo -s GitReports: URL too long $len(%url)
+  DLF.Watch.Log GitReports: URL too long $len(%url)
+  return $false
+
+  :error
+  DLF.Watch.Log GitReports: Error: $error
+  reseterror
+  return $false
+}
 
 ; ========== Utility functions ==========
 alias DLF.Run {
@@ -4579,16 +4645,20 @@ alias -l max {
 }
 
 alias -l urlencode {
-  var %t $1
-  var %reserved $+($cr,$lf,$tab,$space,!#$&'()*+,$comma,/:;=?@[]%)
-  var %i $len(%reserved)
-  while (%i) {
-    var %c $mid(%reserved,%i,1)
-    var %r $base($asc(%c),10,16,2)
-    %t = $replacex(%t,%c,$+(%,%r))
-    dec %i
+  ; replace $cr $lf $tab $space $comma !#$&'()*+/:;=?@[]`%
+  var %s $replacex($1-,$chr(37),$null,$chr(96),$null,$chr(93),$null,$chr(91),$null,$chr(64),$null,$chr(63),$null,$chr(61),$null,$chr(59),$null,$chr(58),$null,$chr(47),$null,$chr(44),$null,$chr(43),$null,$chr(42),$null,$chr(41),$null,$chr(40),$null,$chr(39),$null,$chr(38),$null,$chr(36),$null,$chr(35),$null,$chr(33),$null,$chr(32),$null,$chr(9),$null,$chr(10),$null,$chr(13),$null,$chr(37),$null,$chr(96),$null,$chr(93),$null,$chr(91),$null,$chr(64),$null,$chr(63),$null,$chr(61),$null,$chr(59),$null,$chr(58),$null,$chr(47),$null,$chr(44),$null,$chr(43),$null,$chr(42),$null,$chr(41),$null,$chr(40),$null,$chr(39),$null,$chr(38),$null,$chr(36),$null,$chr(35),$null,$chr(33),$null,$chr(32),$null,$chr(9),$null,$chr(10),$null,$chr(13),$null)
+  var %l $len($1-) - $len(%s)
+  %l = %l * 3
+  %l = %l + $len(%s)
+  if (%l > 4146) {
+    echo 2 -s * $ $+ urlencode: encoded string will exceed mIRC limit of 4146 characters
+    halt
   }
-  return %t
+  return $replacex($1-,$chr(37),$+(%,25),$chr(96),$+(%,60),$chr(93),$+(%,5D),$chr(91),$+(%,5B),$chr(64),$+(%,40),$chr(63),$+(%,3F),$chr(61),$+(%,3D),$chr(59),$+(%,3B),$chr(58),$+(%,3A),$chr(47),$+(%,2F),$chr(44),$+(%,2C),$chr(43),$+(%,2B),$chr(42),$+(%,2A),$chr(41),$+(%,29),$chr(40),$+(%,28),$chr(39),$+(%,27),$chr(38),$+(%,26),$chr(36),$+(%,24),$chr(35),$+(%,23),$chr(33),$+(%,21),$chr(32),$+(%,20),$chr(9),$+(%,09),$chr(10),$+(%,0A),$chr(13),$+(%,0D),$chr(37),$+(%,25),$chr(96),$+(%,60),$chr(93),$+(%,5D),$chr(91),$+(%,5B),$chr(64),$+(%,40),$chr(63),$+(%,3F),$chr(61),$+(%,3D),$chr(59),$+(%,3B),$chr(58),$+(%,3A),$chr(47),$+(%,2F),$chr(44),$+(%,2C),$chr(43),$+(%,2B),$chr(42),$+(%,2A),$chr(41),$+(%,29),$chr(40),$+(%,28),$chr(39),$+(%,27),$chr(38),$+(%,26),$chr(36),$+(%,24),$chr(35),$+(%,23),$chr(33),$+(%,21),$chr(32),$+(%,20),$chr(9),$+(%,09),$chr(10),$+(%,0A),$chr(13),$+(%,0D))
+
+  :error
+  echo 2 -s * $ $+ urlencode: $error
+  halt
 }
 
 ; Generate and run an identifier call from identifier name, parameters and property
@@ -4602,7 +4672,7 @@ alias -l func {
   }
   if (%p != $null) {
     %p = $+($,$1,$lbr,%p,$rbr)
-    if($prop) %p = $+(%p,.,$prop)
+    if ($prop) %p = $+(%p,.,$prop)
   }
   else %p = $ $+ $1
   return $(%p,2)
