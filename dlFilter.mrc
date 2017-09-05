@@ -965,14 +965,14 @@ alias -l DLF.Chan.SetNickColour {
   }
 }
 
-alias DLF.Chan.MsgNick {
+alias -l DLF.Chan.MsgNick {
   var %nick $DLF.Chan.PrefixedNick($1,$2)
   var %colour $DLF.Chan.NickColour($nick($1,$2).pnick)
   if (%colour != $null) %nick = $c(%colour,%nick)
   return %nick
 }
 
-alias DLF.Chan.NickColour {
+alias -l DLF.Chan.NickColour {
   var %cnick $cnick($1)
   if ((%cnick == 0) || ($enablenickcolors == $false)) var %colour $color(Listbox)
   elseif ($cnick(%cnick).method == 2) var %colour $color(Listbox)
@@ -4466,7 +4466,7 @@ alias -l DLF.Alert {
 
 ; $DLF.GitReportsAlert(alert,title,details)
 ; Returns $false if resulting URL is too long
-alias DLF.GitReportsAlert {
+alias -l DLF.GitReportsAlert {
   if ($0 < 2) DLF.Alert $1
   var %txt $replace($1,$crlf,$cr,$lf,$cr), %title %txt
   if ($cr isin %txt) {
@@ -4813,8 +4813,7 @@ alias -l DLF.iSupport.Disconnect {
 
 alias -l DLF.iSupport.Name { return $+(%,DLF.ISUPPORT.,$network) }
 
-alias DLF.iSupport.Supports {
-  DLF.WATCH.LOG DLF.iSupport.Supports
+alias -l DLF.iSupport.Supports {
   var %p [ [ $DLF.iSupport.Name ] ]
   var %m $1 $+ *
   var %i $wildtok(%p,%m,0,$asc($space))
