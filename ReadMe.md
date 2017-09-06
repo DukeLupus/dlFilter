@@ -5,6 +5,9 @@
 Annoyed by advertising messages from the various file serving bots?
 Fed up with endless channel messages by other users searching for and requesting files?
 Are the responses to your own requests getting lost in the crowd?
+Do your channel screens look like this:
+
+![fileserving-channel-screenshot](https://user-images.githubusercontent.com/3001893/30125355-15a8b2d8-9330-11e7-94af-d359b61a2991.png)
 
 dlFilter is a text filtering script for mIRC. It is created with file sharing channels in mind.
 This script filters out the crud, leaving only the useful messages displayed in the channel.
