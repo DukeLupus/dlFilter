@@ -755,7 +755,7 @@ alias -l DLF.Chan.Remove {
     return
   }
   if ($chan(%chan)) echo 4 -t %chan $c(1,4,Channel %chan removed from dlFilter list)
-  if ($istok(%DLF.netchans,%netchan,$asc($comma))) DLF.Chan.Set $remtok(%DLF.netchans,$+(%net,%chan),0,$asc($comma))
+  if ($istok(%DLF.netchans,%nc,$asc($comma))) DLF.Chan.Set $remtok(%DLF.netchans,%nc,0,$asc($comma))
   else DLF.Chan.Set $remtok(%DLF.netchans,%chan,0,$asc($comma))
 }
 
