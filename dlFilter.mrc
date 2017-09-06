@@ -66,6 +66,10 @@ dlFilter uses the following code from other people:
           (And put lifetime / countdown variables only into the hash table.)
         Request and store searchbot triggers to determine @search command validity
 
+  1.19  Enhancements
+
+  1.19  Fixes
+
 */
 
 alias -l DLF.SetVersion {
