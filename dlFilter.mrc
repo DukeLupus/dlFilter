@@ -2280,7 +2280,7 @@ on *:input:@dlF.*Search.*: DLF.Search.Show $target $1-
 alias -l DLF.Search.Show {
   DLF.Watch.Called DLF.Search.Show $1-
   if ($2 == $null) return
-  var %wf $gettok($1,2,$asc(.))
+  var %wf $gettok($1,2,$asc(.)), %ws
   if ($right(%wf,6) != Search) %ws = $+(%wf,Search)
   else {
     %ws = %wf
