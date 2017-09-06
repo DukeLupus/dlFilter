@@ -4465,7 +4465,7 @@ alias -l DLF.Alert {
 
 ; $DLF.GitReportsAlert(alert,title,details)
 ; Returns $false if resulting URL is too long
-alias DLF.GitReportsAlert {
+alias -l DLF.GitReportsAlert {
   if ($0 < 2) DLF.Alert $1
   var %txt $replace($1,$crlf,$cr,$lf,$cr), %title %txt
   if ($cr isin %txt) {
@@ -4643,9 +4643,21 @@ alias -l max {
   return %res
 }
 
-alias urlencode {
+alias -l urlencode {
   ; replace $cr $lf $tab $space $comma !#$&'()*+/:;=?@[]`%
+  var %s $replacex($1-,$chr(37),$null,$chr(96),$null,$chr(93),$null,$chr(91),$null,$chr(64),$null,$chr(63),$null,$chr(61),$null,$chr(59),$null,$chr(58),$null,$chr(47),$null,$chr(44),$null,$chr(43),$null,$chr(42),$null,$chr(41),$null,$chr(40),$null,$chr(39),$null,$chr(38),$null,$chr(36),$null,$chr(35),$null,$chr(33),$null,$chr(32),$null,$chr(9),$null,$chr(10),$null,$chr(13),$null,$chr(37),$null,$chr(96),$null,$chr(93),$null,$chr(91),$null,$chr(64),$null,$chr(63),$null,$chr(61),$null,$chr(59),$null,$chr(58),$null,$chr(47),$null,$chr(44),$null,$chr(43),$null,$chr(42),$null,$chr(41),$null,$chr(40),$null,$chr(39),$null,$chr(38),$null,$chr(36),$null,$chr(35),$null,$chr(33),$null,$chr(32),$null,$chr(9),$null,$chr(10),$null,$chr(13),$null)
+  var %l $len($1-) - $len(%s)
+  %l = %l * 3
+  %l = %l + $len(%s)
+  if (%l > 4146) {
+    echo 2 -s * $ $+ urlencode: encoded string will exceed mIRC limit of 4146 characters
+    halt
+  }
   return $replacex($1-,$chr(37),$+(%,25),$chr(96),$+(%,60),$chr(93),$+(%,5D),$chr(91),$+(%,5B),$chr(64),$+(%,40),$chr(63),$+(%,3F),$chr(61),$+(%,3D),$chr(59),$+(%,3B),$chr(58),$+(%,3A),$chr(47),$+(%,2F),$chr(44),$+(%,2C),$chr(43),$+(%,2B),$chr(42),$+(%,2A),$chr(41),$+(%,29),$chr(40),$+(%,28),$chr(39),$+(%,27),$chr(38),$+(%,26),$chr(36),$+(%,24),$chr(35),$+(%,23),$chr(33),$+(%,21),$chr(32),$+(%,20),$chr(9),$+(%,09),$chr(10),$+(%,0A),$chr(13),$+(%,0D),$chr(37),$+(%,25),$chr(96),$+(%,60),$chr(93),$+(%,5D),$chr(91),$+(%,5B),$chr(64),$+(%,40),$chr(63),$+(%,3F),$chr(61),$+(%,3D),$chr(59),$+(%,3B),$chr(58),$+(%,3A),$chr(47),$+(%,2F),$chr(44),$+(%,2C),$chr(43),$+(%,2B),$chr(42),$+(%,2A),$chr(41),$+(%,29),$chr(40),$+(%,28),$chr(39),$+(%,27),$chr(38),$+(%,26),$chr(36),$+(%,24),$chr(35),$+(%,23),$chr(33),$+(%,21),$chr(32),$+(%,20),$chr(9),$+(%,09),$chr(10),$+(%,0A),$chr(13),$+(%,0D))
+
+  :error
+  echo 2 -s * $ $+ urlencode: $error
+  halt
 }
 
 ; Generate and run an identifier call from identifier name, parameters and property
