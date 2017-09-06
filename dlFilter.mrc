@@ -743,7 +743,7 @@ alias -l DLF.Chan.Add {
   if ($chan(%chan)) echo 4 -t %chan $c(1,4,Channel %chan added to dlFilter list)
   %DLF.netchans = $remtok(%DLF.netchans,$chan,0,$asc($comma))
   if (%DLF.netchans != $hashtag) DLF.Chan.Set $addtok(%DLF.netchans,%netchan,$asc($comma))
-  else DLF.Chan.Set %netchan
+  else DLF.Chan.Set %nc
 }
 
 alias -l DLF.Chan.Remove {
@@ -755,7 +755,7 @@ alias -l DLF.Chan.Remove {
     return
   }
   if ($chan(%chan)) echo 4 -t %chan $c(1,4,Channel %chan removed from dlFilter list)
-  if ($istok(%DLF.netchans,%netchan,$asc($comma))) DLF.Chan.Set $remtok(%DLF.netchans,$+(%net,%chan),0,$asc($comma))
+  if ($istok(%DLF.netchans,%nc,$asc($comma))) DLF.Chan.Set $remtok(%DLF.netchans,%nc,0,$asc($comma))
   else DLF.Chan.Set $remtok(%DLF.netchans,%chan,0,$asc($comma))
 }
 
@@ -1994,8 +1994,8 @@ alias -l DLF.Win.Format {
 alias -l DLF.Win.Echo {
   var %line $DLF.Win.Format($1-)
   var %col $DLF.Win.MsgType($1)
-  var %dol2
-  if ($1 != ctcpreply) %dol2 = $2 $+ :
+  var %pref
+  if ($1 != ctcpreply) %pref = $2 $+ :
   if ($2 == Status) {
     echo -stc %col %line
     DLF.Watch.Log Echoed: To Status Window
@@ -2005,13 +2005,13 @@ alias -l DLF.Win.Echo {
     var %i $numtok(%chans,$asc($space))
     while (%i) {
       var %chan $gettok(%chans,%i,$asc($space))
-      if ($nick(%chan,$3)) echo -tc %col %chan %dol2 %line
+      if ($nick(%chan,$3)) echo -tc %col %chan %pref %line
       else $deltok(%chans,%i,$asc($space))
       dec %i
     }
     if (%chans != $null) DLF.Watch.Log Echoed: To @find channels with $3 $+ : %chans
     else {
-      echo -stc %col %dol2 %line
+      echo -stc %col %pref %line
       DLF.Watch.Log Echoed: To status window
     }
     return
@@ -2207,12 +2207,11 @@ alias -l DLF.Ads.ReportFalse {
     var %line $strip($line($active,%ln))
     if (%DLF.perconnect == 1) $&
       %line = $puttok(%line,$+([,$network,$right($left($gettok(%line,1,$asc($space)),-1),-1),]),1,$asc($space))
-     var %len $len(%body) + $len(%line)
+    var %len $len(%body) + $len(%line)
     if (%len > 4000) break
     %body = $+(%body,$crlf,$crlf,```,%line,```))
   }
   var %url $DLF.GitReports(False Positive Ads,$right(%body,-4))
-
   if (!%url) DLF.Alert Too many lines selected. $+ $crlf $+ You have selected too many lines. Please select fewer lines and try again.
   url -an %url
 }
