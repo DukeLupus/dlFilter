@@ -3244,7 +3244,7 @@ alias -l DLF.Options.Save {
   %DLF.titlebar.stats = $did(DLF.Options.GUI,525).state
   %DLF.colornicks = $did(DLF.Options.GUI,530).state
   %DLF.dccsend.autoaccept = $did(DLF.Options.GUI,540).state
-  %DLF.dccsend.requested = $did(DLF.Options.GUI,550).state
+  %DLF.dccsend.requested = $did(DLF.Options.GUI,545).state
   %DLF.dccsend.dangerous = $did(DLF.Options.GUI,550).state
   %DLF.dccsend.nocomchan = $did(DLF.Options.GUI,555).state
   %DLF.dccsend.untrusted = $did(DLF.Options.GUI,560).state
