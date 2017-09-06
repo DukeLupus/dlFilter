@@ -3208,8 +3208,8 @@ alias -l DLF.Options.Init {
 alias -l DLF.Options.LinkedFields {
   var %state $did(DLF.Options.GUI,$abs($1)).state
   if ($1 < 0) %state = 1 - %state
-  if (%state) var %flags -cb
-  else var %flags -e
+  if (%state) var %flags -e
+  else var %flags -cb
   did %flags DLF.Options.GUI $2
 }
 
