@@ -1,61 +1,83 @@
 # dlFilter Change Log
 
-### 1.17
-* Interim version of significant new functionality
-* Update opening comments and add change log
-* Use custom identifiers for creating bold, colour etc.
-* Use custom identifiers instead of $chr(xx)
-* Use alias for status messages
-* Hash tables for message matching instead of lists of `if` statements.
-(Performance is not believed to be an issue but this should be significantly faster.)
+### Roadmap
+* Report lines which were not filtered when they should be
+* Option to filter trivia-quiz lines
+* Merge in sbClient functionality
+
+### 1.18
+* Support for multi-server connections
+  * Channel names can now be network#channel as well as #channel (any network)
+  * Options for Filter / Ads / Server windows to be per connection rather than shared by all connections
 * Options dialog improvements
-  - Layout
-  - Enable / disable now global
-  - Custom filter Add / Remove button enable / disable
-  - Custom filter list multi-select
-* Menu code cleanup
-* Add generic sockets code
-* Use GitHub for version check
-* Download button to update from GitHub
-* Use script groups to enable / disable DLF event handling
-* Allow msgs from Chanserv etc. and self
-* Cleanup menu code
-* Files now always accepted from Regular users who are in DCC Trust List
-* Allow user to choose whether to delete configuration variables on unload
-* Limit load/start/connect update check to once per 7 days.
-(Options update check still runs every time options dialog is loaded.)
-* All aliases and dialogs local (-l flag)
+  * All dialog option changes now take effect immediately
+  * Subsidiary check-boxes now enable / disable with parent
+  * New Channels tab using list rather than edit box with ability to select from list of joined channels
+  * New Ops tab
+  * New About tab
+  * Channels / custom filters list - double click to edit.
+  * Options dialog only shown automatically On Load if new variable has been defaulted
+* Self-update function
+  * Download button to update from GitHub
+  * Option to update to beta versions
+  * Track minimum mIRC version for web update and not offer update if mirc needs upgrade
+  * dlFilter reinitialised after update.
+  * On download of new version, old version is renamed to .vxxx so user can recover if they have issues with the new version.
+  * Disable rather than unload script if mIRC version is too low
+  * Update check to once per 7 days (once per day for beta versions).
+    (Options update check still runs every time options dialog is loaded.)
+* Extra options
+  * Option to check @find result trigger matches nickname sending them
+  * Option to auto-accept requested files
+  * Option to auto-resend the file request up to 3 times if the send was incomplete.
+  * Option to rename file back to original name if server has changed it (unless mIRC DCC Get Options will run a command on the file).
+  * Option to filter any line containing control codes - filter of last resort
+  * Option to display channel dlF filtering statistics in titlebar
+  * Option to accept private messages from user with a query window open.
+  * Option to filter of channel topics
+* Many code quality improvements - essentially a rewrite.
+* Ads / @find / Server window improvements
+  * Double-click / right-click in @find and Ads windows to download the file
+  * Search functionality in Ads / Server / Filter windows now updates dynamically whilst Search window is open
+  * Lines in @find / Ads windows change colour as user or servers join/part/quit/disconnect.
+  * Added Ctrl-C to copy lines in @find windows
+  * Filter/Ads windows can be open but hidden - available to be displayed already populated when needed
+* Added dlFilter advertising for channel Ops
+* Ability to select and report false positive server ads
+* Improved oNotice functionality
+  * Improved use of ops messaging server functionality
+  * oNotice window nick lists populated correctly as users are opped / deopped / leave
 
 ### 1.16
 * Website change
 
 ### 1.15
-* Fixed two issues with OpsTalk - it still had a bug with logging when mIRC folder had a space in the path 
+* Fixed two issues with OpsTalk - it still had a bug with logging when mIRC folder had a space in the path
 (thanks to zippy1 and SpankyDan for reporting that)
 * Fixed issue with URL's not showing in @#channel window.
 
-### 1.14 
+### 1.14
 * *bonga*, *agnob* and *meep* now auto-added to custom filters (hello EBrarian and waterbaby)
-* Custom filters now enabled by default. 
+* Custom filters now enabled by default.
 * Fixed/updated handling of the socket errors (used in version check routine).
-* Lots of mp3 play messages added to filters - enabled when "..away and thank you messages" filter is enabled. 
+* Lots of mp3 play messages added to filters - enabled when "..away and thank you messages" filter is enabled.
 * Some other minor tweaking.
 
-### 1.12 
+### 1.12
 * Updated links and version checks to point to the new web page
 
 ### 1.11
 Added vPowerServe @find result headers
 
 ## 1.1 Major update
-* You can now log @DLF.Filtered and @DLF.Server messages - select item "Log" in the right-click menu. 
+* You can now log @DLF.Filtered and @DLF.Server messages - select item "Log" in the right-click menu.
 Logging is separate, log files will be in your logs folder with the names dlf.filtered.log and dlf.server.log.
-Note that logging is enabled even after you close respective windows, only way to disable it is to open the window and uncheck menu item. 
-* Fixed several bad errors in on quit routine. 
-* If you filter and send user-related messages (quits, joins, parts, nick changes, kicks) to status window, 
+Note that logging is enabled even after you close respective windows, only way to disable it is to open the window and uncheck menu item.
+* Fixed several bad errors in on quit routine.
+* If you filter and send user-related messages (quits, joins, parts, nick changes, kicks) to status window,
 it no longer highlights status window button.
 * Removed definitions and commented out channel text spam - spamnets using any standard messages note seen for a while
-* As always, more spam definitions. 
+* As always, more spam definitions.
 
 Note: While I didn't add *#*#*#*#*, you might want to add it to custom filters yourself (#chan #chan #chan #chan type spams).
 
@@ -65,8 +87,8 @@ Note: While I didn't add *#*#*#*#*, you might want to add it to custom filters y
 
 ### 1.03
 * Updated spam definitions.
-* Warning when when you get $decode in private message: 
-`[dlFilter] Do not paste any messages containg $decode to your mIRC. They are mIRC worms, people sending them are infected. Report such messages to channel ops.` 
+* Warning when when you get $decode in private message:
+`[dlFilter] Do not paste any messages containg $decode to your mIRC. They are mIRC worms, people sending them are infected. Report such messages to channel ops.`
 * Removed my ctcp DLX thingy.
 
 ### 1.02
@@ -76,7 +98,7 @@ Note: While I didn't add *#*#*#*#*, you might want to add it to custom filters y
 * Switch to two decimal places in version numbers
 * "Send to AutoGet" now works if AG is not in main mIRC folder.
 * Old logs are now loaded to oNotice window if logging is enbled (and old logs exist).
-* Removed some very old spam definitions and added new to get spammers plagueing #bookz and #mp3servers. 
+* Removed some very old spam definitions and added new to get spammers plagueing #bookz and #mp3servers.
 * String will be automatically bracketed by '*' when adding definitions to custom filters
 * Script is now smaller and more compact thanks to ScriptCleaner.
 
@@ -84,15 +106,15 @@ Note: While I didn't add *#*#*#*#*, you might want to add it to custom filters y
 * Spam definitions added to cope with a flood of spammers attacking #mp3servers.
 
 ### 1.008
-* Very minor fixes that I forgot to include into previous public version. 
+* Very minor fixes that I forgot to include into previous public version.
 * Updated some filter definitions again.
 
 ### 1.005
 * Just updated definitions, mostly spam - lots of it lately.
 
 ### 1.004
-* When filtering away/thank you messages, RAW 301 is now also filtered. 
-* Improved "junk" removal from filename when copying to clipboard (experimental). 
+* When filtering away/thank you messages, RAW 301 is now also filtered.
+* Improved "junk" removal from filename when copying to clipboard (experimental).
 * Added lots of spam messages and ads to definitons.
 * Added ertl's second "new release" message, improved new release capturing somewhat.
 
@@ -165,34 +187,34 @@ and you started another mIRC from another installation and loaded DLFilter.
 * Some spam filter definitions added.
 
 ### 0.976
-* DLFilter will no longer block queries (/msg) from users with whom you don't have common channel if you typed first line to that window. 
+* DLFilter will no longer block queries (/msg) from users with whom you don't have common channel if you typed first line to that window.
 * Added "FOR MATRIX 2 DOWNLOAD..." worm to spam definitions.
 
 ### 0.975
-* Fixed minor bug in displaying kicks in status window. 
-* At the reqest of TipiTunes added special private spam catcher (in style "*www*xxx*" first line of private message). 
+* Fixed minor bug in displaying kicks in status window.
+* At the reqest of TipiTunes added special private spam catcher (in style "*www*xxx*" first line of private message).
 * Few more filter definitions.
 
 ### 0.974
-* Moved 100+ private notice events to one event and made relevant changes. 
-* Added new sub-option: "block only potentially dangerous filetypes" to "Do not accept files from regular users". 
+* Moved 100+ private notice events to one event and made relevant changes.
+* Added new sub-option: "block only potentially dangerous filetypes" to "Do not accept files from regular users".
 * Few mode definitions added.
 
 ### 0.973
 * Updated some filter definitions.
-* @find results headers from SoftServe script weren't filtered, same for S343. 
+* @find results headers from SoftServe script weren't filtered, same for S343.
 * Some away messages added.
 
-### 0.972 
+### 0.972
 * Added version check to on connect event.
-* Unloading script now closes all open DLFilter windows. 
-* Only those nicks that are in default nicklist color are now colored when detected to be fileservers. 
+* Unloading script now closes all open DLFilter windows.
+* Only those nicks that are in default nicklist color are now colored when detected to be fileservers.
 * Fixed @find results grouping.
 * "Requests in private" now responds to !nick-que etc commands.
 
 ### 0.970 & 0.971
-* Automatic version check - thanks to TipiTunes. 
-* Added web page & direct download buttons and "..but accept DCC chats" option. 
+* Automatic version check - thanks to TipiTunes.
+* Added web page & direct download buttons and "..but accept DCC chats" option.
 * Added private `on text` event to capture some multiline spams.
 
 ### 0.967
@@ -200,34 +222,34 @@ and you started another mIRC from another installation and loaded DLFilter.
 
 ### 0.966
 * Changed private text event to on open event (got the idea from TipiTunes' antispam script).
-That way spam, private request and @find results are captured even before respective query windows open. Neat! 
+That way spam, private request and @find results are captured even before respective query windows open. Neat!
 * Minor changes in other events.
 
 ### 0.964
-* Better "new release" capturing. 
+* Better "new release" capturing.
 * Improved/changed channel menu - now shows only "Add current channel" or "Remove current channel" instead of showing both items.
-* If channels are set to all, "Set to all channels" item in channel menu is disabled and checked. 
-* More filter definitions. 
+* If channels are set to all, "Set to all channels" item in channel menu is disabled and checked.
+* More filter definitions.
 
 ### 0.961
-* Fixed small bug in DoCheckComChan alias. 
+* Fixed small bug in DoCheckComChan alias.
 * Too much DCC chat windows were closed.
 
 ### 0.960
 * Included my oNotice script
-* Some changes in the way how some events are handled and GUI. 
+* Some changes in the way how some events are handled and GUI.
 * More filter definitions.
 
 ### 0.955
-* Changed GUI a bit, added links to website & direct download. 
-* #find mistake is now filtered correctly. 
-* Added option for coloring nicks of detected servers (works only if filtering of channel ads is enabled, overrides current nick color). 
+* Changed GUI a bit, added links to website & direct download.
+* #find mistake is now filtered correctly.
+* Added option for coloring nicks of detected servers (works only if filtering of channel ads is enabled, overrides current nick color).
 * User related messages in the status window are now shown in user's default colour for respective events.
 
 ### 0.952 & 0.953
 * Made version check for vPowerGet.dll
-* "Copy line(s)" item in @find.results window right-click menu 
-now removes unneeded stuff (such as filesize & bitrate) 
-from filename when copying (may not be 100% foolproof). 
-* Options dialog now shows script version in titlebar. 
+* "Copy line(s)" item in @find.results window right-click menu
+now removes unneeded stuff (such as filesize & bitrate)
+from filename when copying (may not be 100% foolproof).
+* Options dialog now shows script version in titlebar.
 * Additional spam & other filter definitions.
