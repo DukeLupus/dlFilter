@@ -232,6 +232,8 @@ menu channel {
   $iif((%DLF.win-onotice.enabled) && ($me isop $chan),Open oNotice chat window) : DLF.oNotice.Open
   -
   dlFilter
+  .$iif(!$DLF.Chan.IsDlfChan($chan),$style(2)) Report a line which should have been filtered: DLF.Chan.ReportUnfiltered
+  .-
   .$iif($DLF.Chan.IsDlfChan($chan,$false),Remove this channel from,Add this channel to) filtering: DLF.Chan.AddRemove
   .Filter all channels currently joined on $network : DLF.Chan.AddJoinedNetwork
   .$iif($scon(0) > 1,Filter all currently joined channels) : DLF.Chan.AddJoinedAll
@@ -1052,6 +1054,84 @@ alias -l DLF.Trivia.Answer {
     DLF.Watch.Log Trivia: Answer $qt($1-) does not match any masks
     dec %i
   }
+}
+
+alias DLF.Chan.ReportUnfiltered {
+  ; Pop up an input box with instructions to C&P the full line including the <nick>
+  ; Identify msgtype from style (of nickname and whether prefixed with Private etc.
+  ; If message not filtered because option turned off advise user to turn on the option.
+  ; Otherwise launch GitReports with message and filter settings
+  DLF.Watch.Called DLF.Chan.ReportFalse
+  var %msg = Please paste the complete line that should have been filtered into the input box and click OK. $+ $crlf $+ $crlf $+ Incomplete lines cannot be processed, so please ensure that you have copied the whole line. $+ $crlf $+ $crlf $+ If you need to, cancel this, select and copy the full line, and then reopen this box from the right click menu to paste the line. $+ $crlf $+ $crlf $+ Please do NOT attempt to retype the line as any hidden control characters may be important. $+ $crlf $+ $crlf $+ NOTE: Your report can be made anonymously if you wish, but it will include network and the channel names.
+  var %l = $input(%msg,eq,Paste line that should be filtered)
+  if (%l == $null) return
+  ; Remove timestamp if there is one
+  while ($left(%l,1) isin [:0123456789.]) %l = $right(%l,-1)
+  while ($left($1,1) == $space) %l = $right(%l,-1)
+  var %line %l, %event, %type Chan
+  var %nick $gettok(%l,1,$asc($space))
+  if (%nick isin Private: @Find: ->) {
+    if (%nick == ->) %type = Send
+    else %type = $left(%nick,-1)
+    %l = $deltok(%l,1,$asc($space))
+  }
+  %nick = $gettok(%l,1,$asc($space))
+  %l = $gettok(%l,2-,$asc($space))
+  if (%nick == $gt) {
+    %event = Message
+    %nick = $me
+  }
+  elseif (%nick == *) {
+    %event = Action
+    %l = $deltok(%l,1,$asc($space))
+    %nick = $gettok(%l,1,$asc($space))
+  }
+  elseif ((<*> iswm %nick) $&
+       || (($left(%nick,1) == *) && ($right(%nick,1) == *) && (%type == send))) {
+    %event = Message
+    %nick = $DLF.Win.NickFromTag($left($right(%nick,-1),-1))
+  }
+  elseif (($left(%nick,1) == -) && ($right(%nick,1) == -)) {
+    %event = Notice
+    %nick = $left($right(%nick,-1),-1)
+  }
+  elseif ($left(%nick,1) == [) {
+    %event = ctcp
+    %nick = $right(%nick,-1)
+    if ($right(%nick,1) == ]) %nick = $left(%nick,-1)
+    elseif ($right($gettok(%l,1,$asc($space)),1) == ]) %l = $puttok(%l,$left($gettok(%l,1,$asc($space)),-1),1,$asc($space))
+  }
+  else {
+    var %yn $input(Unable to determine the message type. Please make sure that you have copied and pasted the line correctly. $crlf $crlf $+ Would you like me to open a browser window at GitReports.com so you can still report it?,yq,Unknown message type)
+    if (!%yn) return
+    var %url $DLF.GitReports(Unfiltered line - unknown format,$+(The following line should have been filtered in $network,$chan,$comma,$space,but dlFilter is unable to analyse it:,$crlf,$crlf,```,$left(%line,1000),```))
+    if (!%url) DLF.Alert Unable to launch GitReports $cr $+ The line is too long to be able to automatically launch a browser winow for GitReports.
+    url -an %url
+    return
+  }
+  if (%nick == $me) %type = Send
+  %l = $deltok(%l,1,$asc($space))
+  DLF.Watch.Log Analysing unfiltered message
+  ; Analyse the message to see whether user needs to turn on a filtering option
+  if ((%type == Send) && (%event)) noop $DLF.GitReportsAlert(Message you sent $cr $+ This appears to be a $lower(%event) that you sent. Your own messages cannot be filtered. However if you think it appeared in the wrong window $+ $comma would you like to report it?,Message in incorrect window: $+($network,$chan) $q($left(%line,20)))
+  elseif (%type == Send) DLF.Alert Message you sent? $cr $+ This appears to be something you sent, but I am unable to determine what type of message it was.
+  elseif (%type == Private) {
+    if (%event == Message) {}
+    elseif (%event == Action) {}
+    elseif (%event == Notice) {}
+    elseif (%event == ctcp) {}
+    elseif (%event == ctcpreply) {}
+  }
+  elseif (%type == Chan) {
+    if (%event == Message) {}
+    elseif (%event == Action) {}
+    elseif (%event == Notice) {}
+    elseif (%event == ctcp) {}
+    elseif (%event == ctcpreply) {}
+  }
+  var %url $DLF.GitRepports(Unfiltered line in $network $+ $chan,``` $+ $left(%line,1000) $+ ```)
+  if (%url) url -an %url
+  else DLF.Alert Unable to launch GitReports in your browser window.
 }
 
 ; ========== Private messages ==========
