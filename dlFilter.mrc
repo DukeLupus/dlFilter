@@ -4812,8 +4812,7 @@ alias -l DLF.iSupport.Disconnect {
 
 alias -l DLF.iSupport.Name { return $+(%,DLF.ISUPPORT.,$network) }
 
-alias DLF.iSupport.Supports {
-  DLF.WATCH.LOG DLF.iSupport.Supports
+alias -l DLF.iSupport.Supports {
   var %p [ [ $DLF.iSupport.Name ] ]
   var %m $1 $+ *
   var %i $wildtok(%p,%m,0,$asc($space))
