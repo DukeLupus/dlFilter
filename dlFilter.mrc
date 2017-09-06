@@ -43,8 +43,7 @@ dlFilter uses the following code from other people:
   Immediate TODO
         Test location and filename for oNotice log files
         Test window highlighting (flashing etc.) - define rules.
-        Remove Filter wrap lines options and switch to listbox and add right click functions to generate
-          gitreports for false positive filters (with summary of filter settings).
+        Remove Filter wrap lines options and switch to listbox and add right click functions to generate gitreports for false positive filters (with summary of filter settings).
         Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
 
   Ideas for possible future enhancements
@@ -61,9 +60,6 @@ dlFilter uses the following code from other people:
         Configurable F1 etc. aliases to toggle Options, Ads, Filters, Catch-all by F key or other keys.
           (Use On Keydown to capture and check keystrokes, have a key field for each of the options to toggle.)
         Add right click menu items to @find windows to re-sort list by trigger and filename.
-        For performance load copy of options into a hashtable to make lookup faster.
-          (Means that user manually editing options variables will not be recognised until script saves it to hash.)
-          (And put lifetime / countdown variables only into the hash table.)
         Request and store searchbot triggers to determine @search command validity
 
 */
@@ -646,13 +642,13 @@ alias -l DLF.Chan.Add {
   DLF.Watch.Called DLF.Chan.Add $1-
   if ($1) var %nc $+($2,$1), %chan $1
   else var %nc $+($network,$chan), %chan $chan
-  if ($DLF.Chan.IsDlfChan(%chan),$false) {
+  if ($DLF.Chan.IsDlfChan(%chan,$false)) {
     DLF.Watch.Log AddChan: %chan already filtered.
     return
   }
   if ($chan(%chan)) echo 4 -t %chan $c(1,4,Channel %chan added to dlFilter list)
-  %DLF.netchans = $remtok(%DLF.netchans,$chan,0,$asc($comma))
-  if (%DLF.netchans != $hashtag) DLF.Chan.Set $addtok(%DLF.netchans,%netchan,$asc($comma))
+  %DLF.netchans = $remtok(%DLF.netchans,%chan,0,$asc($comma))
+  if (%DLF.netchans != $hashtag) DLF.Chan.Set $addtok(%DLF.netchans,%nc,$asc($comma))
   else DLF.Chan.Set %nc
 }
 
@@ -1474,11 +1470,11 @@ alias -l DLF.DccSend.FileRcvd {
   ; Some servers change spaces to underscores
   ; But we cannot rename if Options / DCC / Folders / Command is set
   ; because it would run after this using the wrong filename
-  if ((%origfn != $null) && $&
-      (%fn != %origfn) && $&
-      ($DLF.DccSend.IsNotGetCommand(%fn)) && $&
-      ($left(%trig,1) == !) && $&
-      (. isin $gettok(%origfn,-1,$asc($space)))) {
+  if ((%origfn != $null) $&
+   && (%fn != %origfn) $&
+   && ($DLF.DccSend.IsNotGetCommand(%fn)) $&
+   && ($left(%trig,1) == !) $&
+   && (. isin $gettok(%origfn,-1,$asc($space)))) {
     var %oldfn $qt($filename)
     var %newfn $qt($+($noqt($nofile($filename)),%origfn))
     DLF.Watch.Log Renaming %oldfn to %newfn
@@ -2054,7 +2050,7 @@ alias -l DLF.Ads.AddLine {
   if (%i == 0) {
     %match = $+([,$2,]*)
     %i = $fline($1,%match,0)
-}
+  }
   if (%i == 0) {
     %match = [*]*
     %i = $fline($1,%match,0)
