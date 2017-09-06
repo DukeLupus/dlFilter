@@ -5,7 +5,7 @@
 * Option to filter trivia-quiz lines
 * Merge in sbClient functionality
 
-### 1.18
+## 1.18 Major Update
 * Support for multi-server connections
   * Channel names can now be network#channel as well as #channel (any network)
   * Options for Filter / Ads / Server windows to be per connection rather than shared by all connections
