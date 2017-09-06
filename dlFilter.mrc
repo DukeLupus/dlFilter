@@ -680,7 +680,7 @@ alias -l DLF.User.Channel {
   elseif ($me isin $1-) %log = About me
   elseif ($notify($nick)) %log = Notify user
   elseif (($event == kick) && ($notify($knick))) %log = About notify user
-  elseif ((%DLF.filter.regular == 1) && ($DLF.IsRegularUser($nick) == $false)) %log = Filtering only regular users
+  elseif ((%DLF.filter.regular == 0) && (!$DLF.IsRegularUser($nick))) %log = Filtering only regular users
   else DLF.Win.Filter $1-
   DLF.Watch.Log Not filtered: %log
 }
@@ -791,7 +791,7 @@ alias -l DLF.Chan.IsChanEvent {
   if ($DLF.Chan.IsDlfChan($chan) == $false) %log = Not a filtered channel
   elseif ($nick == $me) %log = Me
   elseif ($DLF.Chan.TargetNick($true) == $me) %log = About me
-  elseif (($DLF.IsRegularUser($DLF.Chan.TargetNick)) && (%DLF.filter.regular == 1)) %log = Filtering only regular users
+  elseif ((%DLF.filter.regular == 0) && (!$DLF.IsRegularUser($DLF.Chan.TargetNick))) %log = Filtering only regular users
   else DLF.Stats.Count $chan Total
   if ($1 == 0) %log = Filtering off for $event
   if (%log == $null) return $true
@@ -833,7 +833,7 @@ alias -l DLF.Chan.IsUserEvent {
   var %log
   if ($1 == 0) %log = Filtering off for $event
   elseif ((%DLF.netchans != $hashtag) && (!$DLF.Chan.IsCommonDlfChan(%nick))) %log = $nick not in filtered channel
-  elseif ((!$DLF.IsRegularUser(%nick)) && (%DLF.filter.regular == 1)) %log = Filtering only regular users
+  elseif ((%DLF.filter.regular == 0) && (!$DLF.IsRegularUser(%nick))) %log = Filtering only regular users
   elseif (($notify($nick)) || ($notify($DLF.Chan.TargetNick($true)))) %log = Notify user
   if (%log) {
     DLF.Watch.Log Not filtered: %log
@@ -3013,7 +3013,7 @@ dialog -l DLF.Options.GUI {
   check "Kicks …", 388, 66 161 53 6, tab 3
   check "Away and thank-you messages", 390, 7 170 155 6, tab 3
   check "User mode changes", 395, 7 179 155 6, tab 3
-  check "Filter user events only for regular users", 397, 7 188 155 6, tab 3
+  check "Filter user events for non-regular users", 397, 7 188 155 6, tab 3
   ; Tab Other
   box " Extra functions ", 505, 4 23 160 37, tab 5
   check "Collect @find/@locator results into a single window", 510, 7 32 155 6, tab 5
