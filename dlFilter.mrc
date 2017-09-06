@@ -2952,7 +2952,7 @@ dialog -l DLF.Options.GUI {
   check "… and filter them out", 780, 15 96 147 6, tab 7
   check "Prompt individual existing dlFilter users to upgrade", 790, 7 105 155 6, tab 7
   ; tab Custom
-  check "Enable custom filters", 810, 5 28 100 6, tab 8
+  check "Enable custom filters", 810, 5 27 65 7, tab 8
   text "Message type:", 820, 74 27 50 7, tab 8
   combo 830, 114 25 50 10, tab 8 drop
   edit "", 840, 4 37 160 10, tab 8 autohs
@@ -3527,7 +3527,7 @@ alias -l DLF.Options.RemoveCustom {
   }
   did -b DLF.Options.GUI 860
   DLF.Options.SetCustomType
-  DLF.Options.SetRemoveButton
+  DLF.Options.SetRemoveCustomButton
 }
 
 alias -l DLF.Options.EditCustom {
