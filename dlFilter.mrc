@@ -24,7 +24,6 @@ Note that dlFilter loads itself automatically as a first script (or second if yo
 Roadmap
 =======
 • Improve the ability of users to report issues (e.g. channel messages handled incorrectly) directly from dlFilter popup menus via GitReports.
-• Option to filter trivia-games channel messages.
 • Integrate sbClient functionality and rename to sbFilter.
 
 Acknowledgements
@@ -769,11 +768,27 @@ alias -l DLF.Chan.Text {
   }
 
   DLF.Custom.Filter $1-
+  if ((%DLF.filter.requests == 1) && ($DLF.Chan.IsCmd($1-))) DLF.Win.Filter $1-
   if ($hiswm(chantext.spam,%txt)) DLF.Chan.SpamFilter $1
   if ($hiswm(chantext.always,%txt)) DLF.Win.Filter $1-
   if ($hiswm(chantext.announce,%txt)) DLF.Win.AdsAnnounce $1-
   if ($hiswm(chantext.ads,%txt)) DLF.Win.Ads $1-
-  if ((%DLF.filter.requests == 1) && ($DLF.Chan.IsCmd(%txt))) DLF.Win.Filter $1-
+  if (%txt != $1-) {
+    if ($hiswm(chantext.fileserv,%txt)) DLF.Win.AdsAnnounce $1-
+    if (1st Hint: * iswm %txt) DLF.Trivia.QuestionStart $1-
+    if ($hiswm(chantext.trivia,%txt)) DLF.Trivia.Filter $1-
+    if ($DLF.Trivia.IsTriviaBot) {
+      if (($space !isin %txt) && ($len(%txt) > 10) && ($left($right(%txt,2),1) == ?)) {
+        DLF.Watch.Log Obfuscated trivia question
+        if (%DLF.filter.trivia == 1) DLF.Win.Filter $1-
+      }
+      elseif ($gettok(%txt,-1,$asc($space)) == ?) {
+        DLF.Watch.Log Trivia question
+        if (%DLF.filter.trivia == 1) DLF.Win.Filter $1-
+      }
+    }
+  }
+  elseif (%DLF.filter.trivia == 1) DLF.Trivia.QuestionAnswer $1-
   DLF.Chan.ControlCodes $1-
 }
 
@@ -783,6 +798,7 @@ alias -l DLF.Chan.Action {
   var %txt $DLF.strip($1-)
   if ((%DLF.filter.ads == 1) && ($hiswm(chanaction.spam,%txt))) DLF.Win.Filter $1-
   if ((%DLF.filter.aways == 1) && ($hiswm(chanaction.away,%txt))) DLF.Win.Filter $1-
+  if ((%txt != $1-) && ($hiswm(chanaction.trivia,%txt))) DLF.Win.Filter $1-
   DLF.Chan.ControlCodes $1-
 }
 
@@ -791,6 +807,7 @@ alias -l DLF.Chan.Notice {
   DLF.Custom.Filter $1-
   var %txt $DLF.strip($1-)
   if ($hiswm(channotice.spam,%txt)) DLF.Chan.SpamFilter $1-
+  if ((%txt != $1-) && ($hiswm(channotice.trivia,%txt))) DLF.Win.Filter $1-
   DLF.Chan.ControlCodes $1-
   ; Override mIRC default destination and send to channel rather than active/status windows.
   DLF.Win.Echo $event $chan $nick $1-
@@ -936,6 +953,51 @@ alias -l DLF.Chan.SpamFilter {
     DLF.Win.Echo Filter Blocked $chan $nick %msg
   }
   DLF.Win.Filter $1-
+}
+
+; ========== Trivia games ==========
+alias -l DLF.Trivia.Filter {
+  DLF.Chan.SetNickColour
+  var %idx = $+($network,$chan,@,$nick)
+  hadd -muz3600 DLF.trivia.bots %idx 3600
+  if (%DLF.filter.trivia == 0) return
+  DLF.Watch.Log Trivia bot $nick identified
+  DLF.Win.Filter $1-
+}
+
+alias -l DLF.Trivia.IsTriviaBot {
+  var %idx = $+($network,$chan,@,$nick)
+  if (!$hget(DLF.trivia.bots,%idx).item) return $false
+  DLF.Watch.Log Trivia: From trivia bot
+  return $true
+}
+
+alias -l DLF.Trivia.QuestionStart {
+  DLF.Watch.Called DLF.Trivia.QuestionStart
+  var %hint = $DLF.strip($1-)
+  if ($regex(DLF.Trivia.QuestionStart,%hint,/1st Hint:\s+([*]+[\s*]*)/Fi)) {
+    var %mask $regml(DLF.Trivia.QuestionStart,1)
+    %mask = $replace(%mask,*,?)
+    var %idx = $+($network,$chan,@,$nick)
+    hadd -mu60 DLF.trivia.hints %idx %mask
+    DLF.Watch.Log Trivia: Question start
+  }
+  DLF.Trivia.Filter $1-
+}
+
+alias -l DLF.Trivia.QuestionAnswer {
+  DLF.Watch.Called DLF.Trivia.QuestionAnswer
+  var %match = $+($network,$chan,@,*)
+  var %i $hfind(DLF.trivia.hints,%match,0,w)
+  while (%i) {
+    var %idx $hfind(DLF.trivia.hints,%match,%i,w)
+    var %wm $hget(DLF.trivia.hints,%idx)
+    if (%wm iswm $1-) {
+      DLF.Watch.Log Trivia mask %wm matches $1-
+      if (%DLF.filter.trivia == 1) DLF.Win.Filter $1-
+    }
+    dec %i
+  }
 }
 
 ; ========== Private messages ==========
@@ -1768,7 +1830,7 @@ alias -l DLF.Win.Log {
   var %line $DLF.Win.LineFormat($2-)
   if (%log == 1) write $DLF.Win.LogName($DLF.Win.WinName(%type)) $logstamp $strip(%line)
   if ((%type = Filter) && (%DLF.showfiltered == 0) && (%DLF.background == 0)) {
-    DLF.Watch.Log Dropped: Options set to not show filters
+    DLF.Watch.Log Dropped: Filtering off
     return
   }
 
@@ -3005,11 +3067,12 @@ dialog -l DLF.Options.GUI {
   check "Check for &beta versions", 190, 7 189 155 6, tab 1
   ; tab Filters
   box " General ", 305, 4 23 160 118, tab 3
-  check "Filter other users Search / File requests", 310, 7 32 155 6, tab 3
-  check "Filter adverts and announcements", 315, 7 41 155 6, tab 3
-  check "Filter channel mode changes (e.g. user limits)", 325, 7 50 155 6, tab 3
-  check "Filter channel messages with control codes (usually a bot)", 345, 7 86 155 6, tab 3
-  check "Filter channel topic messages", 350, 7 95 155 6, tab 3
+  check "Filter other users @search / @file / @locator / !get requests", 310, 7 32 155 6, tab 3
+  check "Filter server adverts and announcements", 315, 7 41 155 6, tab 3
+  check "Filter channel topic updates", 320, 7 50 155 6, tab 3
+  check "Filter channel mode changes (e.g. maximum user limits)", 325, 7 59 155 6, tab 3
+  check "Filter trivia games", 330, 7 68 155 6, tab 3
+  check "Filter coloured messages (filter of last resort)", 345, 7 86 155 6, tab 3
   check "Filter server responses to my requests to separate window", 355, 7 104 155 6, tab 3
   check "Separate dlF windows per connection", 365, 7 122 155 6, tab 3
   check "Keep Filter windows active in background", 370, 7 131 155 6, tab 3
@@ -3141,6 +3204,7 @@ alias -l DLF.Options.Initialise {
   DLF.Options.InitOption filter.ads 1
   DLF.Options.InitOption serverads 1
   DLF.Options.InitOption filter.modeschan 1
+  DLF.Options.InitOption filter.trivia 0
   DLF.Options.InitOption filter.spampriv 1
   DLF.Options.InitOption filter.controlcodes 0
   DLF.Options.InitOption filter.topic 0
@@ -3260,9 +3324,10 @@ alias -l DLF.Options.Init {
   if (%DLF.filter.requests == 1) did -c DLF.Options.GUI 310
   if (%DLF.filter.ads == 1) did -c DLF.Options.GUI 315
   if (%DLF.filter.modeschan == 1) did -c DLF.Options.GUI 325
+  if (%DLF.filter.trivia == 1) did -c DLF.Options.GUI 330
   if (%DLF.filter.spampriv == 1) did -c DLF.Options.GUI 335
   if (%DLF.filter.controlcodes == 1) did -c DLF.Options.GUI 345
-  if (%DLF.filter.topic == 1) did -c DLF.Options.GUI 350
+  if (%DLF.filter.topic == 1) did -c DLF.Options.GUI 320
   if (%DLF.serverwin == 1) did -c DLF.Options.GUI 355
   if (%DLF.perconnect == 1) did -c DLF.Options.GUI 365
   if (%DLF.background == 1) did -c DLF.Options.GUI 370
@@ -3328,9 +3393,10 @@ alias -l DLF.Options.Save {
   %DLF.filter.ads = $did(DLF.Options.GUI,315).state
   %DLF.serverads = $did(DLF.Options.GUI,40).state
   %DLF.filter.modeschan = $did(DLF.Options.GUI,325).state
+  %DLF.filter.trivia = $did(DLF.Options.GUI,330).state
   %DLF.filter.spampriv = $did(DLF.Options.GUI,335).state
   %DLF.filter.controlcodes = $did(DLF.Options.GUI,345).state
-  %DLF.filter.topic = $did(DLF.Options.GUI,350).state
+  %DLF.filter.topic = $did(DLF.Options.GUI,320).state
   %DLF.serverwin = $did(DLF.Options.GUI,355).state
   %DLF.perconnect = $did(DLF.Options.GUI,365).state
   %DLF.background = $did(DLF.Options.GUI,370).state
@@ -4043,6 +4109,9 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads @ --*
   DLF.hadd chantext.ads @ Use @*
   DLF.hadd chantext.ads *QNet Advanced DCC File Server*Sharing *B of stuff!*
+  DLF.hadd chantext.ads * To Request A File Type: *
+  DLF.hadd chantext.ads * To request a file, type  *
+  DLF.hadd chantext.ads * To request details, type  *
   inc %matches $hget(DLF.chantext.ads,0).item
 
   DLF.hmake DLF.chantext.announce
@@ -4181,6 +4250,25 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *[Mp3xBR]*
   DLF.hadd chantext.announce Thanks for serving *
   DLF.hadd chantext.announce Escribe: * !*.mp3*
+  DLF.hadd chantext.announce Je Viens D'envoyer: * © À: * © Total De Fichiers Partagés: * © Hier J'ai Envoyé: * Fichiers © Aujourd'hui J'ai Envoyé [à * ]: * Fichiers © OS-Limites V*
+  DLF.hadd chantext.announce *sent*at*to*total sent*files*yesterday*files*today*
+  DLF.hadd chantext.announce Mode: Server Priority
+  DLF.hadd chantext.announce * packs * slots open, Record: *
+  DLF.hadd chantext.announce * Brought To You By *
+  DLF.hadd chantext.announce * XDCC Server *
+  DLF.hadd chantext.announce Total Offered: * Total Transferred: *
+  DLF.hadd chantext.announce If your server doesn't work please turn it off!
+  DLF.hadd chantext.announce Please *don*t flood our servers.
+  DLF.hadd chantext.announce Need Help with a Command type *
+  DLF.hadd chantext.announce No Flooding *Flooding is defined as *
+  DLF.hadd chantext.announce Hints & Tips *
+  DLF.hadd chantext.announce Do Not Ask For OPs *
+  DLF.hadd chantext.announce No Pornography *
+  DLF.hadd chantext.announce No Spamming *
+  DLF.hadd chantext.announce No Racism & Nazism *
+  DLF.hadd chantext.announce Do Not Attempt To Get Past Channel Bans *
+  DLF.hadd chantext.announce Want the FileServ Serv*ing Bot *
+  DLF.hadd chantext.announce List: * Search: * Mode: *
   inc %matches $hget(DLF.chantext.announce,0).item
 
   DLF.hmake DLF.chantext.always
@@ -4203,6 +4291,102 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.always *::INFO:: *.*MB
   DLF.hadd chantext.always <*> *
   inc %matches $hget(DLF.chantext.always,0).item
+
+  DLF.hmake DLF.chantext.fileserv
+  DLF.hadd chantext.fileserv #* *x [*] *
+  DLF.hadd chantext.fileserv * Bandwidth Usage * Current: *, Record: *
+  DLF.hadd chantext.fileserv * Total Offered: *, Total Transferred (since *): *
+  DLF.hadd chantext.fileserv * packs * of * slots open Queue: *, Priority queue: *
+  inc %matches $hget(DLF.chantext.always,0).item
+
+  DLF.hmake DLF.chantext.trivia
+  DLF.hadd chantext.trivia KAOS: * ? * Question Value : *
+  DLF.hadd chantext.trivia KAOS *?* Answers
+  DLF.hadd chantext.trivia ???.*
+  DLF.hadd chantext.trivia 1st Hint: *
+  DLF.hadd chantext.trivia 2nd Hint: *
+  DLF.hadd chantext.trivia 3rd Hint: *
+  DLF.hadd chantext.trivia *S Top * #*: *
+  DLF.hadd chantext.trivia *S Ago* Top * #*: *
+  DLF.hadd chantext.trivia This * Top * #*: *
+  DLF.hadd chantext.trivia Last * Top * #*: *
+  DLF.hadd chantext.trivia Top JACKPOT scorers: * #*: *
+  DLF.hadd chantext.trivia TOP* PLAYERS * #*: *
+  DLF.hadd chantext.trivia Top Player of*: *: *
+  DLF.hadd chantext.trivia BogusTrivia v*
+  DLF.hadd chantext.trivia *TrivBot2001*
+  DLF.hadd chantext.trivia *WQuizz 2*
+  DLF.hadd chantext.trivia Public Commands: .* .* & .*
+  DLF.hadd chantext.trivia Trivia Commands: *
+  DLF.hadd chantext.trivia Welcome to *, kick back and play some Trivia!!
+  DLF.hadd chantext.trivia PLAY it's what i'm here for!
+  DLF.hadd chantext.trivia Only * to go until the * Scores are reset
+  DLF.hadd chantext.trivia * Points have been added to JACKPOT totalling * Points
+  DLF.hadd chantext.trivia * JACKPOT Points *have been returned to JACKPOT
+  DLF.hadd chantext.trivia Top* Players *are Auto-Voiced
+  DLF.hadd chantext.trivia Watch for the * BONUS Questions !!!
+  DLF.hadd chantext.trivia Please report incorrect Q&A WITH Question Number & Correction to a Channel OP
+  DLF.hadd chantext.trivia If you think a Q&A is wrong, please check it at *
+  DLF.hadd chantext.trivia Please refrain from using Extreme Bad Language
+  DLF.hadd chantext.trivia For The Competitive Edge type*
+  DLF.hadd chantext.trivia PINGREPLY : * seconds *I am running on: *
+  DLF.hadd chantext.trivia Enjoy some free downloads while you play.
+  DLF.hadd chantext.trivia Please remember this is a FREE service, Please do not complain*
+  DLF.hadd chantext.trivia We feature over * Q&A !
+  DLF.hadd chantext.trivia If you think a Q&A is wrong, please leave * a msg with Q number and correct Answer.
+  DLF.hadd chantext.trivia Please report incorrect Q&A WITH Question Number & Correction to *
+  DLF.hadd chantext.trivia Trivia Starting in * seconds, get ready!!!
+  DLF.hadd chantext.trivia Resetting * SCORES
+  ; Question end
+  DLF.hadd chantext.trivia Times up! The answer was -> * <-
+  DLF.hadd chantext.trivia TIMES UP! *The answers were [ * ][ * ]*
+  DLF.hadd chantext.trivia Times up! *No one got *[*] [*]
+  DLF.hadd chantext.trivia NOBODY GOT ANY OF THE ANSWERS !!!
+  DLF.hadd chantext.trivia You've Guessed Them All !!! *The answers were [ * ][ * ]*
+  DLF.hadd chantext.trivia Total Number Answered Correctly: * from a possible * !
+  DLF.hadd chantext.trivia YES, *!!!  got the answer -> * <-  in * secs, and gets * Points
+  DLF.hadd chantext.trivia You got it *! The answer was "*". You got it in * seconds and are awarded * Points
+  DLF.hadd chantext.trivia Unbelievable!! * got the answer "*" in only * seconds earning * Points
+  DLF.hadd chantext.trivia That's the way *! The answer was "*". You got it in * seconds, scooping up * Points
+  DLF.hadd chantext.trivia Nice going *! The answer was "*". You got it in * seconds and receive * Points
+  DLF.hadd chantext.trivia Check out the big brain on *!! The answer was "*". You got it in * seconds and get * Points
+  DLF.hadd chantext.trivia Show 'em how it's done *! The answer was "*". You got it in * seconds for * Points
+  DLF.hadd chantext.trivia Everyone, High-5 * for getting the answer "*" and scoring * Points
+  DLF.hadd chantext.trivia Congratulations *! The answer was "*". You got it in * seconds, raising your score by * Points
+  DLF.hadd chantext.trivia Way to go *!! You answered "*" in * seconds for * Points
+  DLF.hadd chantext.trivia * wins * Points for *
+  DLF.hadd chantext.trivia * has won * in a row!! Total Points *
+  DLF.hadd chantext.trivia * in a Row !!! I Think that * is * !!! Is Everybody Asleep!?*
+  DLF.hadd chantext.trivia A Special Bonus of * Points is Awarded to * for getting * in a row!!!
+  ; French trivia
+  DLF.hadd chantext.trivia En attente de joueurs, tapez !* pour lancer le Quizz!
+  DLF.hadd chantext.trivia Le Quizz démarre dans * secondes, préparez-vous!
+  DLF.hadd chantext.trivia Les * meilleurs : 1.*
+  DLF.hadd chantext.trivia Il y a * questions dans la base.
+  DLF.hadd chantext.trivia Le délai est bientot écoulé! Une petite aide: *
+  DLF.hadd chantext.trivia Désolé, le délai est écoulé pour cette question... La réponse était: *
+  DLF.hadd chantext.trivia Le Quizz continue dans * secondes...
+  DLF.hadd chantext.trivia Prochaine question dans * secondes...*
+  DLF.hadd chantext.trivia Question: *
+  DLF.hadd chantext.trivia Vous devez taper le premier la bonne réponse avec l'orthographe correcte.
+  DLF.hadd chantext.trivia Les accents, ainsi que les articles et conjonctions en début de réponse sont optionnels *
+  DLF.hadd chantext.trivia Les grands nombres, à l'exception des années, doivent être tapés avec un espace comme séparateur des milliers *
+  DLF.hadd chantext.trivia Plus la réponse est longue, plus il y a de lettres données dans l'aide.
+  DLF.hadd chantext.trivia Tapez * pour connaitre les commandes que le Quizz reconnait
+  DLF.hadd chantext.trivia Il y a eu * questions non trouvées. Le Quizz est suspendu...*
+  DLF.hadd chantext.trivia Correct! La réponse est: *. Continue comme çà, * ! *
+  DLF.hadd chantext.trivia Le délai est bientot écoulé!
+  inc %matches $hget(DLF.chantext.trivia,0).item
+
+  DLF.hmake DLF.chanaction.trivia
+  DLF.hadd chanaction.trivia passes * a ice cold beer and large pizza for getting * wins!! way to go *!!!
+  DLF.hadd chanaction.trivia awards * with a +v for having over * points
+  inc %matches $hget(DLF.chanaction.trivia,0).item
+
+  DLF.hmake DLF.channotice.trivia
+  DLF.hadd channotice.trivia Welcome To * Please Enjoy Your Stay. Grab Some Files Play Some Trivia & Just Have Fun.*
+  DLF.hadd channotice.trivia *'s Stats: *Points (answers) Today: * This Week: * This Month: * Total Ever: *
+  inc %matches $hget(DLF.channotice.trivia,0).item
 
   DLF.hmake DLF.chantext.dlf
   DLF.hadd chantext.dlf $strip($DLF.logo) *
@@ -4452,7 +4636,6 @@ alias -l DLF.CreateHashTables {
   inc %matches $hget(DLF.find.fileserv,0).item
 
   DLF.hmake DLF.find.headregex
-  hmake DLF.find.headregex 10
   hadd DLF.find.headregex ^\s*From\s+list\s+(@\S+)\s+found\s+([0-9,]+),\s+displaying\s+([0-9]+):$ 1 2 3
   hadd DLF.find.headregex ^\s*Result.*limit\s+by\s+([0-9,]+)\s+reached\.\s+Download\s+my\s+list\s+for\s+more,\s+by\s+typing\s+(@\S+) 2 0 1
   hadd DLF.find.headregex ^\s*Search\s+Result\W+More\s+than\s+([0-9,]+)\s+Matches\s+For\s+(.*?)\W+Get\s+My\s+List\s+Of\s+[0-9\54]+\s+Files\s+By\s+Typing\s+(@\S+)\s+In\s+The\s+Channel\s+Or\s+Refine\s+Your\s+Search.\s+Sending\s+first\s+([0-9\54]+)\s+Results\W+OmenServe 3 1 4 2
