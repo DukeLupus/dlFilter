@@ -800,6 +800,9 @@ alias -l DLF.Chan.Notice {
   var %txt $DLF.strip($1-)
   if ((%DLF.filter.spamchan == 1) && ($hiswm(channotice.spam,%txt))) DLF.Chan.SpamFilter $1-
   DLF.Chan.ControlCodes $1-
+  ; Override mIRC default destination and send to channel rather than active/status windows.
+  DLF.Win.Echo $event $chan $nick $1-
+  halt
 }
 
 alias -l DLF.Chan.ctcp {
@@ -807,6 +810,9 @@ alias -l DLF.Chan.ctcp {
   DLF.Custom.Filter $1-
   if ($hiswm(chanctcp.spam,$1-)) DLF.Win.Filter $1-
   if ($hiswm(chanctcp.server,$1-)) DLF.Win.Server $1-
+  ; Override mIRC default destination and send to channel rather than active/status windows.
+  DLF.Win.Echo $event $chan $nick $1-
+  halt
 }
 
 alias -l DLF.Chan.IsCmd {
