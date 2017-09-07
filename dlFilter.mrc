@@ -757,7 +757,7 @@ alias -l DLF.Chan.Text {
     DLF.Watch.Log Dropped: Blank line
     DLF.Win.Filter $1-
   }
-   if ($hiswm(chantext.dlf,%txt)) {
+  if ($hiswm(chantext.dlf,%txt)) {
     ; Someone else is sending channel ads - reset timer to prevent multiple ops flooding the channel
     var %secs $timer(dlf.advert).secs + 30
     set $+(-eu,%secs) [ $+(%,DLF.opsnochanads.,$network,$chan) ] 1
@@ -2029,9 +2029,8 @@ alias -l DLF.Ads.Add {
     aline -n 4 %win You can double-click to have the request for the list of files sent for you.
     aline -n 1 %win $crlf
   }
-  var %new = $trim($2-)
-  if ($0 == 2) %new = $+(*,%new,*)
-  %new = $replace(%new,$comma,?,$+($space,$space,*),$+($space,*),$+(*,$space,$space),$+(*,$space),**,*)
+  var %line $DLF.Win.LineFormat($event $chan $nick $replace($DLF.strip($1-),$tab,$null))
+  var %ad $gettok(%line,3-,$asc($space))
   while ($left(%ad,1) == $space) %ad = $right(%ad,-1)
   while ((%ad != $null) && (($left(%ad,1) !isletter) || ($asc($left(%ad,1)) >= 192))) %ad = $deltok(%ad,1,$asc($space))
   while ($wildtok(%ad,@*,0,$asc($space))) {
