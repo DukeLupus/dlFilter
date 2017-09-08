@@ -23,19 +23,19 @@ The options dialog allows you to set most of dlFilter's options (with the except
 for dlFilter's custom Filter and Server windows).
 
 The options dialog consists of:
-* [Global options](https://github.com/DukeLupus/dlFilter/options-help.md#global-options) (which appear at the top and bottom of the Options dialog regardless of which tab you are viewing)
-* [Channels tab](https://github.com/DukeLupus/dlFilter/options-help.md#channels-tab)
-* [Filters tab](https://github.com/DukeLupus/dlFilter/options-help.md#filter-tab)
-* [Other tab](https://github.com/DukeLupus/dlFilter/options-help.md#other-tab)
-* [Ops tab](https://github.com/DukeLupus/dlFilter/options-help.md#ops-tab)
-* [Custom tab](https://github.com/DukeLupus/dlFilter/options-help.md#custom-tab)
-* [About tab](https://github.com/DukeLupus/dlFilter/options-help.md#about-tab)
+* [Global options](https://github.com/DukeLupus/dlFilter/blob/master/options-help.md#global-options) (which appear at the top and bottom of the Options dialog regardless of which tab you are viewing)
+* [Channels tab](https://github.com/DukeLupus/dlFilter/blob/master/options-help.md#channels-tab)
+* [Filters tab](https://github.com/DukeLupus/dlFilter/blob/master/options-help.md#filter-tab)
+* [Other tab](https://github.com/DukeLupus/dlFilter/blob/master/options-help.md#other-tab)
+* [Ops tab](https://github.com/DukeLupus/dlFilter/blob/master/options-help.md#ops-tab)
+* [Custom tab](https://github.com/DukeLupus/dlFilter/blob/master/options-help.md#custom-tab)
+* [About tab](https://github.com/DukeLupus/dlFilter/blob/master/options-help.md#about-tab)
 
 ## Global options
 dlFilter's global options allow you to:
-* [Enable or disable dlFilter's functionality](https://github.com/DukeLupus/dlFilter/options-help.md#enable-dlfilter)
+* [Enable or disable dlFilter's functionality](https://github.com/DukeLupus/dlFilter/blob/master/options-help.md#enable-dlfilter)
 (without having to unload / reload the script)
-* Show or Hide the [Filter window(s)](https://github.com/DukeLupus/dlFilter/options-help.md#show-hide-filter-windows) and [Ads window(s)](https://github.com/DukeLupus/dlFilter/options-help.md#show-hide-ads-windows)
+* Show or Hide the [Filter window(s)](https://github.com/DukeLupus/dlFilter/blob/master/options-help.md#show-hide-filter-windows) and [Ads window(s)](https://github.com/DukeLupus/dlFilter/blob/master/options-help.md#show-hide-ads-windows)
 
 ### Enable dlFilter
 This option enables / disables the event handling functionality that is the core of dlFilter.
@@ -66,9 +66,9 @@ Ads windows can be in one of 2 states:
 Click the **Show/Hide Ads Windows** button to switch between Visible and Hidden states.
 
 ## Channels tab
-The channels tab is primarily where you [define which channels you want dlFilter to operate on](https://github.com/DukeLupus/dlFilter/options-help.md#channel-list).
+The channels tab is primarily where you [define which channels you want dlFilter to operate on](https://github.com/DukeLupus/dlFilter/blob/master/options-help.md#channel-list).
 
-This tab is also used for the [script Update functionality[(https://github.com/DukeLupus/dlFilter/options-help.md#dlFilter-update)
+This tab is also used for the [script Update functionality](https://github.com/DukeLupus/dlFilter/blob/master/options-help.md#dlFilter-update)
 
 ### Channel list
 The channels tab is where you can see the list of channels that dlFilter is processing,
