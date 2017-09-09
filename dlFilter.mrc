@@ -554,20 +554,6 @@ alias -l DLF.Event.MeConnect {
   DLF.Update.Check
 }
 
-alias -l DLF.Win.CloseServer {
-  if (($event == connect) && (%DLF.perconnect == 0)) return
-  DLF.Watch.Called DLF.Win.CloseServer
-  var %i $window(@DLF.*,0)
-  while (%i) {
-    var %win $window(@DLF.*,%i)
-    if ($window(%win).cid == $cid) {
-      if (($event == close) && ($gettok(%win,-1,$asc(.)) == $network)) close -@ %win
-      elseif (($event == connect) && ($gettok(%win,-1,$asc(.)) != $network)) close -@ %win
-    }
-    dec %i
-  }
-}
-
 alias -l DLF.Event.JustConnected {
   if ($var($+(DLF.CONNECT.CID,$cid),1).value) return $true
   return $false
@@ -2000,6 +1986,31 @@ alias -l DLF.Win.ShowHide {
     }
   }
   elseif ($2 == 0) close -@ $1
+}
+
+; If user has scrolled up from the bottom of custom window, mIRC does not delete excess lines
+; Since user can leave these windows scrolled up, they would grow uncontrollably unless we prune them manually.
+alias -l DLF.Win.CustomTrim {
+  if ($window($1).type !isin custom listbox) return
+  var %buf $windowbuffer
+  var %max %buf * 1.2
+  var %del %buf * 1.1
+  var %del $line($1,0) - $int(%del)
+  if ($line($1,0) >= %max) dline $1 $+(1-,%del)
+}
+
+alias -l DLF.Win.CloseServer {
+  if (($event == connect) && (%DLF.perconnect == 0)) return
+  DLF.Watch.Called DLF.Win.CloseServer
+  var %i $window(@DLF.*,0)
+  while (%i) {
+    var %win $window(@DLF.*,%i)
+    if ($window(%win).cid == $cid) {
+      if (($event == close) && ($gettok(%win,-1,$asc(.)) == $network)) close -@ %win
+      elseif (($event == connect) && ($gettok(%win,-1,$asc(.)) != $network)) close -@ %win
+    }
+    dec %i
+  }
 }
 
 ; ========== Ads Window ==========
@@ -4871,17 +4882,6 @@ alias -l DLF.Watch.Called {
   var %msg
   if ($2-) %msg = : $2-
   DLF.Watch.Log %event called $1 $+ %msg
-}
-
-; If user has scrolled up from the bottom of custom window, mIRC does not delete excess lines
-; Since user can leave these windows scrolled up, they would grow uncontrollably unless we prune them manually.
-alias -l DLF.Win.CustomTrim {
-  if ($window($1).type !isin custom listbox) return
-  var %buf $windowbuffer
-  var %max %buf * 1.2
-  var %del %buf * 1.1
-  var %del $line($1,0) - $int(%del)
-  if ($line($1,0) >= %max) dline $1 $+(1-,%del)
 }
 
 alias -l DLF.Watch.Log {
