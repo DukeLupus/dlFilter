@@ -137,6 +137,7 @@ alias DLF.Initialise {
   .unset %DLF.custom.selected
   .unset %DLF.filtered.limit
   .unset %DLF.newreleases
+  .unset %DLF.privrequests
   .unset %DLF.ptext
   .unset %DLF.server.limit
   .unset %DLF.showstatus
@@ -162,7 +163,6 @@ alias DLF.Initialise {
   DLF.RenameVar opwarning.spampriv privspam.opnotify
   DLF.RenameVar private.nocomchan nocomchan
   DLF.RenameVar private.regular noregmsg
-  DLF.RenameVar private.requests privrequests
   DLF.RenameVar serverwin server
   DLF.RenameVar update.betas betas
   DLF.RenameVar win-filter.log filtered.log
@@ -976,23 +976,6 @@ alias -l DLF.Priv.Action {
   DLF.Priv.RegularUser Action $1-
   DLF.Win.Echo $event Private $nick $1-
   halt
-}
-
-alias -l DLF.Priv.Request {
-  if (%DLF.private.requests == 0) return
-  DLF.Watch.Called DLF.Priv.Request
-  if ($nick === $me) return
-  var %trigger $strip($1)
-  var %nicklist @ $+ $me
-  var %nickfile ! $+ $me
-  if ((%nicklist == %trigger) || (%nickfile == %trigger) || (%nickfile == $gettok($strip($1),1,$asc(-)))) {
-    .msg $nick Please $u(do not make requests in private) $+ . All commands need to go to $u(channel).
-    .msg $nick If you are running mIRC, you may have to go to $c(2,mIRC options -> Sounds -> Requests) and uncheck $qt($c(3,Send '!nick file' as private message))
-    DLF.Watch.Log Blocked: Request made in private rather than in chan
-    DLF.Status Blocked: Request made in private from $nick
-    DLF.Win.Log Filter Blocked Private $nick Request made in private from $nick
-    DLF.Win.Filter $1-
-  }
 }
 
 alias -l DLF.Priv.SpamFilter {
@@ -2928,7 +2911,6 @@ dialog -l DLF.Options.GUI {
   check "Filter channel messages with control codes (usually a bot)", 345, 7 86 155 6, tab 3
   check "Filter channel topic messages", 350, 7 95 155 6, tab 3
   check "Filter server responses to my requests to separate window", 355, 7 104 155 6, tab 3
-  check "Filter requests to you in PM (@yournick, !yournick)", 360, 7 113 155 6, tab 3
   check "Separate dlF windows per connection", 365, 7 122 155 6, tab 3
   check "Keep Filter and Ads windows active in background", 370, 7 131 155 6, tab 3
   box " Filter user events ", 375, 4 142 160 57, tab 3
@@ -3064,7 +3046,6 @@ alias -l DLF.Options.Initialise {
   DLF.Options.InitOption filter.controlcodes 0
   DLF.Options.InitOption filter.topic 0
   DLF.Options.InitOption serverwin 0
-  DLF.Options.InitOption private.requests 1
   DLF.Options.InitOption perconnect 1
   DLF.Options.InitOption background 0
   ; Filter tab User events box
@@ -3186,7 +3167,6 @@ alias -l DLF.Options.Init {
   if (%DLF.filter.controlcodes == 1) did -c DLF.Options.GUI 345
   if (%DLF.filter.topic == 1) did -c DLF.Options.GUI 350
   if (%DLF.serverwin == 1) did -c DLF.Options.GUI 355
-  if (%DLF.private.requests == 1) did -c DLF.Options.GUI 360
   if (%DLF.perconnect == 1) did -c DLF.Options.GUI 365
   if (%DLF.background == 1) did -c DLF.Options.GUI 370
   if (%DLF.filter.joins == 1) did -c DLF.Options.GUI 380
@@ -3257,7 +3237,6 @@ alias -l DLF.Options.Save {
   %DLF.filter.controlcodes = $did(DLF.Options.GUI,345).state
   %DLF.filter.topic = $did(DLF.Options.GUI,350).state
   %DLF.serverwin = $did(DLF.Options.GUI,355).state
-  %DLF.private.requests = $did(DLF.Options.GUI,360).state
   %DLF.perconnect = $did(DLF.Options.GUI,365).state
   %DLF.background = $did(DLF.Options.GUI,370).state
   %DLF.filter.joins = $did(DLF.Options.GUI,380).state
