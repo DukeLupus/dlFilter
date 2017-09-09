@@ -1046,9 +1046,12 @@ alias -l DLF.Priv.CommonChan {
 }
 
 alias -l DLF.Priv.QueryOpen {
-  if (($query($nick)) && ($event != open)) {
-    DLF.Watch.Log Query window open for private $event from $nick
-    DLF.Win.Echo $event $nick $nick $1-
+  var %notify $notify($nick)
+  if ((%notify) || (($query($nick)) && ($event != open))) {
+    if (%notify) DLF.Watch.Log Private $event from notify user
+    else DLF.Watch.Log Query window exists for private $event from $nick
+    ; Echo this ourselves so that notices / ctcp / ctcpreply go to the query / single message window
+    DLF.Win.Echo $event Private $nick $1-
     halt
   }
 }
@@ -1955,10 +1958,15 @@ alias -l DLF.Win.Echo {
   else {
     var %sent
     var %i $comchan($3,0)
-    if ((%i == 0) || ($3 == $me)) {
+    if ((%i == 0) || ($3 == $me) || (($2 == Private) && ($notify($3))) {
       if (($window($active).type !isin custom listbox) && ((($DLF.IsServiceUser($3)) && (!$DLF.Event.JustConnected)) || ($3 == $me))) {
         echo -atc %col %pref %line
         DLF.Watch.Log Echoed: To active window $active
+      }
+      elseif ($query($3)) {
+        if ($2 == Private) %pref = $null
+        echo -tc %col $2 %pref %line
+        DLF.Watch.Log Echoed: To query window
       }
       elseif (($usesinglemsg == 0) || ($DLF.IsServiceUser($3))) {
         if ($2 == Private) %pref = $null
