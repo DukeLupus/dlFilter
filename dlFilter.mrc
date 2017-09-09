@@ -768,11 +768,11 @@ alias -l DLF.Chan.Text {
   }
 
   DLF.Custom.Filter $1-
-  if ($hiswm(chantext.spam,%txt)) { echo -s spam | DLF.Chan.SpamFilter $1- }
-  if ($hiswm(chantext.always,%txt)) { echo -s always | DLF.Win.Filter $1- }
-  if ((%DLF.filter.ads == 1) && ($hiswm(chantext.announce,%txt))) { echo -s announce | DLF.Win.Filter $1- }
-  if ((%DLF.filter.ads == 1) && ($hiswm(chantext.ads,%txt))) { echo -s ads | DLF.Win.Ads $1- }
-  if ((%DLF.filter.requests == 1) && ($DLF.Chan.IsCmd(%txt))) { echo -s cmd | DLF.Win.Filter $1- }
+  if ($hiswm(chantext.spam,%txt)) DLF.Chan.SpamFilter $1
+  if ($hiswm(chantext.always,%txt)) DLF.Win.Filter $1-
+  if ((%DLF.filter.ads == 1) && ($hiswm(chantext.announce,%txt))) DLF.Win.Filter $1-
+  if ((%DLF.filter.ads == 1) && ($hiswm(chantext.ads,%txt))) DLF.Win.Ads $1-
+  if ((%DLF.filter.requests == 1) && ($DLF.Chan.IsCmd(%txt))) DLF.Win.Filter $1-
   DLF.Chan.ControlCodes $1-
 }
 
@@ -2929,7 +2929,6 @@ dialog -l DLF.Options.GUI {
   check "Filter other users Search / File requests", 310, 7 32 155 6, tab 3
   check "Filter adverts and announcements", 315, 7 41 155 6, tab 3
   check "Filter channel mode changes (e.g. user limits)", 325, 7 50 155 6, tab 3
-  check "Filter private spam", 335, 7 68 155 6, tab 3
   check "Filter channel messages with control codes (usually a bot)", 345, 7 86 155 6, tab 3
   check "Filter channel topic messages", 350, 7 95 155 6, tab 3
   check "Filter server responses to my requests to separate window", 355, 7 104 155 6, tab 3
@@ -2959,8 +2958,9 @@ dialog -l DLF.Options.GUI {
   check "Retry incomplete file requests (up to 3 times)", 570, 7 124 155 6, tab 5
   box " mIRC-wide ", 605, 4 135 160 64, tab 5
   check "Check mIRC settings are secure (future enhancement)", 610, 7 144 155 6, tab 5 disable
-  check "Block private messages from users not in a common channel", 620, 7 162 155 6, tab 5
-  check "Block private messages from regular users", 625, 7 171 155 6, tab 5
+  check "Filter private spam", 335, 7 153 155 6, tab 5
+  check "Filter private messages from users not in a common channel", 620, 7 162 155 6, tab 5
+  check "Filter private messages from regular users", 625, 7 171 155 6, tab 5
   check "Block channel CTCP requests unless from an op", 655, 7 180 155 6, tab 5
   check "Block IRC Finger requests (which share personal information)", 660, 7 189 155 6, tab 5
   ; tab Ops
