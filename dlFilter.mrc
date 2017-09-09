@@ -1012,8 +1012,12 @@ alias -l DLF.Priv.CommonChan {
 }
 
 alias -l DLF.Priv.QueryOpen {
-  if ((%DLF.private.query == 1) && ($query($nick)) && ($event != open)) {
-    DLF.Win.Echo $event $nick $nick $1-
+  var %notify $notify($nick)
+  if ((%notify) || (($query($nick)) && ($event != open))) {
+    if (%notify) DLF.Watch.Log Private $event from notify user
+    else DLF.Watch.Log Query window exists for private $event from $nick
+    ; Echo this ourselves so that notices / ctcp / ctcpreply go to the query / single message window
+    DLF.Win.Echo $event Private $nick $1-
     halt
   }
 }
@@ -1923,10 +1927,15 @@ alias -l DLF.Win.Echo {
   else {
     var %sent
     var %i $comchan($3,0)
-    if ((%i == 0) || ($3 == $me)) {
+    if ((%i == 0) || ($3 == $me) || (($2 == Private) && ($notify($3))) {
       if (($window($active).type !isin custom listbox) && ((($DLF.IsServiceUser($3)) && (!$DLF.Event.JustConnected)) || ($3 == $me))) {
         echo -atc %col %pref %line
         DLF.Watch.Log Echoed: To active window $active
+      }
+      elseif ($query($3)) {
+        if ($2 == Private) %pref = $null
+        echo -tc %col $2 %pref %line
+        DLF.Watch.Log Echoed: To query window
       }
       elseif (($usesinglemsg == 0) || ($DLF.IsServiceUser($3))) {
         if ($2 == Private) %pref = $null
@@ -2943,7 +2952,6 @@ dialog -l DLF.Options.GUI {
   check "Retry incomplete file requests (up to 3 times)", 570, 7 124 155 6, tab 5
   box " mIRC-wide ", 605, 4 135 160 64, tab 5
   check "Check mIRC settings are secure (future enhancement)", 610, 7 144 155 6, tab 5 disable
-  check "Allow private messages from users with open query window", 615, 7 153 155 6, tab 5
   check "Block private messages from users not in a common channel", 620, 7 162 155 6, tab 5
   check "Block private messages from regular users", 625, 7 171 155 6, tab 5
   check "Block channel CTCP requests unless from an op", 655, 7 180 155 6, tab 5
@@ -3078,7 +3086,6 @@ alias -l DLF.Options.Initialise {
   DLF.Options.InitOption serverretry 1
   ; Other tab mIRC-wide box
   DLF.Options.InitOption checksecurity 1
-  DLF.Options.InitOption private.query 1
   DLF.Options.InitOption private.nocomchan 1
   DLF.Options.InitOption private.regular 1
   DLF.Options.InitOption chanctcp 1
@@ -3198,7 +3205,6 @@ alias -l DLF.Options.Init {
   if (%DLF.dccsend.regular == 1) did -c DLF.Options.GUI 565
   if (%DLF.serverretry == 1) did -c DLF.Options.GUI 570
   if (%DLF.checksecurity == 1) did -c DLF.Options.GUI 610
-  if (%DLF.private.query == 1) did -c DLF.Options.GUI 615
   if (%DLF.private.nocomchan == 1) did -c DLF.Options.GUI 620
   if (%DLF.private.regular == 1) did -c DLF.Options.GUI 625
   if (%DLF.chanctcp == 1) did -c DLF.Options.GUI 655
@@ -3261,7 +3267,6 @@ alias -l DLF.Options.Save {
   %DLF.dccsend.regular = $did(DLF.Options.GUI,565).state
   %DLF.serverretry = $did(DLF.Options.GUI,570).state
   %DLF.checksecurity = $did(DLF.Options.GUI,610).state
-  %DLF.private.query = $did(DLF.Options.GUI,615).state
   %DLF.private.nocomchan = $did(DLF.Options.GUI,620).state
   %DLF.private.regular = $did(DLF.Options.GUI,625).state
   %DLF.chanctcp = $did(DLF.Options.GUI,655).state
