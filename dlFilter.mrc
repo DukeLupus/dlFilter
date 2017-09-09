@@ -140,6 +140,7 @@ alias DLF.Initialise {
   .unset %DLF.ptext
   .unset %DLF.server.limit
   .unset %DLF.showstatus
+  .unset %DLF.spam.addignore
   ; Make variables more consistent
   if (%DLF.netchans == $null) %DLF.netchans = %DLF.channels
   DLF.RenameVar dccsend.dangerous askregfile.type
@@ -945,9 +946,9 @@ alias -l DLF.Priv.Text {
   DLF.Priv.QueryOpen $1-
   DLF.Custom.Filter $1-
   var %txt $DLF.strip($1-)
-  if ((%DLF.filter.spampriv == 1) && ($hiswm(privtext.spam,%txt)) && (!$window($1))) DLF.Priv.SpamFilter $1-
   if ($hiswm(privtext.server,%txt)) DLF.Win.Server $1-
   if ((%DLF.filter.aways == 1) && ($hiswm(privtext.away,%txt))) DLF.Win.Filter $1-
+  if ((%DLF.filter.spampriv == 1) && ($hiswm(privtext.spam,%txt))) DLF.Priv.SpamFilter $1-
   DLF.Priv.CommonChan $1-
   DLF.Priv.RegularUser Text $1-
   DLF.Win.Echo $event Private $nick $1-
@@ -964,6 +965,7 @@ alias -l DLF.Priv.Notice {
   var %txt $DLF.strip($1-)
   if ($hiswm(privnotice.dnd,%txt)) DLF.Win.Filter $1-
   if ($hiswm(privnotice.server,%txt)) DLF.Win.Server $1-
+  if ((%DLF.filter.spampriv == 1) && ($hiswm(privnotice.spam,%txt))) DLF.Priv.SpamFilter $1-
   DLF.Priv.CommonChan $1-
   DLF.Priv.RegularUser Notice $1-
   DLF.Win.Echo $event Private $nick $1-
@@ -983,6 +985,7 @@ alias -l DLF.Priv.Action {
   DLF.Watch.Called DLF.Priv.Action
   DLF.Priv.QueryOpen $1-
   DLF.Custom.Filter $1-
+  if ((%DLF.filter.spampriv == 1) && ($hiswm(privaction.spam,%txt))) DLF.Priv.SpamFilter $1-
   DLF.Priv.CommonChan $1-
   DLF.Priv.RegularUser Action $1-
   DLF.Win.Echo $event Private $nick $1-
@@ -1007,30 +1010,17 @@ alias -l DLF.Priv.Request {
 }
 
 alias -l DLF.Priv.SpamFilter {
-  if (%DLF.opwarning.spampriv == 0) return
-  DLF.Watch.Called DLF.Priv.SpamFilter
-  if (%DLF.spam.addignore == 1) [ $+(.timerDLFSpamIgnore,$DLF.TimerAddress) ] 1 0 .signal DLF.Priv.SpamIgnore $nick $1-
-  if ($comchan($nick,0)) var %inchan in common channel(s):
-  else var %inchan not in common channel:
-  DLF.Win.Log Filter Blocked Private $nick Spam from user %inchan $c(4,15,$tag($nick) $br($address($nick,5)) -> $b($1-))
-  DLF.Win.Filter $1-
-}
-
-on *:signal:DLF.Priv.SpamIgnore: { DLF.Priv.SpamIgnore $1- }
-alias -l DLF.Priv.SpamIgnore {
-  DLF.Watch.Called DLF.Priv.SpamIgnore
-  var %addr $address($1,6)
-  var %who $1
-  if (%addr) var %who %who $br(%addr)
-  else %addr = %who
-  var %ignore $input($&
-    $+(Spam received from ,%who,.,$crlf,$crlf,Spam: $qt($2-),.,$crlf,$crlf,Add this user to ignore for one hour?),$&
-    yq,Add spammer to /ignore?)
-  if (%ignore == $true) {
-    DLF.Watch.Log Ignoring $1 $br(%addr) on $network
-    .ignore on
-    ignore -u3600 %addr $network
+ if (%DLF.opwarning.spamchan == 1) {
+    var %msg $c(4,15,Private spam from $nick $br($address($nick,5)) $+: $q($1-))
+    var %i $comchan($nick,0)
+    while (%i) {
+      var %chan $comchan($nick,%i)
+      if ($me isop %chan) DLF.notice @ $+ $chan $logo %msg
+      dec %i
+    }
+    DLF.Win.Echo Filter Blocked Private $nick %msg
   }
+  DLF.Win.Filter $1-
 }
 
 alias -l DLF.Priv.CommonChan {
@@ -2921,7 +2911,6 @@ dialog -l DLF.Options.GUI {
   check "Filter channel mode changes (e.g. user limits)", 325, 7 50 155 6, tab 3
   check "Filter channel spam", 330, 7 59 155 6, tab 3
   check "Filter private spam", 335, 7 68 155 6, tab 3
-  check "… and /ignore spammer for 1h (asks confirmation)", 340, 15 77 147 6, tab 3
   check "Filter channel messages with control codes (usually a bot)", 345, 7 86 155 6, tab 3
   check "Filter channel topic messages", 350, 7 95 155 6, tab 3
   check "Filter server responses to my requests to separate window", 355, 7 104 155 6, tab 3
@@ -2986,7 +2975,6 @@ dialog -l DLF.Options.GUI {
 }
 
 alias -l DLF.Options.SetLinkedFields {
-  DLF.Options.LinkedFields 335 340
   DLF.Options.LinkedFields -545 550,555,560,565
 }
 
@@ -3059,7 +3047,6 @@ alias -l DLF.Options.Initialise {
   DLF.Options.InitOption filter.modeschan 1
   DLF.Options.InitOption filter.spamchan 1
   DLF.Options.InitOption filter.spampriv 1
-  DLF.Options.InitOption spam.addignore 0
   DLF.Options.InitOption filter.controlcodes 0
   DLF.Options.InitOption filter.topic 0
   DLF.Options.InitOption serverwin 0
@@ -3182,8 +3169,6 @@ alias -l DLF.Options.Init {
   if (%DLF.filter.modeschan == 1) did -c DLF.Options.GUI 325
   if (%DLF.filter.spamchan == 1) did -c DLF.Options.GUI 330
   if (%DLF.filter.spampriv == 1) did -c DLF.Options.GUI 335
-  else %DLF.spam.addignore = 0
-  if (%DLF.spam.addignore == 1) did -c DLF.Options.GUI 340
   if (%DLF.filter.controlcodes == 1) did -c DLF.Options.GUI 345
   if (%DLF.filter.topic == 1) did -c DLF.Options.GUI 350
   if (%DLF.serverwin == 1) did -c DLF.Options.GUI 355
@@ -3255,7 +3240,6 @@ alias -l DLF.Options.Save {
   %DLF.filter.modeschan = $did(DLF.Options.GUI,325).state
   %DLF.filter.spamchan = $did(DLF.Options.GUI,330).state
   %DLF.filter.spampriv = $did(DLF.Options.GUI,335).state
-  %DLF.spam.addignore = $did(DLF.Options.GUI,340).state
   %DLF.filter.controlcodes = $did(DLF.Options.GUI,345).state
   %DLF.filter.topic = $did(DLF.Options.GUI,350).state
   %DLF.serverwin = $did(DLF.Options.GUI,355).state
@@ -4185,6 +4169,12 @@ alias -l DLF.CreateHashTables {
   DLF.hadd privtext.spam *xxx*http*
   DLF.hadd privtext.spam *xxx*www*
   inc %matches $hget(DLF.privtext.spam,0).item
+
+  if ($hget(DLF.privaction.spam)) hfree DLF.privaction.spam
+  inc %matches $hget(DLF.privaction.spam,0).item
+
+  if ($hget(DLF.privnotice.spam)) hfree DLF.privnotice.spam
+  inc %matches $hget(DLF.privnotice.spam,0).item
 
   if ($hget(DLF.privtext.server)) hfree DLF.privtext.server
   DLF.hadd privtext.server *Empieza transferencia*IMPORTANTE*dccallow*
