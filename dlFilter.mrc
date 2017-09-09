@@ -1010,9 +1010,10 @@ alias -l DLF.Priv.CommonChan {
   DLF.Watch.Called DLF.Priv.CommonChan
   if ($DLF.IsServiceUser($nick)) return
   if ($comchan($nick,0) == 0) {
-    DLF.Watch.Log Blocked: Private $event from regular user
-    DLF.Status Blocked: Private $event from $nick with no common channel
-    DLF.Win.Log Filter Blocked Private $nick Private $event from user with no common channel:
+    var %msg Private $event from $nick with no common channel
+    DLF.Watch.Log Blocked: %msg
+    DLF.Status Blocked: %msg
+    DLF.Win.Log Filter Blocked Private $nick %msg $+ :
     DLF.Win.Filter $1-
   }
 }
@@ -1064,9 +1065,10 @@ alias -l DLF.Priv.RegularUser {
   if ($DLF.IsRegularUser($nick)) {
     var %type $lower($replace($1,-,$space))
     if (%type isin normal text) %type = message
-    DLF.Watch.Log Blocked: Private %type from regular user
-    DLF.Status Blocked: Private %type from regular user $nick $br($address)
-    DLF.Win.Log Filter Blocked Private $nick Private %type from regular user $nick $br($address) $+ :
+    var %msg Private %type from regular user $nick $br($address)
+    DLF.Watch.Log Blocked: %msg
+    DLF.Status Blocked: %msg
+    DLF.Win.Log Filter Blocked Private $nick %msg $+ :
     DLF.Win.Filter $2-
   }
 }
