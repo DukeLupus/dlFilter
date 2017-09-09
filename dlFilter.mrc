@@ -351,8 +351,8 @@ on ^*:servermode:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.modescha
 
 ; filter topic changes and when joining channel
 on ^*:topic:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.topic)) DLF.Win.Filter $nick changes topic to: $sqt($1-) }
-raw 332:*: { if (($DLF.Chan.IsDlfChan($2)) && (%DLF.filter.topic == 1)) DLF.Win.Filter Topic is: $sqt($1-) }
-raw 333:*: { if (($DLF.Chan.IsDlfChan($2)) && (%DLF.filter.topic == 1)) DLF.Win.Filter Set by $1 on $asctime($3,ddd mmm dd HH:nn:ss yyyy) }
+raw 332:*: { if (($DLF.Chan.IsDlfChan($2)) && (%DLF.filter.topic == 1)) DLF.Win.Log Filter $event $DLF.chan $DLF.nick Topic is: $sqt($3-) }
+raw 333:*: { if (($DLF.Chan.IsDlfChan($2)) && (%DLF.filter.topic == 1)) DLF.Win.Filter Set by $3 on $asctime($4,ddd mmm dd HH:nn:ss yyyy) }
 
 ; Trigger processing
 on *:input:%DLF.channels: {
@@ -1719,7 +1719,7 @@ menu @dlF.Server.* {
 }
 
 alias -l DLF.Win.Filter {
-  DLF.Win.Log Filter $event $DLF.chan $nick $1-
+  DLF.Win.Log Filter $event $DLF.chan $DLF.nick $1-
   halt
 }
 
@@ -1784,7 +1784,7 @@ alias -l DLF.Win.Log {
   if (%wrap == 1) aline -pi %col %win %line
   else aline %col %win %line
   DLF.Search.Add %win %wrap %col %line
-  DLF.Watch.Log Filtered: To %win
+  DLF.Watch.Log Filtered: To %win $2 $3 $4
 }
 
 alias -l DLF.Win.Ads {
@@ -1867,7 +1867,10 @@ alias -l DLF.Win.LineFormat {
   return %nc $DLF.Win.Format($1-)
 }
 
-alias -l DLF.Win.MsgType return $replace($1,text,normal,textsend,normal,actionsend,action,noticesend,notice,ctcpsend,ctcp,ctcpreply,ctcp,ctcpreplysend,ctcp)
+alias -l DLF.Win.MsgType {
+  if ($1 isnum) return Info2
+  return $replace($1,text,normal,textsend,normal,actionsend,action,noticesend,notice,ctcpsend,ctcp,ctcpreply,ctcp,ctcpreplysend,ctcp)
+}
 
 alias -l DLF.Win.Format {
   tokenize $asc($space) $1-
@@ -4452,6 +4455,11 @@ alias DLF.Run {
 alias -l DLF.chan {
   if ($chan != $null) return $chan
   return Private
+}
+
+alias -l DLF.nick {
+  if ($nick != $null) return $nick
+  return -
 }
 
 alias -l DLF.TimerAddress {
