@@ -68,7 +68,7 @@ dlFilter uses the following code from other people:
 */
 
 alias -l DLF.SetVersion {
-  %DLF.version = 1.18
+  %DLF.version = 1.181
   return %DLF.version
 }
 
