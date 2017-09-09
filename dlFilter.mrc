@@ -116,7 +116,7 @@ on *:load: {
 }
 
 alias -l DLF.LoadCheck {
-  if (sbClient.* iswm $nopath($script(1)) || sbClient.* iswm $nopath($script(2))) var %sbc $true
+  if ((sbClient.* iswm $nopath($script(1))) || (sbClient.* iswm $nopath($script(2)))) var %sbc $true
   else var %sbc $false
   if (($script == $script(1)) && (%sbc == $false)) return
   if (($script == $script(2)) && (%sbc)) return
@@ -688,12 +688,19 @@ alias -l DLF.Chan.IsChanEvent {
   if ($DLF.Chan.IsDlfChan($chan) == $false) %log = Not a filtered channel
   elseif ($nick == $me) %log = Me
   elseif ($DLF.Chan.TargetNick($true) == $me) %log = About me
-  elseif ((%DLF.filter.regular == 0) && (!$DLF.IsRegularUser($DLF.Chan.TargetNick))) %log = Filtering only regular users
+  elseif (%DLF.Chan.IsOnlyRegUserChanEvent) %log = Filtering only regular users
   else DLF.Stats.Count $chan Total
   if ($1 == 0) %log = Filtering off for $event
   if (%log == $null) return $true
   DLF.Watch.Log Not filtered: %log
   return $false
+}
+
+alias -l DLF.Chan.IsOnlyRegUserChanEvent {
+  if ($event !isin join part quit nick kick) return $false
+  if (%DLF.filter.regular == 1) return $false
+  if ($DLF.IsRegularUser($DLF.Chan.TargetNick)) return $false
+  return $true
 }
 
 alias -l DLF.Chan.IsDlfChan {
@@ -761,11 +768,11 @@ alias -l DLF.Chan.Text {
   }
 
   DLF.Custom.Filter $1-
-  if ($hiswm(chantext.spam,%txt)) DLF.Chan.SpamFilter $1-
-  if ($hiswm(chantext.always,%txt)) DLF.Win.Filter $1-
-  if ((%DLF.filter.ads == 1) && ($hiswm(chantext.announce,%txt))) DLF.Win.Filter $1-
-  if ((%DLF.filter.ads == 1) && ($hiswm(chantext.ads,%txt))) DLF.Win.Ads $1-
-  if ((%DLF.filter.requests == 1) && ($DLF.Chan.IsCmd(%txt))) DLF.Win.Filter $1-
+  if ($hiswm(chantext.spam,%txt)) { echo -s spam | DLF.Chan.SpamFilter $1- }
+  if ($hiswm(chantext.always,%txt)) { echo -s always | DLF.Win.Filter $1- }
+  if ((%DLF.filter.ads == 1) && ($hiswm(chantext.announce,%txt))) { echo -s announce | DLF.Win.Filter $1- }
+  if ((%DLF.filter.ads == 1) && ($hiswm(chantext.ads,%txt))) { echo -s ads | DLF.Win.Ads $1- }
+  if ((%DLF.filter.requests == 1) && ($DLF.Chan.IsCmd(%txt))) { echo -s cmd | DLF.Win.Filter $1- }
   DLF.Chan.ControlCodes $1-
 }
 
@@ -934,7 +941,6 @@ alias -l DLF.Chan.SpamFilter {
 alias -l DLF.Priv.Text {
   DLF.Watch.Called DLF.Priv.Text
   DLF.@find.Response $1-
-  DLF.Priv.Request $1-
   if ($DLF.DccSend.IsTrigger) DLF.Win.Server $1-
   DLF.Priv.QueryOpen $1-
   DLF.Custom.Filter $1-
@@ -1671,8 +1677,7 @@ alias -l DLF.Custom.Set {
 alias -l DLF.Custom.CreateHash {
   var %hash $+(DLF.custfilt.,$1)
   var %filt [ [ $+(%,DLF.custom.,$1) ] ]
-  if ($hget(%hash)) hfree %hash
-  hmake %hash 10
+  DLF.hmake %hash
   var %i $numtok(%filt,$asc($comma))
   while (%i) {
     hadd %hash %i $gettok(%filt,%i,$asc($comma))
@@ -1927,7 +1932,7 @@ alias -l DLF.Win.Echo {
   else {
     var %sent
     var %i $comchan($3,0)
-    if ((%i == 0) || ($3 == $me) || (($2 == Private) && ($notify($3))) {
+    if ((%i == 0) || ($3 == $me) || (($2 == Private) && ($notify($3)))) {
       if (($window($active).type !isin custom listbox) && ((($DLF.IsServiceUser($3)) && (!$DLF.Event.JustConnected)) || ($3 == $me))) {
         echo -atc %col %pref %line
         DLF.Watch.Log Echoed: To active window $active
@@ -3888,6 +3893,11 @@ alias -l hiswm {
   return %result
 }
 
+alias -l DLF.hmake {
+  if ($hget($1)) hfree $1
+  hmake $1
+}
+
 alias -l DLF.hadd {
   var %h DLF. $+ $1
   if (!$hget(%h)) hmake %h 10
@@ -3899,14 +3909,14 @@ alias -l DLF.hadd {
 alias -l DLF.CreateHashTables {
   var %matches 0
 
-  if ($hget(DLF.chantext.mistakes)) hfree DLF.chantext.mistakes
+  DLF.hmake DLF.chantext.mistakes
   DLF.hadd chantext.mistakes quit
   DLF.hadd chantext.mistakes exit
   DLF.hadd chantext.mistakes :quit
   DLF.hadd chantext.mistakes :exit
   inc %matches $hget(DLF.chantext.mistakes,0).item
 
-  if ($hget(DLF.chantext.ads)) hfree DLF.chantext.ads
+  DLF.hmake DLF.chantext.ads
   DLF.hadd chantext.ads * CSE Fact *
   DLF.hadd chantext.ads *@*DragonServe*
   DLF.hadd chantext.ads *@*Finålity*
@@ -3949,7 +3959,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *QNet Advanced DCC File Server*Sharing *B of stuff!*
   inc %matches $hget(DLF.chantext.ads,0).item
 
-  if ($hget(DLF.chantext.announce)) hfree DLF.chantext.announce
+  DLF.hmake DLF.chantext.announce
   DLF.hadd chantext.announce *Has The Best Servers*We have * Servers Sharing * Files*
   DLF.hadd chantext.announce *§ÐfíñÐ âÐÐ-øñ§*
   DLF.hadd chantext.announce *« Ë×Çü®§îöñ »*
@@ -4087,7 +4097,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce Escribe: * !*.mp3*
   inc %matches $hget(DLF.chantext.announce,0).item
 
-  if ($hget(DLF.chantext.always)) hfree DLF.chantext.always
+  DLF.hmake DLF.chantext.always
   DLF.hadd chantext.always "find *
   DLF.hadd chantext.always #find *
   DLF.hadd chantext.always quit
@@ -4108,14 +4118,14 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.always <*> *
   inc %matches $hget(DLF.chantext.always,0).item
 
-  if ($hget(DLF.chantext.dlf)) hfree DLF.chantext.dlf
+  DLF.hmake DLF.chantext.dlf
   DLF.hadd chantext.dlf $strip($DLF.logo) *
   inc %matches $hget(DLF.chantext.dlf,0).item
 
-  if ($hget(DLF.chantext.spam)) hfree DLF.chantext.spam
+  DLF.hmake DLF.chantext.spam
   inc %matches $hget(DLF.chantext.spam,0).item
 
-  if ($hget(DLF.chanaction.away)) hfree DLF.chanaction.away
+  DLF.hmake DLF.chanaction.away
   DLF.hadd chanaction.away *asculta*
   DLF.hadd chanaction.away *Avertisseur*Journal*
   DLF.hadd chanaction.away *está away*pager*
@@ -4139,17 +4149,17 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chanaction.away *[Backing Up]*
   inc %matches $hget(DLF.chanaction.away,0).item
 
-  if ($hget(DLF.chanaction.spam)) hfree DLF.chanaction.spam
+  DLF.hmake DLF.chanaction.spam
   DLF.hadd chanaction.spam *FTP*port*user*pass*
   DLF.hadd chanaction.spam *get AMIP*plug-in at http*amip.tools-for.net*
   inc %matches $hget(DLF.chanaction.spam,0).item
 
-  if ($hget(DLF.channotice.spam)) hfree DLF.channotice.spam
+  DLF.hmake DLF.channotice.spam
   DLF.hadd channotice.spam *free-download*
   DLF.hadd channotice.spam *WWW.TURKSMSBOT.CJB.NET*
   inc %matches $hget(DLF.channotice.spam,0).item
 
-  if ($hget(DLF.chanctcp.spam)) hfree DLF.chanctcp.spam
+  DLF.hmake DLF.chanctcp.spam
   DLF.hadd chanctcp.spam ASF*
   DLF.hadd chanctcp.spam MP*
   DLF.hadd chanctcp.spam RAR*
@@ -4158,11 +4168,11 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chanctcp.spam SLOTS*
   inc %matches $hget(DLF.chanctcp.spam,0).item
 
-  if ($hget(DLF.chanctcp.server)) hfree DLF.chanctcp.server
+  DLF.hmake DLF.chanctcp.server
   DLF.hadd chanctcp.server *OmeNServE*
   inc %matches $hget(DLF.chanctcp.server,0).item
 
-  if ($hget(DLF.privtext.spam)) hfree DLF.privtext.spam
+  DLF.hmake DLF.privtext.spam
   DLF.hadd privtext.spam *http*sex*
   DLF.hadd privtext.spam *http*xxx*
   DLF.hadd privtext.spam *porn*http*
@@ -4174,13 +4184,13 @@ alias -l DLF.CreateHashTables {
   DLF.hadd privtext.spam *xxx*www*
   inc %matches $hget(DLF.privtext.spam,0).item
 
-  if ($hget(DLF.privaction.spam)) hfree DLF.privaction.spam
+  DLF.hmake DLF.privaction.spam
   inc %matches $hget(DLF.privaction.spam,0).item
 
-  if ($hget(DLF.privnotice.spam)) hfree DLF.privnotice.spam
+  DLF.hmake DLF.privnotice.spam
   inc %matches $hget(DLF.privnotice.spam,0).item
 
-  if ($hget(DLF.privtext.server)) hfree DLF.privtext.server
+  DLF.hmake DLF.privtext.server
   DLF.hadd privtext.server *Empieza transferencia*IMPORTANTE*dccallow*
   DLF.hadd privtext.server *I don't have*Please check your spelling or get my newest list by typing @* in the channel*
   DLF.hadd privtext.server *Petición rechazada*DragonServe*
@@ -4199,7 +4209,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd privtext.server Sorry, I'm making a new list right now, please try later*
   inc %matches $hget(DLF.privtext.server,0).item
 
-  if ($hget(DLF.privtext.away)) hfree DLF.privtext.away
+  DLF.hmake DLF.privtext.away
   DLF.hadd privtext.away *AFK, auto away after*minutes. Gone*
   DLF.hadd privtext.away *automated msg*
   DLF.hadd privtext.away *Away*Reason*Auto Away*
@@ -4212,7 +4222,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd privtext.away *^Auto-Thanker^*
   inc %matches $hget(DLF.privtext.away,0).item
 
-  if ($hget(DLF.privnotice.server)) hfree DLF.privnotice.server
+  DLF.hmake DLF.privnotice.server
   DLF.hadd privnotice.server *«OmeN»*
   DLF.hadd privnotice.server *«SoftServe»*
   DLF.hadd privnotice.server *«[RDC]»*
@@ -4290,18 +4300,18 @@ alias -l DLF.CreateHashTables {
   DLF.hadd privnotice.server Thank you for*.*!
   inc %matches $hget(DLF.privnotice.server,0).item
 
-  if ($hget(DLF.privnotice.dnd)) hfree DLF.privnotice.dnd
+  DLF.hmake DLF.privnotice.dnd
   DLF.hadd privnotice.dnd *CTCP flood detected, protection enabled*
   DLF.hadd privnotice.dnd *SLOTS My mom always told me not to talk to strangers*
   inc %matches $hget(DLF.privnotice.dnd,0).item
 
-  if ($hget(DLF.Priv.ctcpReply)) hfree DLF.Priv.ctcpReply
+  DLF.hmake DLF.Priv.ctcpReply
   DLF.hadd ctcp.reply ERRMSG*
   DLF.hadd ctcp.reply MP3*
   DLF.hadd ctcp.reply SLOTS*
   inc %matches $hget(DLF.Priv.ctcpReply,0).item
 
-  if ($hget(DLF.find.header)) hfree DLF.find.header
+  DLF.hmake DLF.find.header
   DLF.hadd find.header *«SoftServe»*
   DLF.hadd find.header *@Find Results*SysReset*
   DLF.hadd find.header *End of @Find*
@@ -4342,7 +4352,7 @@ alias -l DLF.CreateHashTables {
   inc %matches $hget(DLF.find.header,0).item
 
   ; ps fileserv special responses
-  if ($hget(DLF.find.fileserv)) hfree DLF.find.fileserv
+  DLF.hmake DLF.find.fileserv
   DLF.hadd find.fileserv *@find·* Searching For..::*::..
   DLF.hadd find.fileserv *found * matches* on my fserve*
   DLF.hadd find.fileserv [*] Matches found in [*] Trigger..::/ctcp *
@@ -4355,7 +4365,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd find.fileserv Use @* to search *
   inc %matches $hget(DLF.find.fileserv,0).item
 
-  if ($hget(DLF.find.headregex)) hfree DLF.find.headregex
+  DLF.hmake DLF.find.headregex
   hmake DLF.find.headregex 10
   hadd DLF.find.headregex ^\s*From\s+list\s+(@\S+)\s+found\s+([0-9,]+),\s+displaying\s+([0-9]+):$ 1 2 3
   hadd DLF.find.headregex ^\s*Result.*limit\s+by\s+([0-9,]+)\s+reached\.\s+Download\s+my\s+list\s+for\s+more,\s+by\s+typing\s+(@\S+) 2 0 1
@@ -4364,7 +4374,7 @@ alias -l DLF.CreateHashTables {
   hadd DLF.find.headregex ^\s*Search\s+Result\s+\+\s+More\s+than\s+([0-9\54]+)\s+Matches\s+For\s+(.*?)\s+\+\s+Get\s+My\s+List\s+Of\s+[0-9\54]+\s+Files\s+By\s+Typing\s+(@\S+)\s+In\s+The\s+Channel\s+Or\s+Refine\s+Your\s+Search\.\s+Sending\s+first\s+([0-9\54]+)\s+Results 3 1 4 2
   inc %matches $hget(DLF.find.headregex,0).item
 
-  if ($hget(DLF.find.result)) hfree DLF.find.result
+  DLF.hmake DLF.find.result
   DLF.hadd find.result !*
   DLF.hadd find.result : !*
   inc %matches $hget(DLF.find.result,0).item
