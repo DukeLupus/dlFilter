@@ -41,30 +41,29 @@ dlFilter uses the following code from other people:
 /* CHANGE LOG
 
   Immediate TODO
-        Test location and filename for oNotice log files
-        Test window highlighting (flashing etc.) - define rules.
-        Remove Filter wrap lines options and switch to listbox and add right click functions to generate gitreports for false positive filters (with summary of filter settings).
-        Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
+      Test location and filename for oNotice log files
+      Test window highlighting (flashing etc.) - define rules.
+      Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
 
   Ideas for possible future enhancements
-        Implement toolbar functionality with right click menu
-        Check mIRC security settings not too lax
-        Manage filetype ignore list like trust list i.e. temp add for requested filetypes.
-        Advertising for sbClient for @search + option (await sbClient remediation).
-        Better icon file
-        Right click channel line menu-items for adding to custom filter (if possible since not a list window)
-        More menu options equivalent to dialog options
-        Make it work on AdiIRC and update version check handle AdiIRC.
-        Merge in sbClient functionality
-        Trim lines from Ads window for servers which have been offline for xx hours.
-        Configurable F1 etc. aliases to toggle Options, Ads, Filters, Catch-all by F key or other keys.
-          (Use On Keydown to capture and check keystrokes, have a key field for each of the options to toggle.)
-        Add right click menu items to @find windows to re-sort list by trigger and filename.
-        Request and store searchbot triggers to determine @search command validity
+      Implement toolbar functionality with right click menu
+      Check mIRC security settings not too lax
+      Manage filetype ignore list like trust list i.e. temp add for requested filetypes.
+      Advertising for sbClient for @search + option (await sbClient remediation).
+      Better icon file
+      Right click channel line menu-items for adding to custom filter (if possible since not a list window)
+      More menu options equivalent to dialog options
+      Make it work on AdiIRC and update version check handle AdiIRC.
+      Merge in sbClient functionality
+      Trim lines from Ads window for servers which have been offline for xx hours.
+      Configurable F1 etc. aliases to toggle Options, Ads, Filters, Catch-all by F key or other keys.
+        (Use On Keydown to capture and check keystrokes, have a key field for each of the options to toggle.)
+      Add right click menu items to @find windows to re-sort list by trigger and filename.
+      Request and store searchbot triggers to determine @search command validity
 
-  1.19  Enhancements
+1.19  Enhancements
 
-  1.19  Fixes
+1.19  Fixes
 
 */
 
@@ -278,7 +277,7 @@ on ^*:snotice:*: {
 
 
 ; ========= Events when dlFilter is enabled ==========
-#dlf_events off
+#dlf_events on
 
 ; Channel user activity
 ; join, part, quit, nick changes, kick
@@ -443,7 +442,7 @@ on *:keydown:@dlf.@find.*:*: { if ((!$keyrpt) && ($keyval == 3)) DLF.@find.CopyL
 
 ; Following is just in case groups get reset to default...
 ; Primarily for developers when e.g. script is reloaded on change by authors autoreload script
-#dlf_bootstrap on
+#dlf_bootstrap off
 on *:text:*:*: { DLF.Groups.Bootstrap }
 alias -l DLF.Groups.Bootstrap {
   if (%DLF.enabled != $null) DLF.Groups.Events
@@ -1487,10 +1486,10 @@ alias -l DLF.DccSend.FileRcvd {
   ; But we cannot rename if Options / DCC / Folders / Command is set
   ; because it would run after this using the wrong filename
   if ((%origfn != $null) $&
-   && (%fn != %origfn) $&
-   && ($DLF.DccSend.IsNotGetCommand(%fn)) $&
-   && ($left(%trig,1) == !) $&
-   && (. isin $gettok(%origfn,-1,$asc($space)))) {
+    && (%fn != %origfn) $&
+    && ($DLF.DccSend.IsNotGetCommand(%fn)) $&
+    && ($left(%trig,1) == !) $&
+    && (. isin $gettok(%origfn,-1,$asc($space)))) {
     var %oldfn $qt($filename)
     var %newfn $qt($+($noqt($nofile($filename)),%origfn))
     DLF.Watch.Log Renaming %oldfn to %newfn
@@ -4534,8 +4533,8 @@ alias -l DLF.GetFileName {
   while ($numtok(%txt,$asc($space))) {
     var %last $gettok(%txt,-1,$asc($space))
     if (($+($lbr,*,$rbr) iswm %last) $&
-     || ($+(CRC,$lbr,*,$rbr) iswm %last) $&
-     || (%last isnum)) %txt = $deltok(%txt,-1,$asc($space))
+      || ($+(CRC,$lbr,*,$rbr) iswm %last) $&
+      || (%last isnum)) %txt = $deltok(%txt,-1,$asc($space))
     else break
   }
   %txt = $noqt(%txt)
