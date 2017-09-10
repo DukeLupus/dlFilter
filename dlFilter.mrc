@@ -277,7 +277,6 @@ on ^*:snotice:*: {
   halt
 }
 
-
 ; ========= Events when dlFilter is enabled ==========
 #dlf_events on
 
@@ -433,6 +432,8 @@ raw 421:*: {
   echo -a $2-
   halt
 }
+
+on *:close:@DLF.Ads.*: { DLF.Ads.Close }
 
 ; Adjust titlebar on window change
 on *:active:*: { DLF.Stats.Active }
@@ -770,8 +771,8 @@ alias -l DLF.Chan.Text {
   DLF.Custom.Filter $1-
   if ($hiswm(chantext.spam,%txt)) DLF.Chan.SpamFilter $1
   if ($hiswm(chantext.always,%txt)) DLF.Win.Filter $1-
-  if ((%DLF.filter.ads == 1) && ($hiswm(chantext.announce,%txt))) DLF.Win.Filter $1-
-  if ((%DLF.filter.ads == 1) && ($hiswm(chantext.ads,%txt))) DLF.Win.Ads $1-
+  if ($hiswm(chantext.announce,%txt)) DLF.Win.AdsAnnounce $1-
+  if ($hiswm(chantext.ads,%txt)) DLF.Win.Ads $1-
   if ((%DLF.filter.requests == 1) && ($DLF.Chan.IsCmd(%txt))) DLF.Win.Filter $1-
   DLF.Chan.ControlCodes $1-
 }
@@ -1790,9 +1791,14 @@ alias -l DLF.Win.Log {
 
 alias -l DLF.Win.Ads {
   DLF.Watch.Called DLF.Win.Ads
-  DLF.Chan.SetNickColour
   DLF.Ads.Add $1-
-  DLF.Win.Filter $1-
+  DLF.Win.AdsAnnounce $1-
+}
+
+alias -l DLF.Win.AdsAnnounce {
+  DLF.Watch.Called DLF.Win.AdsAnnounce
+  DLF.Chan.SetNickColour
+  if (%DLF.filter.ads == 1) DLF.Win.Filter $1-
 }
 
 alias -l DLF.Win.IsInvalidSelection {
@@ -1851,7 +1857,7 @@ alias -l DLF.Win.WinOpen {
   if ($window(%win)) return %win
   var %lfn $DLF.Win.LogName(%win)
   var %switches $2
-  if (%DLF.perconnect == 0) %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ z,1,$asc($space))
+  if (%DLF.perconnect == 0) %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ iz,1,$asc($space))
   if ((%DLF.background == 1) && ($4 == 0)) %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ h,1,$asc($space))
   window %switches %win
   if (($3) && ($isfile(%lfn))) loadbuf $windowbuffer -rpi %win %lfn
@@ -1983,18 +1989,21 @@ alias -l DLF.Win.NickChgDCC {
   dcc nick $2-
 }
 
-; DLF.Win.ShowHide @dlF.Filter/Ads* 1/0
+; DLF.Win.ShowHide Filter/Ads. 1/0
 alias -l DLF.Win.ShowHide {
-  if (%DLF.background == 1) {
-    var %i $window($1,0)
+  var %win $+(@DLF.,$1,*)
+  if ((%DLF.background == 1) || ($1 == Ads.)) {
+    var %i $window(%win,0)
+    if ($2 == 1) var %flags -w3
+    else var %flags -h
     while (%i) {
-      if ($2 == 1) var %flags -w3
-      else var %flags -h
-      window %flags $window($1,%i)
+      var %w $window(%win,%i)
+      window %flags %w
+      if (($2 == 1) && ($network == $gettok(%w,-1,$asc(.)))) window -a %w
       dec %i
     }
   }
-  elseif ($2 == 0) close -@ $1
+  elseif ($2 == 0) close -@ %win
 }
 
 ; If user has scrolled up from the bottom of custom window, mIRC does not delete excess lines
@@ -2038,9 +2047,7 @@ menu @dlF.Ads.* {
 alias -l DLF.Ads.Add {
   if ((%DLF.serverads == 0) && (%DLF.background == 0)) return
   DLF.Watch.Called DLF.Ads.Add
-  if (%DLF.perconnect == 1) var %tabs -t20,40
-  else var %tabs -t30,55
-  var %win $DLF.Win.WinOpen(Ads,-k0nwl %tabs,0,%DLF.serverads,0 %tb)
+  var %win $DLF.Ads.OpenWin(Ads)
   if ($line(%win,0) == 0) {
     aline -n 6 %win This window shows adverts from servers describing how many files they have and how to get a list of their files.
     aline -n 2 %win However you will probably find it easier to use "@search search words" (or "@find search words") to locate files you want.
@@ -2048,6 +2055,7 @@ alias -l DLF.Ads.Add {
     aline -n 4 %win You can double-click to have the request for the list of files sent for you.
     aline -n 1 %win $crlf
   }
+  if ($0 == 0) return
   var %line $DLF.Win.LineFormat($event $chan $nick $replace($DLF.strip($1-),$tab,$null))
   var %ad $gettok(%line,3-,$asc($space))
   while ($left(%ad,1) == $space) %ad = $right(%ad,-1)
@@ -2063,20 +2071,26 @@ alias -l DLF.Ads.Add {
   %line = $gettok(%line,1,$asc($space)) $tab $+ $gettok(%line,2,$asc($space)) $tab $+ %ad
   var %nc $chan
   if (%DLF.perconnect == 0) %nc = $+($network,$chan)
-  DLF.Ads.AddLine %win %nc $nick %line
+  DLF.Ads.AddLine %win 3 %nc $nick %line
 }
 
-; DLF.Ads.AddLine win netchan nick line
+alias -l DLF.Ads.OpenWin {
+  if (%DLF.perconnect == 1) var %tabs -t20,40
+  else var %tabs -t30,55
+  return $DLF.Win.WinOpen($1,-k0nwl %tabs,0,%DLF.serverads,0 %tb)
+}
+
+; DLF.Ads.AddLine win colour netchan nick line
 alias -l DLF.Ads.AddLine {
-  if ($fline($1,$4-,0) > 0) {
+  if ($fline($1,$5-,0) > 0) {
     DLF.Watch.Log Advert: Identical to existing
     return
   }
-  var %srch $DLF.Ads.SearchText($4-)
-  var %match $+([,$2,]*,$tag(* $+ $3),*)
+  var %srch $DLF.Ads.SearchText($5-)
+  var %match $+([,$3,]*,$tag(* $+ $4),*)
   var %i $fline($1,%match,0)
   if (%i == 0) {
-    %match = $+([,$2,]*)
+    %match = $+([,$3,]*)
     %i = $fline($1,%match,0)
   }
   if (%i == 0) {
@@ -2089,10 +2103,10 @@ alias -l DLF.Ads.AddLine {
     var %l $line($1,%ln)
     var %s $DLF.Ads.SearchText(%l)
     if (%s == %srch) {
-      if ($4- != %l) {
+      if ($5- != %l) {
         var %selected
         if ($line($1,%ln).state) %selected = -a
-        rline %selected 3 $1 %ln $4-
+        rline %selected $2 $1 %ln $5-
         DLF.Watch.Log Advert: Replaced
       }
       else DLF.Watch.Log Advert: Not replaced
@@ -2100,14 +2114,14 @@ alias -l DLF.Ads.AddLine {
     }
     elseif (%s < %srch) {
       inc %ln
-      iline 3 $1 %ln $4-
+      iline $2 $1 %ln $5-
       DLF.Watch.Log Advert: Inserted
       break
     }
     dec %i
   }
   if (%i == 0) {
-    iline 3 $1 %ln $4-
+    iline $2 $1 %ln $5-
     DLF.Watch.Log Advert: $nick prepended
   }
   window -b $1
@@ -2238,7 +2252,7 @@ alias -l DLF.Ads.NickChg {
       DLF.Watch.Log Renaming Ad line $nick -> $newnick : %l
       ; Delete and re-add to ensure in the correct sort order
       dline %win %ln
-      DLF.Ads.AddLine %win %nc $newnick %l
+      DLF.Ads.AddLine %win 3 %nc $newnick %l
     }
   }
 }
@@ -2283,6 +2297,72 @@ alias -l DLF.Ads.ColourLines {
   }
 }
 
+alias -l DLF.Ads.Merge {
+  var %active $active
+  var %i $window(@DLF.Ads.*,0)
+  if (%i == 0) return
+  DLF.Ads.Add
+  var %win $DLF.Win.WinName(Ads)
+  while (%i) {
+    var %oldwin $window(@DLF.Ads.*,%i)
+    var %net $gettok(%oldwin,-1,$asc(.))
+    var %j $line(%oldwin,0)
+    while (%j) {
+      var %l $line(%oldwin,%j)
+      if (%l == $crlf) break
+      var %chan $left($right($gettok(%l,1,$asc($tab)),-1),-2)
+      var %nc = $+(%net,%chan)
+      var %col = $line(%oldwin,%j).color
+      DLF.Ads.AddLine %win %col %nc $DLF.Win.NickFromTag($gettok(%l,2,$asc($tab))) $sbr(%nc) $tab $+ $deltok(%l,1,$asc($tab))
+      dec %j
+    }
+    close -@ %oldwin
+    dec %i
+  }
+  if ($left(%active,9) == @DLF.Ads.) window -a %win
+}
+
+alias -l DLF.Ads.Split {
+  var %oldwin @DLF.Ads.All
+  if (!$window(%oldwin)) return
+  var %i $scon(0)
+  while (%i) {
+    scon %i
+    var %match $+([,$network,*]*)
+    var %nl - $+ $len($network)
+    var %j $fline(%oldwin,%match,0)
+    if (%j) DLF.Ads.Add
+    while (%j) {
+      var %ln $fline(%oldwin,%match,%j)
+      var %l $line(%oldwin,%ln)
+      var %col $line(%oldwin,%ln).color
+      var %nc $left($right($gettok(%l,1,$asc($tab)),-1),-2)
+      var %nc $right(%nc,%nl)
+      if ($left(%nc,1) isin $chantypes) DLF.Ads.AddLine $DLF.Win.WinName(Ads) %col %nc $DLF.Win.NickFromTag($gettok(%l,2,$asc($tab))) $sbr(%nc) $tab $+ $deltok(%l,1,$asc($tab))
+      dec %j
+    }
+    dec %i
+  }
+  scon -r
+  close -@ %oldwin
+}
+
+alias DLF.Ads.Close {
+  DLF.Watch.Called DLF.Ads.Close $target
+  var %win $DLF.Ads.OpenWin(Ads.New)
+  DLF.Options.ToggleOption serverads 40
+  DLF.Options.SetButtonTextAds
+  DLF.Win.ShowHide Ads. %DLF.serverads
+  filter -wwz $target %win *
+  .timer 1 0 .signal DLF.Ads.CloseRen %win $target
+}
+
+on *:signal:DLF.Ads.CloseRen: { DLF.Ads.CloseRen $1- }
+alias DLF.Ads.CloseRen {
+  if ($window($2)) close -@ $2
+  if ($window($1)) renwin $1 $2
+}
+
 ; ========== Search within Filter / Server / Watch windows - new lines added dynamically ==========
 menu @dlF.*Search.* {
   Copy line: {
@@ -2296,7 +2376,6 @@ menu @dlF.*Search.* {
 }
 
 on *:input:@dlF.*Search.*: DLF.Search.Show $target $1-
-
 alias -l DLF.Search.Show {
   DLF.Watch.Called DLF.Search.Show $1-
   if ($2 == $null) return
@@ -2933,7 +3012,7 @@ dialog -l DLF.Options.GUI {
   check "Filter channel topic messages", 350, 7 95 155 6, tab 3
   check "Filter server responses to my requests to separate window", 355, 7 104 155 6, tab 3
   check "Separate dlF windows per connection", 365, 7 122 155 6, tab 3
-  check "Keep Filter and Ads windows active in background", 370, 7 131 155 6, tab 3
+  check "Keep Filter windows active in background", 370, 7 131 155 6, tab 3
   box " Filter user events ", 375, 4 142 160 57, tab 3
   check "Joins …", 380, 7 152 53 6, tab 3
   check "Parts …", 382, 66 152 53 6, tab 3
@@ -3134,13 +3213,13 @@ alias -l DLF.Options.InitOption {
 alias -l DLF.Options.ToggleShowFilter {
   DLF.Options.ToggleOption showfiltered 30
   DLF.Options.SetButtonTextFilter
-  DLF.Win.ShowHide @dlF.Filter* %DLF.showfiltered
+  DLF.Win.ShowHide Filter %DLF.showfiltered
 }
 
 alias -l DLF.Options.ToggleShowAds {
   DLF.Options.ToggleOption serverads 40
   DLF.Options.SetButtonTextAds
-  DLF.Win.ShowHide @dlF.Ads.* %DLF.serverads
+  DLF.Win.ShowHide Ads. %DLF.serverads
 }
 
 alias -l DLF.Options.SetButtonTextFilter { DLF.Options.SetButtonText 30 Filter windows }
@@ -3324,14 +3403,14 @@ alias -l DLF.Options.PerConnection {
   DLF.Stats.Active
   close -a@ @dlF.Filter*
   close -a@ @dlF.Server*
-  close -a@ @dlF.Ads.*
+  if (%DLF.perconnect == 1) DLF.Ads.Split
+  else DLF.Ads.Merge
 }
 
 alias -l DLF.Options.Background {
   DLF.Options.Save
   if (%DLF.background == 1) return
   if (%DLF.showfiltered == 0) close -a@ @dlF.Filter*
-  if (%DLF.serverads == 0) close -a@ @dlF.Ads.*
 }
 
 alias -l DLF.Options.Titlebar {
@@ -3358,8 +3437,8 @@ alias -l DLF.Options.ClickOption {
   DLF.Options.Save
   DLF.Options.SetButtonTextFilter
   DLF.Options.SetButtonTextAds
-  DLF.Win.ShowHide @dlF.Filter* %DLF.showfiltered
-  DLF.Win.ShowHide @dlF.Ads.* %DLF.serverads
+  DLF.Win.ShowHide Filter %DLF.showfiltered
+  DLF.Win.ShowHide Ads. %DLF.serverads
   if (($did == 190) && (!$sock(DLF.Socket.Update))) {
     if (%DLF.update.betas == 0) DLF.Update.CheckVersions
     else DLF.Update.Run
