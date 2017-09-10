@@ -1180,7 +1180,7 @@ alias -l DLF.Away.Filter {
 }
 
 ; ==========  Filtering Stats in titlebar ==========
-alias -l DLF.Stats.Count { if (($1 != Private) && ($1 != $hashtag)) hinc -m DLF.stats $+($network,$1,|,$2) }
+alias -l DLF.Stats.Count { hinc -m DLF.stats $+($network,$1,|,$2) }
 alias -l DLF.Stats.Get { return $hget(DLF.stats,$+($network,$1,|,$2)) }
 alias -l DLF.Stats.TitleText { return $+(dlFilter efficiency:,$space,$1,%) }
 
@@ -1809,7 +1809,7 @@ alias -l DLF.Win.Log {
   if (($window($4)) && ($event == open)) .window -c $4
   elseif ($dqwindow & 4) close -d
   var %type $1
-  if (($1 == Filter) && ($2 != ctcpsend) && ($4 != $me)) {
+  if (($1 == Filter) && ($2 !isin ctcpsend blocked warning) && ($3 != Private) && ($4 != $me)) {
     if ($3 != $hashtag) DLF.Stats.Count $3 Filter
     else {
       var %i $comchan($4,0)
