@@ -809,47 +809,47 @@ alias -l DLF.Chan.ctcp {
 
 alias -l DLF.Chan.IsCmd {
   tokenize $asc($space) $1-
-  if ($0 == 0) return $true
+  if ($1 == !seen) return $false
+  if ($left($1,1) isin @!) return $true
   ; Handle mistyped !nick, @search or @nick with incorrect/without trigger character
   var %fn $DLF.GetFileName($2-)
-  var %cc $left($1,2)
+  var %c2 $right($1,-1)
+  var %after $gettok(%c2,1,$asc(-))
   if (%fn) {
-    ; correct format
-    if ($left($1,1) == !) return $true
-    ; Missed ! on file get
+    ; Check for mistyped ! file get triggers
+    ; Missed !
     if ($1 ison $chan) return $true
-    ; Mistyped !  on file get
-    if ($right($1,-1) ison $chan) return $true
-    ; Extra character on file get
-    if (($right(%cc,1) == !) && ($right($1,-2) ison $chan)) return $true
+    ; Mistyped ! on file get
+    if (%c2 ison $chan) return $true
+    ; Extra characters preceeding ! trigger
+    if ($gettok($1,2,$asc(!)) ison $chan) return $true
   }
   elseif ($0 == 1) {
-    ; correct format
-    if ($left($1,1) == @) return $true
-    ; Missed @ on server list
+    ; Check for mistyped @server get triggers
+    ; Missed @
     if ($1 ison $chan) return $true
     if ($gettok($1,1,$asc(-)) ison $chan) return $true
     ; Mistyped @ on server list
-    if ($right($1,-1) ison $chan) return $true
-    if ($gettok($right($1,-1),1,$asc(-)) ison $chan) return $true
-    ; Extra character on file get
-    if (($right(%cc,1) == @) && ($right($1,-2) ison $chan)) return $true
+    if (%c2 ison $chan) return $true
+    if ($gettok(%c2,1,$asc(-)) ison $chan) return $true
+    ; Extra characters preceeding @trigger
+    if (%after ison $chan) return $true
+    if ($gettok(%after,1,$asc(-)) ison $chan) return $true
   }
   else {
-    ; correct format
-    if ($left($1,7) == @search) return $true
-    if ($left($1,5) == @find) return $true
+    ; search / find / locator
     ; Missed @
     if ($1 == find) return $true
-    ; @ space find/search
-    if (($1 == @) && ($2 == find)) return $true
-    if (($1 == @) && ($left($1,6) == search)) return $true
+    if ($1 == locator) return $true
+    if (($left($1,6) == search) && (($1 ison $chan) || ($right($1,-6) ison $chan))) return $true
     ; Mistyped @
-    if (($mid($1,2,6) == search) && ($right($1,-1) ison $chan)) return $true
-    if ($mid($1,2,4) == find) return $true
-    ; Extra character on search
-    if (($right(%cc,1) == @) && ($mid($1,3,6) == search) && ($right($1,-2) ison $chan)) return $true
-    if (($right(%cc,1) == @) && ($mid($1,3,4) == find)) return $true
+    if (%c2 == find) return $true
+    if (%c2 == locator) return $true
+    if ($left(%c2,6) == search) && ((%c2 ison $chan) || ($right(%c2,-6) ison $chan))) return $true
+    ; Extra characters on search
+    if (%after == find) return $true
+    if (%after == locator) return $true
+    if ($left(%after,6) == search) && ((%after ison $chan) || ($right(%after,-6) ison $chan))) return $true
   }
   if ($hiswm(chantext.mistakes,$1-)) return $true
   return $false
