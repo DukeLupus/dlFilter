@@ -2328,8 +2328,7 @@ alias -l DLF.Ads.Split {
   var %i $scon(0)
   while (%i) {
     scon %i
-    var %repl $+([,$network)
-    var %match $+(%repl,*]*)
+    var %match $+([,$network,*]*)
     var %nl - $+ $len($network)
     var %j $fline(%oldwin,%match,0)
     if (%j) DLF.Ads.Add
