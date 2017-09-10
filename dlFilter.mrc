@@ -987,7 +987,7 @@ alias -l DLF.Trivia.QuestionStart {
 alias -l DLF.Trivia.QuestionMatch {
   if ($1 iswm $2) {
     DLF.Watch.Log Trivia mask $1 $3 matches $2
-    if (%DLF.filter.trivia == 1) DLF.Win.Filter $1-
+    if (%DLF.filter.trivia == 1) DLF.Win.Filter $2-
     return $true
   }
   return $false
@@ -1003,7 +1003,7 @@ alias -l DLF.Trivia.QuestionAnswer {
     if ($DLF.Trivia.QuestionMatch(%wm,$1-)) return
     ; Not an exact match - possibly a typo with 1 greater or fewer letter
     var %j = $numtok(%wm,$asc($space))
-    while (&j) {
+    while (%j) {
       if ($DLF.Trivia.QuestionMatch($puttok(%wm,$left($gettok(%wm,%j,$asc($space)),-1),%j,$asc($space)),$1-,fuzzy)) return
       if ($DLF.Trivia.QuestionMatch($puttok(%wm,$gettok(%wm,%j,$asc($space)) $+ ?,%j,$asc($space)),$1-,fuzzy)) return
       dec %j
