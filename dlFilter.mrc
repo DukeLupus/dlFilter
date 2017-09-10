@@ -1,4 +1,4 @@
-1/*
+/*
 DLFILTER -=- Firewall, anti-spam for mIRC
 and message filter for file sharing channels.
 Authors: DukeLupus and Sophist
