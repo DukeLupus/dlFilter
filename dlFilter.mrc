@@ -60,9 +60,8 @@ dlFilter uses the following code from other people:
       Add right click menu items to @find windows to re-sort list by trigger and filename.
       Request and store searchbot triggers to determine @search command validity
 
-1.19  Enhancements
-
-1.19  Fixes
+1.19  Enhancements & fixes
+      Add filtering for trivia bots
 
 */
 
