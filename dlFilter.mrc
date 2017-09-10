@@ -771,8 +771,8 @@ alias -l DLF.Chan.Text {
   DLF.Custom.Filter $1-
   if ($hiswm(chantext.spam,%txt)) DLF.Chan.SpamFilter $1
   if ($hiswm(chantext.always,%txt)) DLF.Win.Filter $1-
-  if ((%DLF.filter.ads == 1) && ($hiswm(chantext.announce,%txt))) DLF.Win.Filter $1-
-  if ((%DLF.filter.ads == 1) && ($hiswm(chantext.ads,%txt))) DLF.Win.Ads $1-
+  if ($hiswm(chantext.announce,%txt)) DLF.Win.AdsAnnounce $1-
+  if ($hiswm(chantext.ads,%txt)) DLF.Win.Ads $1-
   if ((%DLF.filter.requests == 1) && ($DLF.Chan.IsCmd(%txt))) DLF.Win.Filter $1-
   DLF.Chan.ControlCodes $1-
 }
@@ -1791,9 +1791,14 @@ alias -l DLF.Win.Log {
 
 alias -l DLF.Win.Ads {
   DLF.Watch.Called DLF.Win.Ads
-  DLF.Chan.SetNickColour
   DLF.Ads.Add $1-
-  DLF.Win.Filter $1-
+  DLF.Win.AdsAnnounce $1-
+}
+
+alias -l DLF.Win.AdsAnnounce {
+  DLF.Watch.Called DLF.Win.AdsAnnounce
+  DLF.Chan.SetNickColour
+  if (%DLF.filter.ads == 1) DLF.Win.Filter $1-
 }
 
 alias -l DLF.Win.IsInvalidSelection {
