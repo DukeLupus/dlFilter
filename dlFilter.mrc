@@ -984,6 +984,15 @@ alias -l DLF.Trivia.QuestionStart {
   DLF.Trivia.Filter $1-
 }
 
+alias -l DLF.Trivia.QuestionMatch {
+  if ($1 iswm $2) {
+    DLF.Watch.Log Trivia mask $1 $3 matches $2
+    if (%DLF.filter.trivia == 1) DLF.Win.Filter $1-
+    return $true
+  }
+  return $false
+}
+
 alias -l DLF.Trivia.QuestionAnswer {
   DLF.Watch.Called DLF.Trivia.QuestionAnswer
   var %match = $+($network,$chan,@,*)
@@ -991,10 +1000,15 @@ alias -l DLF.Trivia.QuestionAnswer {
   while (%i) {
     var %idx $hfind(DLF.trivia.hints,%match,%i,w)
     var %wm $hget(DLF.trivia.hints,%idx)
-    if (%wm iswm $1-) {
-      DLF.Watch.Log Trivia mask %wm matches $1-
-      if (%DLF.filter.trivia == 1) DLF.Win.Filter $1-
+    if ($DLF.Trivia.QuestionMatch(%wm,$1-)) return
+    ; Not an exact match - possibly a typo with 1 greater or fewer letter
+    var %j = $numtok(%wm,$asc($space))
+    while (&j) {
+      if ($DLF.Trivia.QuestionMatch($puttok(%wm,$left($gettok(%wm,%j,$asc($space)),-1),%j,$asc($space)),$1-,fuzzy)) return
+      if ($DLF.Trivia.QuestionMatch($puttok(%wm,$gettok(%wm,%j,$asc($space)) $+ ?,%j,$asc($space)),$1-,fuzzy)) return
+      dec %j
     }
+    DLF.Watch.Log Trivia mask %wm does not match $1-
     dec %i
   }
 }
