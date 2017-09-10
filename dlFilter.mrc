@@ -2345,6 +2345,7 @@ alias -l DLF.Ads.Split {
 
 alias DLF.Ads.Close {
   DLF.Watch.Called DLF.Ads.Close $target
+  var %win $DLF.Ads.OpenWin(Ads.New)
   DLF.Options.ToggleOption serverads 40
   DLF.Options.SetButtonTextAds
   DLF.Win.ShowHide Ads. %DLF.serverads
