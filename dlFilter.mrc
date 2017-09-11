@@ -1037,7 +1037,6 @@ alias -l DLF.Trivia.Answer {
       }
       dec %j
     }
-    echo $chan Trivia: Answer $qt($1-) does not match any masks
     DLF.Watch.Log Trivia: Answer $qt($1-) does not match any masks
     dec %i
   }
