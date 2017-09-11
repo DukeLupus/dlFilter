@@ -773,8 +773,6 @@ alias -l DLF.Chan.Text {
   if ($hiswm(chantext.announce,%txt)) DLF.Win.AdsAnnounce $1-
   if ($hiswm(chantext.spam,%txt)) DLF.Chan.SpamFilter $1
   if ($hiswm(chantext.always,%txt)) DLF.Win.Filter $1-
-  if (zachary isin $nick) echo $chan $nick not filtered here 1
-  if (zachary isin $nick) DLF.Watch.Log $nick not filtered here 1
   if (%txt != $1-) {
     if ($hiswm(chantext.fileserv,%txt)) DLF.Win.AdsAnnounce $1-
     if ($DLF.Trivia.IsTriviaBot) {
