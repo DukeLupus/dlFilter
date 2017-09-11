@@ -306,9 +306,8 @@ on ^*:kick:#: {
   DLF.Event.Kick $knick %addr was kicked %fromchan by $nick %txt
 }
 on ^*:nick: {
-  var %addr
-  if (!$shortjoinsparts) %addr = $br($address($nick,5))
-  DLF.Event.Nick $nick %addr is now known as $newnick
+  if ($nick == $newnick) DLF.Halt Nick failed.
+  DLF.Event.Nick $nick is now known as $newnick
 }
 on ^*:quit: {
   var %txt, %quits, %quit
@@ -422,13 +421,18 @@ raw 005:*: { DLF.iSupport.Raw005 $1- }
 ; Filter away messages
 raw 301:*: { DLF.Away.Filter $1- }
 
-; Show "Unknown command" / "No such nick/channel" messages in active window (rather than hidden in status)
+; Show messages in status AND active windows (rather than just status)
+; Unknown command / No such nick/channel / Nick change too fast
 raw 401:*: {
-  echo -a $2-
+  echo -ast $2-
   halt
 }
 raw 421:*: {
-  echo -a $2-
+  echo -ast $2-
+  halt
+}
+raw 438:*: {
+  echo -ast $2-
   halt
 }
 
@@ -529,7 +533,7 @@ alias -l DLF.Event.Nick {
   DLF.Ops.NickChg
   DLF.Ads.NickChg
   DLF.Win.NickChg
-  if ($DLF.Chan.IsUserEvent(%DLF.filter.nicks)) DLF.User.NoChannel $newnick $1-
+  if ($DLF.Chan.IsUserEvent(%DLF.filter.nicks)) DLF.User.NoChannel $1-
 }
 
 alias -l DLF.Event.Quit {
@@ -585,17 +589,22 @@ alias -l DLF.User.Channel {
 ; Non-channel user activity
 ; nick changes, quit
 alias -l DLF.User.NoChannel {
-  DLF.Watch.Called DLF.User.NoChannel $1
-  if ($notify($nick)) {
+  var %nick $DLF.Chan.TargetNick
+  DLF.Watch.Called DLF.User.NoChannel $nick
+  if (($nick == $me) || (%nick == $me)) {
+    DLF.Watch.Log Not filtered: Me
+    return
+  }
+  if (($notify($nick)) || ($notify(%nick))) {
     DLF.Watch.Log Not filtered: Notify user
     return
   }
   var %dlfchan $false
   if (%DLF.netchans != $hashtag) {
-    var %i $comchan($1,0)
+    var %i $comchan(%nick,0)
     while (%i) {
-      var %chan $comchan($1,%i)
-      if (($nick == $me) || ($DLF.Chan.IsDlfChan(%chan) == $false)) echo -tc $event %chan * $2-
+      var %chan $comchan(%nick,%i)
+      if (($nick == $me) || ($DLF.Chan.IsDlfChan(%chan) == $false)) echo -tc $event %chan * $1-
       else {
         DLF.Stats.Count %chan Total
         %dlfchan = $true
@@ -603,7 +612,7 @@ alias -l DLF.User.NoChannel {
       dec %i
     }
   }
-  if (%dlfchan) DLF.Win.Log Filter $event $hashtag $nick $2-
+  if (%dlfchan) DLF.Win.Log Filter $event $hashtag $nick $1-
   else DLF.Watch.Log Echoed to all common $network channels
   halt
 }
@@ -1201,7 +1210,10 @@ alias -l DLF.Away.Filter {
 }
 
 ; ==========  Filtering Stats in titlebar ==========
-alias -l DLF.Stats.Count { hinc -m DLF.stats $+($network,$1,|,$2) }
+alias -l DLF.Stats.Count {
+  DLF.Watch.Called DLF.Stats.Count $1-
+  hinc -m DLF.stats $+($network,$1,|,$2)
+}
 alias -l DLF.Stats.Get { return $hget(DLF.stats,$+($network,$1,|,$2)) }
 alias -l DLF.Stats.TitleText { return $+(dlFilter efficiency:,$space,$1,%) }
 
@@ -1827,15 +1839,23 @@ alias -l DLF.Win.Server {
 }
 
 alias -l DLF.Win.Log {
+  DLF.Watch.Called DLF.Win.Log $1-4
   if (($window($4)) && ($event == open)) .window -c $4
   elseif ($dqwindow & 4) close -d
-  var %type $1
-  if (($1 == Filter) && ($2 !isin ctcpsend blocked warning) && ($3 != Private) && ($4 != $me)) {
+  var %type $1, %nick $DLF.Chan.TargetNick
+  if (($1 == Filter) $&
+   && (!$istok(ctcpsend blocked warning,$2,$asc($space))) $&
+   && ($3 != Private) $&
+   && (!$notify($4)) $&
+   && (!$notify($nick)) $&
+   && (!$notify(%nick)) $&
+   && ($4 != $me) $&
+   ) {
     if ($3 != $hashtag) DLF.Stats.Count $3 Filter
     else {
-      var %i $comchan($4,0)
+      var %i $comchan(%nick,0)
       while (%i) {
-        var %chan $comchan($4,%i)
+        var %chan $comchan(%nick,%i)
         if ($DLF.Chan.IsDlfChan(%chan)) DLF.Stats.Count %chan Filter
         dec %i
       }
@@ -4225,6 +4245,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *'s current status * Points this WEEK * Points this MONTH*
   DLF.hadd chantext.announce *- ??/??/????  *  Ajouté par *
   DLF.hadd chantext.announce Mode: Normal
+  DLF.hadd chantext.announce Mode: Server* Priority
   DLF.hadd chantext.announce Normal
   DLF.hadd chantext.announce ø
   DLF.hadd chantext.announce *Je Vient Juste De Reçevoir * De La Pars De * Pour Un Total De * Fichier(s)*
@@ -4606,6 +4627,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd privnotice.server *Your send of*was successfully completed*
   DLF.hadd privnotice.server *zip va en camino*
   DLF.hadd privnotice.server Thank you for*.*!
+  DLF.hadd privnotice.server *'s Stats:  Points (answers) Total Ever: *
   inc %matches $hget(DLF.privnotice.server,0).item
 
   DLF.hmake DLF.privnotice.dnd
