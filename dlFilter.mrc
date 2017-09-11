@@ -248,6 +248,7 @@ menu channel {
     DLF.StatusAll $c(6,Channels set to $c(4,$hashtag))
   }
   .-
+  .$iif($DLF.Trivia.IsTriviaChan($menu),$iif(%DLF.filter.trivia,Don't filter,Filter) trivia questions): DLF.Options.ToggleOption filter.trivia 330
   .$iif(%DLF.filter.controlcodes,Don't filter,Filter) coloured messages: DLF.Options.ToggleOption filter.controlcodes 345
   .$iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Options.ToggleShowFilter
   .$iif(%DLF.serverads,Hide,Show) ads window(s): DLF.Options.ToggleShowAds
@@ -687,9 +688,9 @@ alias -l DLF.Chan.IsChanEvent {
   if ($DLF.Chan.IsDlfChan($chan) == $false) %log = Not a filtered channel
   elseif ($nick == $me) %log = Me
   elseif ($DLF.Chan.TargetNick($true) == $me) %log = About me
-  elseif (%DLF.Chan.IsOnlyRegUserChanEvent) %log = Filtering only regular users
   else DLF.Stats.Count $chan Total
-  if ($1 == 0) %log = Filtering off for $event
+  if (%DLF.Chan.IsOnlyRegUserChanEvent) %log = Filtering only regular users
+  elseif ($1 == 0) %log = Filtering off for $event
   if (%log == $null) return $true
   DLF.Watch.Log Not filtered: %log
   return $false
@@ -768,15 +769,16 @@ alias -l DLF.Chan.Text {
 
   DLF.Custom.Filter $1-
   if ((%DLF.filter.requests == 1) && ($DLF.Chan.IsCmd($1-))) DLF.Win.Filter $1-
+  if ($hiswm(chantext.ads,%txt)) DLF.Win.Ads $1-
+  if ($hiswm(chantext.announce,%txt)) DLF.Win.AdsAnnounce $1-
   if ($hiswm(chantext.spam,%txt)) DLF.Chan.SpamFilter $1
   if ($hiswm(chantext.always,%txt)) DLF.Win.Filter $1-
-  if ($hiswm(chantext.announce,%txt)) DLF.Win.AdsAnnounce $1-
-  if ($hiswm(chantext.ads,%txt)) DLF.Win.Ads $1-
+  if (zachary isin $nick) echo $chan $nick not filtered here 1
+  if (zachary isin $nick) DLF.Watch.Log $nick not filtered here 1
   if (%txt != $1-) {
     if ($hiswm(chantext.fileserv,%txt)) DLF.Win.AdsAnnounce $1-
-    if (1st Hint: * iswm %txt) DLF.Trivia.QuestionStart $1-
-    if ($hiswm(chantext.trivia,%txt)) DLF.Trivia.Filter $1-
     if ($DLF.Trivia.IsTriviaBot) {
+      if ($istok(1st hint:|2nd hint:|3rd hint:,$gettok(%txt,1-2,$asc($space)),$asc(|))) DLF.Trivia.Hint $1-
       if (($space !isin %txt) && ($len(%txt) > 10) && ($left($right(%txt,2),1) == ?)) {
         DLF.Watch.Log Obfuscated trivia question
         if (%DLF.filter.trivia == 1) DLF.Win.Filter $1-
@@ -786,8 +788,9 @@ alias -l DLF.Chan.Text {
         if (%DLF.filter.trivia == 1) DLF.Win.Filter $1-
       }
     }
+    if ($hiswm(chantext.trivia,%txt)) DLF.Trivia.Filter $1-
   }
-  elseif (%DLF.filter.trivia == 1) DLF.Trivia.QuestionAnswer $1-
+  elseif (($DLF.Trivia.IsTriviachan) && (%DLF.filter.trivia == 1)) DLF.Trivia.Answer $1-
   DLF.Chan.ControlCodes $1-
 }
 
@@ -958,12 +961,13 @@ alias -l DLF.Chan.SpamFilter {
 alias -l DLF.Trivia.Filter {
   DLF.Chan.SetNickColour
   var %idx = $+($network,$chan,@,$nick)
-  hadd -muz3600 DLF.trivia.bots %idx 3600
+  hadd -muz300 DLF.trivia.bots %idx 300
   if (%DLF.filter.trivia == 0) return
   DLF.Watch.Log Trivia bot $nick identified
   DLF.Win.Filter $1-
 }
 
+alias DLF.Trivia.IsTriviaChan { return $hfind(DLF.trivia.bots,$+($network,$chan,@,*),0,w) }
 alias -l DLF.Trivia.IsTriviaBot {
   var %idx = $+($network,$chan,@,$nick)
   if (!$hget(DLF.trivia.bots,%idx).item) return $false
@@ -971,44 +975,63 @@ alias -l DLF.Trivia.IsTriviaBot {
   return $true
 }
 
-alias -l DLF.Trivia.QuestionStart {
-  DLF.Watch.Called DLF.Trivia.QuestionStart
-  var %hint = $DLF.strip($1-)
-  if ($regex(DLF.Trivia.QuestionStart,%hint,/1st Hint:\s+([*]+[\s*]*)/Fi)) {
-    var %mask $regml(DLF.Trivia.QuestionStart,1)
-    %mask = $replace(%mask,*,?)
-    var %idx = $+($network,$chan,@,$nick)
-    hadd -mu60 DLF.trivia.hints %idx %mask
+alias DLF.Trivia.Hint {
+  DLF.Watch.Called DLF.Trivia.Hint
+  var %hint $DLF.strip($1-)
+  var %reword $+([*.'"&a-z0-9,$comma,]*)
+  var %restar $+([*.'"&a-z0-9]*[*],%reword)
+  var %rehint ( $+ (?:\s+ $+ %reword $+ )*(?:\s+ $+ %restar $+ )+)
+  var %reprefix (?:\S+\s+Hint:)
+  var %renorm / $+ %reprefix $+ %rehint $+ /Fi
+  var %rekaos /(?: $+ %reprefix $+ )?(?:\s+[[]\s*) $+ %rehint $+ (?:\s*[]])/Fig
+  var %i $regex(DLF.Trivia.Hint,%hint,%rekaos)
+  if (%i == 0) %i = $regex(DLF.Trivia.Hint,%hint,%renorm)
+  var %masks
+  while (%i) {
+    var %mask $regmlex(DLF.Trivia.Hint,%i,1)
+    %mask = $regsubex(%mask,/([^ '.&])/g,?)
+    %masks = $addtok(%masks,%mask,$asc(|))
+    dec %i
+  }
+  if (%masks) {
+    var %idx $+($network,$chan,@,$nick)
+    hadd -mu60 DLF.trivia.hints %idx %masks
     DLF.Watch.Log Trivia: Question start
   }
   DLF.Trivia.Filter $1-
 }
 
-alias -l DLF.Trivia.QuestionMatch {
+alias -l DLF.Trivia.HintMatch {
   if ($1 iswm $2) {
-    DLF.Watch.Log Trivia mask $1 $3 matches $2
+    DLF.Watch.Log Trivia: Answer $qt($2-) $3 matches mask $1
     if (%DLF.filter.trivia == 1) DLF.Win.Filter $2-
     return $true
   }
   return $false
 }
 
-alias -l DLF.Trivia.QuestionAnswer {
-  DLF.Watch.Called DLF.Trivia.QuestionAnswer
+alias -l DLF.Trivia.Answer {
+  DLF.Watch.Called DLF.Trivia.Answer
   var %match = $+($network,$chan,@,*)
   var %i $hfind(DLF.trivia.hints,%match,0,w)
   while (%i) {
     var %idx $hfind(DLF.trivia.hints,%match,%i,w)
-    var %wm $hget(DLF.trivia.hints,%idx)
-    if ($DLF.Trivia.QuestionMatch(%wm,$1-)) return
-    ; Not an exact match - possibly a typo with 1 greater or fewer letter
-    var %j = $numtok(%wm,$asc($space))
+    var %masks $hget(DLF.trivia.hints,%idx)
+    var %j $numtok(%masks,$asc(|))
     while (%j) {
-      if ($DLF.Trivia.QuestionMatch($puttok(%wm,$left($gettok(%wm,%j,$asc($space)),-1),%j,$asc($space)),$1-,fuzzy)) return
-      if ($DLF.Trivia.QuestionMatch($puttok(%wm,$gettok(%wm,%j,$asc($space)) $+ ?,%j,$asc($space)),$1-,fuzzy)) return
+      var %wm $gettok(%masks,%j,$asc(|))
+      if ($DLF.Trivia.HintMatch(%wm,$1-)) return
+      ; Not an exact match - possibly a typo with 1 greater or fewer letter
+      var %k = $numtok(%wm,$asc($space))
+      while (%k) {
+        if ($DLF.Trivia.HintMatch($puttok(%wm,$left($gettok(%wm,%k,$asc($space)),-1),%k,$asc($space)),$1-,fuzzy)) return
+        if ($DLF.Trivia.HintMatch($puttok(%wm,$gettok(%wm,%k,$asc($space)) $+ ?,%k,$asc($space)),$1-,fuzzy)) return
+        dec %k
+      }
       dec %j
     }
-    DLF.Watch.Log Trivia mask %wm does not match $1-
+    echo $chan Trivia: Answer $qt($1-) does not match any masks
+    DLF.Watch.Log Trivia: Answer $qt($1-) does not match any masks
     dec %i
   }
 }
@@ -4108,8 +4131,6 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *Pour ma liste écrire*@* fichiers * Slots* utilisé*
   DLF.hadd chantext.ads *Statistici 1*by Un_DuLciC*
   DLF.hadd chantext.ads *Tape*@*
-  DLF.hadd chantext.ads *Tapez*Pour avoir ce Fichier*
-  DLF.hadd chantext.ads *Tapez*Pour*Ma Liste De*Fichier En Attente*
   DLF.hadd chantext.ads *Tasteazã*@*
   DLF.hadd chantext.ads *Teclea: @*
   DLF.hadd chantext.ads *Total Offered*Files*Total Sent*Files*Total Sent Today*Files*
@@ -4125,9 +4146,12 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads * To Request A File Type: *
   DLF.hadd chantext.ads * To request a file, type  *
   DLF.hadd chantext.ads * To request details, type  *
+  DLF.hadd chantext.ads En attente de joueurs, tapez !* pour lancer le Quizz!
+  DLF.hadd chantext.ads @* = * songs & * movies *
   inc %matches $hget(DLF.chantext.ads,0).item
 
   DLF.hmake DLF.chantext.announce
+  DLF.hadd chantext.announce *Vient Juste De Reçevoir * Pour Un Total De * Fichier(s) * Envoyés Depuit Le *
   DLF.hadd chantext.announce *Has The Best Servers*We have * Servers Sharing * Files*
   DLF.hadd chantext.announce *§ÐfíñÐ âÐÐ-øñ§*
   DLF.hadd chantext.announce *« Ë×Çü®§îöñ »*
@@ -4161,7 +4185,8 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *Receive Successful*Thanks for*
   DLF.hadd chantext.announce *Received*From*Size*Speed*Time*since*
   DLF.hadd chantext.announce *ROLL TIDE*Now Playing*mp3*
-  DLF.hadd chantext.announce *sent*to*at*total sent*files*yesterday*files*today*files*
+  DLF.hadd chantext.announce *sent*to*at*total sent*files*
+  DLF.hadd chantext.announce *OS-Limits v*
   DLF.hadd chantext.announce *sets away*auto idle away*since*
   DLF.hadd chantext.announce *Thank You*for serving in*
   DLF.hadd chantext.announce *Thanks for the +v*
@@ -4181,8 +4206,8 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *[Away]*SysReset*
   DLF.hadd chantext.announce *[F][U][N]*
   DLF.hadd chantext.announce Request * —I-n-v-i-s-i-o-n—
-  DLF.hadd chantext.announce *Tape*!*.mp3*
-  DLF.hadd chantext.announce *Tape*!*MB*
+  DLF.hadd chantext.announce *Tape*!*Pour Avoir Ce *
+  DLF.hadd chantext.announce *Tape*!*Pour Recevoir Ce Fichier*
   DLF.hadd chantext.announce *!*.mp3*SpR*
   DLF.hadd chantext.announce *!*MB*Kbps*Khz*
   DLF.hadd chantext.announce *Sent*to*OS-Limits v*
@@ -4281,7 +4306,9 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce No Racism & Nazism *
   DLF.hadd chantext.announce Do Not Attempt To Get Past Channel Bans *
   DLF.hadd chantext.announce Want the FileServ Serv*ing Bot *
-  DLF.hadd chantext.announce List: * Search: * Mode: *
+  DLF.hadd chantext.announce *List: * Search: * Mode: *
+  DLF.hadd chantext.announce *Creating Archive*Stand By For Download * OmeNTweaK v*
+  DLF.hadd chantext.announce * has just received * files from me, a total sent of * files
   inc %matches $hget(DLF.chantext.announce,0).item
 
   DLF.hmake DLF.chantext.always
@@ -4313,8 +4340,8 @@ alias -l DLF.CreateHashTables {
   inc %matches $hget(DLF.chantext.always,0).item
 
   DLF.hmake DLF.chantext.trivia
-  DLF.hadd chantext.trivia KAOS: * ? * Question Value : *
-  DLF.hadd chantext.trivia KAOS *?* Answers
+  DLF.hadd chantext.trivia KAOS: * Question Value : *
+  DLF.hadd chantext.trivia KAOS * Answers
   DLF.hadd chantext.trivia ???.*
   DLF.hadd chantext.trivia 1st Hint: *
   DLF.hadd chantext.trivia 2nd Hint: *
@@ -4372,7 +4399,6 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia * in a Row !!! I Think that * is * !!! Is Everybody Asleep!?*
   DLF.hadd chantext.trivia A Special Bonus of * Points is Awarded to * for getting * in a row!!!
   ; French trivia
-  DLF.hadd chantext.trivia En attente de joueurs, tapez !* pour lancer le Quizz!
   DLF.hadd chantext.trivia Le Quizz démarre dans * secondes, préparez-vous!
   DLF.hadd chantext.trivia Les * meilleurs : 1.*
   DLF.hadd chantext.trivia Il y a * questions dans la base.
@@ -4385,13 +4411,14 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia Les accents, ainsi que les articles et conjonctions en début de réponse sont optionnels *
   DLF.hadd chantext.trivia Les grands nombres, à l'exception des années, doivent être tapés avec un espace comme séparateur des milliers *
   DLF.hadd chantext.trivia Plus la réponse est longue, plus il y a de lettres données dans l'aide.
-  DLF.hadd chantext.trivia Tapez * pour connaitre les commandes que le Quizz reconnait
   DLF.hadd chantext.trivia Il y a eu * questions non trouvées. Le Quizz est suspendu...*
   DLF.hadd chantext.trivia Correct! La réponse est: *. Continue comme çà, * ! *
   DLF.hadd chantext.trivia Le délai est bientot écoulé!
+  DLF.hadd chantext.trivia Tapez * pour connaitre les commandes que le Quizz reconnait
   inc %matches $hget(DLF.chantext.trivia,0).item
 
   DLF.hmake DLF.chanaction.trivia
+  DLF.hadd chanaction.trivia passes * a Pepsi & Dinner for one for getting * wins!! way to go *!!!
   DLF.hadd chanaction.trivia passes * a ice cold beer and large pizza for getting * wins!! way to go *!!!
   DLF.hadd chanaction.trivia awards * with a +v for having over * points
   inc %matches $hget(DLF.chanaction.trivia,0).item

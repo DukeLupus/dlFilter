@@ -1,9 +1,0 @@
-User 2 not op
-  User 2 send a private msg - warning message in common channels
-  User 2 send a private action - warning message in common channels
-  User 2 send a private notice - warning message in common channels
-  User 2 send a private ctcp - warning message in common channels
-  User 2 send a DCC chat - warning message in common channels
-  User 2 send a file - warning message in common channels
-  User 1 request a file from user 2, user 2 sends a different file - warning message in common channels
-  User 2 send a private msg containing @decode(something) - warning message in common channel
