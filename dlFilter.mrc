@@ -757,6 +757,8 @@ alias -l DLF.Chan.IsUserEvent {
 }
 
 alias -l DLF.Chan.Text {
+  IF (($nick == `cathy) || (`Cathy ISIN $1-)) echo -st $nick $1-
+  IF (($nick == `cathy) || (`Cathy ISIN $1-)) echo -st $nick $burko($1-)
   DLF.Watch.Called DLF.Chan.Text
   ; Remove leading and double spaces
   var %txt $DLF.strip($1-)
@@ -871,11 +873,11 @@ alias -l DLF.Chan.IsCmd {
     ; Mistyped @
     if (%c2 == find) return $true
     if (%c2 == locator) return $true
-    if ($left(%c2,6) == search) && ((%c2 ison $chan) || ($right(%c2,-6) ison $chan))) return $true
+    if (($left(%c2,6) == search) && ((%c2 ison $chan) || ($right(%c2,-6) ison $chan))) return $true
     ; Extra characters on search
     if (%after == find) return $true
     if (%after == locator) return $true
-    if ($left(%after,6) == search) && ((%after ison $chan) || ($right(%after,-6) ison $chan))) return $true
+    if (($left(%after,6) == search) && ((%after ison $chan) || ($right(%after,-6) ison $chan))) return $true
   }
   if ($hiswm(chantext.mistakes,$1-)) return $true
   return $false
@@ -1243,6 +1245,50 @@ alias -l DLF.Stats.Titlebar {
   titlebar %tb
 }
 
+alias DLF.Stats {
+  echo -a $crlf
+  echo -a dlFilter: Current channel stats:
+  echo -a --------------------------------
+  var %i $hget(DLF.stats,0).item
+  if (%i == 0) {
+    echo -a No stats
+    return
+  }
+  var %list
+  while (%i) {
+    var %item $hget(DLF.stats,%i).item
+    var %data $hget(DLF.stats,%i).data
+    %list = $addtok(%list,%item %data,$asc(!))
+    dec %i
+  }
+  %list = $sorttok(%list,$asc(!),r)
+  %i = $numtok(%list,$asc(!))
+  while (%i > 1) {
+    var %filtval $gettok(%list,%i,$asc(!))
+    dec %i
+    var %filtitem $gettok(%filtval,1,$asc($space))
+    var %type $gettok(%filtitem,2,$asc(|))
+    if (%type != Filter) continue
+    var %filtdata $gettok(%filtval,2,$asc($space))
+    var %net $gettok(%filtitem,1,$asc($hashtag))
+    var %chan $right($gettok(%filtitem,1,$asc(|)),- $+ $len(%net))
+
+    var %totval $gettok(%list,%i,$asc(!))
+    var %totitem $gettok(%totval,1,$asc($space))
+    var %type $gettok(%totitem,2,$asc(|))
+    if (%type != Total) continue
+    var %totdata $gettok(%totval,2,$asc($space))
+    var %totnet $gettok(%totitem,1,$asc($hashtag))
+    var %totchan $right($gettok(%totitem,1,$asc(|)),- $+ $len(%totnet))
+    if (%totnet != %net) continue
+    if (%totchan != %chan) continue
+    dec %i
+
+    echo -a %net %chan : Filtered %filtdata of %totdata = $calc(%filtdata * 100 / %totdata) $+ %
+  }
+  echo -a $crlf
+}
+
 ; ========== Ops advertising ==========
 alias -l DLF.Ops.AdvertsEnable {
   if (%DLF.ops.advertchan == 1) {
@@ -1545,7 +1591,7 @@ alias -l DLF.DccSend.Receiving {
   var %origfn $decode($gettok(%req,5,$asc(|)))
   if (%origfn == $null) %origfn = $1-
   var %secs 86400 - $hget(DLF.dccsend.requests,%req)
-  DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick starting $br(waited $duration(%secs,3))
+  DLF.Win.Log Server ctcp %chan $nick DCC Get of %origfn from $nick starting $br(waited $duration(%secs,3))
 }
 
 alias -l DLF.DccSend.Taskbar {
@@ -1567,7 +1613,7 @@ alias -l DLF.DccSend.FileRcvd {
   var %hash $encode(%trig %origfn)
   if ($hget(DLF.dccsend.retries,%hash)) .hdel DLF.dccsend.retries %hash
   var %bytes $get(-1).rcvd / %dur
-  DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick complete $br($duration(%dur,3) $bytes(%bytes).suf $+ /Sec)
+  DLF.Win.Log Server ctcp %chan $nick DCC Get of %origfn from $nick complete $br($duration(%dur,3) $bytes(%bytes,3).suf $+ /Sec)
   ; Some servers change spaces to underscores
   ; But we cannot rename if Options / DCC / Folders / Command is set
   ; because it would run after this using the wrong filename
@@ -1582,6 +1628,7 @@ alias -l DLF.DccSend.FileRcvd {
     if ($isfile(%newfn)) .remove %newfn
     .rename $qt($filename) $qt($+($noqt($nofile($filename)),%origfn))
   }
+  halt
 }
 
 ; Check that there is no mIRC Options / DCC / Folders / Command for the file
@@ -1976,7 +2023,7 @@ alias -l DLF.Win.WinOpen {
   if ((%DLF.background == 1) && ($4 == 0)) %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ h,1,$asc($space))
   window %switches %win
   if (($3) && ($isfile(%lfn))) loadbuf $windowbuffer -rpi %win %lfn
-  if ($4- != $null) titlebar %win -=- $5-
+  if ($5- != $null) titlebar %win -=- $5-
   return %win
 }
 
@@ -2023,7 +2070,7 @@ alias -l DLF.Win.Echo {
   var %pref
   if ($1 != ctcpreply) %pref = $2 $+ :
   if ($2 == Status) {
-    echo -stc %col %line
+    echo -stci2 %col %line
     DLF.Watch.Log Echoed: To Status Window
   }
   elseif ($2 == @find) {
@@ -2031,22 +2078,22 @@ alias -l DLF.Win.Echo {
     var %i $numtok(%chans,$asc($space))
     while (%i) {
       var %chan $gettok(%chans,%i,$asc($space))
-      if ($nick(%chan,$3)) echo -tc %col %chan %pref %line
+      if ($nick(%chan,$3)) echo -tci2 %col %chan %pref %line
       else $deltok(%chans,%i,$asc($space))
       dec %i
     }
     if (%chans != $null) DLF.Watch.Log Echoed: To @find channels with $3 $+ : %chans
     else {
-      echo -stc %col %pref %line
+      echo -stci2 %col %pref %line
       DLF.Watch.Log Echoed: To status window
     }
     return
   }
   elseif ($2 !isin Private @find $hashtag) {
     ; mIRC does not support native options for timestamping of custom windows
-    var %flags -tc
+    var %flags -tci2
     if (@#* iswm $2) {
-      if (%DLF.win-onotice.timestamp == 0) %flags = -c
+      if (%DLF.win-onotice.timestamp == 0) %flags = -ci2
       elseif (!$window($2).stamp) %line = $timestamp %line
     }
     echo %flags %col $2 %line
@@ -2057,29 +2104,29 @@ alias -l DLF.Win.Echo {
     var %i $comchan($3,0)
     if ((%i == 0) || ($3 == $me) || (($2 == Private) && ($notify($3)))) {
       if (($window($active).type !isin custom listbox) && ((($DLF.IsServiceUser($3)) && (!$DLF.Event.JustConnected)) || ($3 == $me))) {
-        echo -atc %col %pref %line
+        echo -atci2 %col %pref %line
         DLF.Watch.Log Echoed: To active window $active
       }
       elseif ($query($3)) {
         if ($2 == Private) %pref = $null
-        echo -tc %col $2 %pref %line
+        echo -tci2 %col $2 %pref %line
         DLF.Watch.Log Echoed: To query window
       }
       elseif (($usesinglemsg == 0) || ($DLF.IsServiceUser($3))) {
         if ($2 == Private) %pref = $null
-        echo -stc %col %pref %line
+        echo -stci2 %col %pref %line
         DLF.Watch.Log Echoed: To status window
       }
       else {
         if ($2 == Private) %pref = $null
-        echo -dtc %col %pref %line
+        echo -dtci2 %col %pref %line
         DLF.Watch.Log Echoed: To single message window
       }
       return
     }
     while (%i) {
       var %chan $comchan($3,%i)
-      echo -tc %col %chan %pref %line
+      echo -tci2 %col %chan %pref %line
       %sent = $addtok(%sent,%chan,$asc($comma))
       dec %i
     }
@@ -2160,7 +2207,6 @@ menu @dlF.Ads.* {
 }
 
 alias -l DLF.Ads.Add {
-  if ((%DLF.serverads == 0) && (%DLF.background == 0)) return
   DLF.Watch.Called DLF.Ads.Add
   var %win $DLF.Ads.OpenWin(Ads)
   if ($line(%win,0) == 0) {
@@ -4202,7 +4248,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *Receive Successful*Thanks for*
   DLF.hadd chantext.announce *Received*From*Size*Speed*Time*since*
   DLF.hadd chantext.announce *ROLL TIDE*Now Playing*mp3*
-  DLF.hadd chantext.announce *sent*to*at*total sent*files*
+  DLF.hadd chantext.announce *sent*to*total sent*files*
   DLF.hadd chantext.announce *OS-Limits v*
   DLF.hadd chantext.announce *sets away*auto idle away*since*
   DLF.hadd chantext.announce *Thank You*for serving in*
@@ -4327,6 +4373,9 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *List: * Search: * Mode: *
   DLF.hadd chantext.announce *Creating Archive*Stand By For Download * OmeNTweaK v*
   DLF.hadd chantext.announce * has just received * files from me, a total sent of * files
+  DLF.hadd chantext.announce * BORGserv - A BRAND NEW SCRIPT WITH A BRAND NEW APPROACH TO IRC FILESHARING! GET YOUR COPY RIGHT NOW!!! - BORGserv v*
+  DLF.hadd chantext.announce Dans Ma Liste D'attente J'ai * Personne(s) * Aujourd'hui J'ai Partagé * Fichier(s) * Hier J'ai Partagé * Fichier(s) * Au Total J'ai Partagé * Fichier(s)
+  DLF.hadd chantext.announce ««º Thªñk$ ÐêªR * Fºr Thê HºñºuR º»»
   inc %matches $hget(DLF.chantext.announce,0).item
 
   DLF.hmake DLF.chantext.always
@@ -5012,6 +5061,18 @@ alias -l c {
   return $+(%code,%text,$chr(15))
 }
 
+alias burko {
+  var %txt $replace($1-,$chr(2),{b},$chr(31),{u},$chr(29),{i},$chr(22),{r},$chr(3),{k},$chr(15),{o})
+  var %i $len(%txt)
+  while (%i) {
+    var %c $mid(%txt,%i,1), %n %c, %a $asc(%c)
+    if ((%a < 32) || (%a >= 127)) %n = $+($lcurly,%a,$rcurly)
+    if (%c != %n) %txt = $+($left(%txt,$calc(%i-1)),%n,$right(%txt,- $+ %i))
+    dec %i
+  }
+  return %txt
+}
+
 ; ========== Binary file encode/decode ==========
 alias -l DLF.CreateBinaryFile {
   if (($0 < 2) || (!$regex($1,/^&[^ ]+$/))) DLF.Error DLF.CreateBinaryFile: Invalid parameters: $1-
@@ -5194,8 +5255,6 @@ alias DLF.Watch {
 }
 
 alias DLF.Watch.Filter {
-  ; This identifier should return $1- if it is a line dlF reacts to else $null
-  ; In practice this means returning $null iff it is a channel message and not a dlF channel.
   var %text $1-
   tokenize $asc($space)) $1-
   if ($left($2,1) == :) {
