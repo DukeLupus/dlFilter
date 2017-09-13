@@ -757,8 +757,6 @@ alias -l DLF.Chan.IsUserEvent {
 }
 
 alias -l DLF.Chan.Text {
-  IF ($nick == `cathy) echo $chan $nick $1-
-  IF ($nick == `cathy) echo $chan $nick $burko($1-)
   DLF.Watch.Called DLF.Chan.Text
   ; Remove leading and double spaces
   var %txt $DLF.strip($1-)
@@ -1011,7 +1009,6 @@ alias DLF.Trivia.Hint {
 }
 
 alias -l DLF.Trivia.HintMatch {
-  echo $chan DEBUG $qt($1) $qt($2)
   if ($1 iswm $2) {
     DLF.Watch.Log Trivia: Answer $qt($2-) $3 matches mask $1
     if (%DLF.filter.trivia == 1) DLF.Win.Filter $2-
@@ -4377,6 +4374,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce * BORGserv - A BRAND NEW SCRIPT WITH A BRAND NEW APPROACH TO IRC FILESHARING! GET YOUR COPY RIGHT NOW!!! - BORGserv v*
   DLF.hadd chantext.announce Dans Ma Liste D'attente J'ai * Personne(s) * Aujourd'hui J'ai Partagé * Fichier(s) * Hier J'ai Partagé * Fichier(s) * Au Total J'ai Partagé * Fichier(s)
   DLF.hadd chantext.announce ««º Thªñk$ ÐêªR * Fºr Thê HºñºuR º»»
+  DLF.hadd chantext.announce QwIRC * server online * Pour ma Liste*@* files * MB*Slots: * in use  InQueue:*
   inc %matches $hget(DLF.chantext.announce,0).item
 
   DLF.hmake DLF.chantext.always
@@ -5064,7 +5062,7 @@ alias -l c {
   return $+(%code,%text,$chr(15))
 }
 
-alias burko {
+alias -l burko {
   var %txt $replace($1-,$chr(2),{b},$chr(31),{u},$chr(29),{i},$chr(22),{r},$chr(3),{k},$chr(15),{o})
   var %i $len(%txt)
   while (%i) {
@@ -5295,7 +5293,7 @@ alias -l DLF.Watch.Log {
     if ($1 isin <->) DLF.Watch.Offset
     var %l $timestamp $+ $DLF.Watch.Offset $1-
     DLF.Search.Add $debug 1 %c %l
-    aline -pi %c $debug %l
+    aline -pi %c $debug $burko(%l)
   }
 }
 
