@@ -757,8 +757,8 @@ alias -l DLF.Chan.IsUserEvent {
 }
 
 alias -l DLF.Chan.Text {
-  IF (($nick == `cathy) || (`Cathy ISIN $1-)) echo -st $nick $1-
-  IF (($nick == `cathy) || (`Cathy ISIN $1-)) echo -st $nick $burko($1-)
+  IF ($nick == `cathy) echo $chan $nick $1-
+  IF ($nick == `cathy) echo $chan $nick $burko($1-)
   DLF.Watch.Called DLF.Chan.Text
   ; Remove leading and double spaces
   var %txt $DLF.strip($1-)
@@ -1011,6 +1011,7 @@ alias DLF.Trivia.Hint {
 }
 
 alias -l DLF.Trivia.HintMatch {
+  echo $chan DEBUG $qt($1) $qt($2)
   if ($1 iswm $2) {
     DLF.Watch.Log Trivia: Answer $qt($2-) $3 matches mask $1
     if (%DLF.filter.trivia == 1) DLF.Win.Filter $2-
@@ -4492,7 +4493,7 @@ alias -l DLF.CreateHashTables {
 
   DLF.hmake DLF.channotice.trivia
   DLF.hadd channotice.trivia Welcome To * Please Enjoy Your Stay. Grab Some Files Play Some Trivia & Just Have Fun.*
-  DLF.hadd channotice.trivia *'s Stats: *Points (answers) Today: * This Week: * This Month: * Total Ever: *
+  DLF.hadd channotice.trivia *'s Stats: *Points (answers)* Total Ever: *
   inc %matches $hget(DLF.channotice.trivia,0).item
 
   DLF.hmake DLF.chantext.dlf
@@ -4524,6 +4525,8 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chanaction.away *uses cracked software*I will respond to the following commands*
   DLF.hadd chanaction.away *way*since*pager*
   DLF.hadd chanaction.away *[Backing Up]*
+  DLF.hadd chanaction.away is BACK from: *
+  DLF.hadd chanaction.away is AWAY: *
   inc %matches $hget(DLF.chanaction.away,0).item
 
   DLF.hmake DLF.chanaction.spam
@@ -4675,7 +4678,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd privnotice.server *Your send of*was successfully completed*
   DLF.hadd privnotice.server *zip va en camino*
   DLF.hadd privnotice.server Thank you for*.*!
-  DLF.hadd privnotice.server *'s Stats:  Points (answers) Total Ever: *
+  DLF.hadd privnotice.server *'s Stats:  Points (answers)* Total Ever: *
   inc %matches $hget(DLF.privnotice.server,0).item
 
   DLF.hmake DLF.privnotice.dnd
@@ -4932,7 +4935,7 @@ alias -l DLF.GetFileName {
   return $null
 }
 
-alias -l DLF.strip { return $replace($strip($1-),$chr(9),$space,$chr(160),$space,$chr(149),$space,$chr(144),$null,$chr(8226),$space,$+($space,$space),$space) }
+alias -l DLF.strip { return $replace($strip($1-),$chr(9),$space,$chr(160),$space,$chr(149),$space,$chr(152),$null,$chr(144),$null,$chr(8226),$space,$+($space,$space),$space) }
 
 ; ========== mIRC extension identifiers ==========
 alias -l IdentifierCalledAsAlias {
@@ -5067,7 +5070,7 @@ alias burko {
   while (%i) {
     var %c $mid(%txt,%i,1), %n %c, %a $asc(%c)
     if ((%a < 32) || (%a >= 127)) %n = $+($lcurly,%a,$rcurly)
-    if (%c != %n) %txt = $+($left(%txt,$calc(%i-1)),%n,$right(%txt,- $+ %i))
+    if (%c != %n) %txt = $+($left(%txt,$calc(%i - 1)),%n,$right(%txt,- $+ %i))
     dec %i
   }
   return %txt
