@@ -970,7 +970,7 @@ alias -l DLF.Trivia.Filter {
   var %idx = $+($network,$chan,@,$nick)
   hadd -muz300 DLF.trivia.bots %idx 300
   if (%DLF.filter.trivia == 0) return
-  DLF.Watch.Log Trivia bot $nick identified
+  DLF.Watch.Log Trivia from $nick filtered
   DLF.Win.Filter $1-
 }
 
@@ -985,24 +985,30 @@ alias -l DLF.Trivia.IsTriviaBot {
 alias DLF.Trivia.Hint {
   DLF.Watch.Called DLF.Trivia.Hint
   var %hint $DLF.strip($1-)
-  var %reword $+([*.'"&a-z0-9,$comma,]*)
-  var %restar $+([*.'"&a-z0-9]*[*],%reword)
-  var %rehint ( $+ (?:\s+ $+ %reword $+ )*(?:\s+ $+ %restar $+ )+)
-  var %reprefix (?:\S+\s+Hint:)
-  var %renorm / $+ %reprefix $+ %rehint $+ /Fi
-  var %rekaos /(?: $+ %reprefix $+ )?(?:\s+[[]\s*) $+ %rehint $+ (?:\s*[]])/Fig
+  var %reletter $+([*.'"&a-z0-9,$comma,])
+  var %restar $+([*.'"&a-z0-9]*[*],%reletter,*)
+  var %rehint ( $+ (?:\s+ $+ %reletter $+ *)*(?:\s+ $+ %restar $+ )+)
+  var %resecs (?:\s+([\d.]+)\s+secs)?
+  var %renorm /\S+\s+Hint: $+ %rehint $+ %resecs $+ /Fi
+  var %rekaos /(?:\s+[[]((?:\s* $+ %reletter $+ +)+)\s*[]]) $+ %resecs $+ /Fig
   var %i $regex(DLF.Trivia.Hint,%hint,%rekaos)
   if (%i == 0) %i = $regex(DLF.Trivia.Hint,%hint,%renorm)
-  var %masks
+  if (%i == 0) return
+  var %masks, %secs 55
+  %i = $regml(DLF.Trivia.Hint,0)
   while (%i) {
-    var %mask $regmlex(DLF.Trivia.Hint,%i,1)
-    %mask = $regsubex(%mask,/([^ '.&])/g,?)
-    %masks = $addtok(%masks,%mask,$asc(|))
+    var %txt $regml(DLF.Trivia.Hint,%i)
+    var %grp $regml(DLF.Trivia.Hint,%i).group
+    if (%grp == 2) %secs = %txt + 10
+    else {
+      %txt = $regsubex(%txt,/([^ ])/g,?)
+      %masks = $addtok(%masks,$trim(%txt),$asc(|))
+    }
     dec %i
   }
   if (%masks) {
     var %idx $+($network,$chan,@,$nick)
-    hadd -mu60 DLF.trivia.hints %idx %masks
+    hadd -mu $+ %secs DLF.trivia.hints %idx %masks
     DLF.Watch.Log Trivia: Question start
   }
   DLF.Trivia.Filter $1-
@@ -2566,7 +2572,7 @@ alias -l DLF.Search.Add {
   var %win $puttok($1,$+(%type,Search),2,$asc(.))
   if (!$window(%win)) return
   var %tb $window(%win).title
-  var %match /found for $qt((.*)) in $1/F
+  var %match /found for $qt((.*)) in $1/Fi
   if ($regex(DLF.Search.Add,%tb,%match) == 0) return
   var %wild $regml(DLF.Search.Add,1)
   if (%wild !iswm $4-) {
