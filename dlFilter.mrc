@@ -2158,14 +2158,15 @@ alias -l DLF.Win.NickChgDCC {
 ; DLF.Win.ShowHide Filter/Ads. 1/0
 alias -l DLF.Win.ShowHide {
   var %win $+(@DLF.,$1,*)
-  if ((%DLF.background == 1) || ($1 == Ads.)) {
-    var %i $window(%win,0)
+  if ((%DLF.background == 1) || ($1 == Ads.) || ($2 == 1)) {
     if ($2 == 1) var %flags -w3
     else var %flags -h
+    var %i $window(%win,0)
     while (%i) {
       var %w $window(%win,%i)
+      var %s $window(%w).state
       window %flags %w
-      if (($2 == 1) && ($network == $gettok(%w,-1,$asc(.)))) window -a %w
+      if (($2 == 1) && ($network == $gettok(%w,-1,$asc(.))) && (%s == hidden)) window -a %w
       dec %i
     }
   }
