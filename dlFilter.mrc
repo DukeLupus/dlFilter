@@ -1011,6 +1011,7 @@ alias DLF.Trivia.Hint {
     hadd -mu $+ %secs DLF.trivia.hints %idx %masks
     DLF.Watch.Log Trivia: Question start
   }
+  ;echo 7 $chan Hint: %masks
   DLF.Trivia.Filter $1-
 }
 
@@ -1041,6 +1042,7 @@ alias -l DLF.Trivia.Answer {
         if ($DLF.Trivia.HintMatch($puttok(%wm,$gettok(%wm,%k,$asc($space)) $+ ?,%k,$asc($space)),$1-,fuzzy)) return
         dec %k
       }
+      ;echo 7 $chan Answer $qt($1-) did not match %masks
       dec %j
     }
     DLF.Watch.Log Trivia: Answer $qt($1-) does not match any masks
@@ -4382,6 +4384,8 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce Dans Ma Liste D'attente J'ai * Personne(s) * Aujourd'hui J'ai Partagé * Fichier(s) * Hier J'ai Partagé * Fichier(s) * Au Total J'ai Partagé * Fichier(s)
   DLF.hadd chantext.announce ««º Thªñk$ ÐêªR * Fºr Thê HºñºuR º»»
   DLF.hadd chantext.announce QwIRC * server online * Pour ma Liste*@* files * MB*Slots: * in use  InQueue:*
+  DLF.hadd chantext.announce Ce Système Utilise Un Serveur
+  DLF.hadd chantext.announce Dans Ma Liste D'attente J'ai * Personne(s) * Aujourd'hui J'ai Partagé : * Fichier(s) *
   inc %matches $hget(DLF.chantext.announce,0).item
 
   DLF.hmake DLF.chantext.always
@@ -4537,6 +4541,7 @@ alias -l DLF.CreateHashTables {
   DLF.hmake DLF.chanaction.spam
   DLF.hadd chanaction.spam *FTP*port*user*pass*
   DLF.hadd chanaction.spam *get AMIP*plug-in at http*amip.tools-for.net*
+  DLF.hadd chanaction.spam is dAnCiNg ArOuNd *ThE *RoOm (_\_)(_/_)(_\_) MovInG' iT (_\_)(_/_)(_\_) *ShAkeN' *iT (_\_)(_/_)(_\_) *WiggLiNg' *iT (_\_)(_/_)(_\_) *JuSt *LeTTinG *iT aLL *fLoW (_\_)(_/_)(_\_)
   inc %matches $hget(DLF.chanaction.spam,0).item
 
   DLF.hmake DLF.channotice.spam
@@ -4940,7 +4945,7 @@ alias -l DLF.GetFileName {
   return $null
 }
 
-alias -l DLF.strip { return $replace($strip($1-),$chr(9),$space,$chr(160),$space,$chr(149),$space,$chr(152),$null,$chr(144),$null,$chr(8226),$space,$+($space,$space),$space) }
+alias -l DLF.strip { return $replace($strip($1-),$tab,$space,$nbsp,$space,$chr(149),$space,$chr(152),$null,$chr(144),$null,$chr(8226),$space,$+($space,$space),$space) }
 
 ; ========== mIRC extension identifiers ==========
 alias -l IdentifierCalledAsAlias {
@@ -4989,7 +4994,7 @@ alias -l max {
 
 alias -l urlencode {
   ; replace $cr $lf $tab $space $comma !#$&'()*+/:;=?@[]`%
-  var %s $replacex($1-,$chr(37),$null,$chr(96),$null,$chr(93),$null,$chr(91),$null,$chr(64),$null,$chr(63),$null,$chr(61),$null,$chr(59),$null,$chr(58),$null,$chr(47),$null,$chr(44),$null,$chr(43),$null,$chr(42),$null,$chr(41),$null,$chr(40),$null,$chr(39),$null,$chr(38),$null,$chr(36),$null,$chr(35),$null,$chr(33),$null,$chr(32),$null,$chr(9),$null,$chr(10),$null,$chr(13),$null,$chr(37),$null,$chr(96),$null,$chr(93),$null,$chr(91),$null,$chr(64),$null,$chr(63),$null,$chr(61),$null,$chr(59),$null,$chr(58),$null,$chr(47),$null,$chr(44),$null,$chr(43),$null,$chr(42),$null,$chr(41),$null,$chr(40),$null,$chr(39),$null,$chr(38),$null,$chr(36),$null,$chr(35),$null,$chr(33),$null,$chr(32),$null,$chr(9),$null,$chr(10),$null,$chr(13),$null)
+  var %s $replacex($1-,$chr(37),$null,$chr(96),$null,$chr(93),$null,$chr(91),$null,$chr(64),$null,$chr(63),$null,$chr(61),$null,$chr(59),$null,$chr(58),$null,$chr(47),$null,$comma,$null,$chr(43),$null,$chr(42),$null,$rbr,$null,$lbr,$null,$chr(39),$null,$chr(38),$null,$chr(37),$null,$chr(36),$null,$hashtag,$null,$chr(33),$null,$space,$null,$tab,$null,$cr,$null,$lf,$null)
   var %l $len($1-) - $len(%s)
   %l = %l * 3
   %l = %l + $len(%s)
@@ -4997,7 +5002,7 @@ alias -l urlencode {
     echo 2 -s * $ $+ urlencode: encoded string will exceed mIRC limit of 4146 characters
     halt
   }
-  return $replacex($1-,$chr(37),$+(%,25),$chr(96),$+(%,60),$chr(93),$+(%,5D),$chr(91),$+(%,5B),$chr(64),$+(%,40),$chr(63),$+(%,3F),$chr(61),$+(%,3D),$chr(59),$+(%,3B),$chr(58),$+(%,3A),$chr(47),$+(%,2F),$chr(44),$+(%,2C),$chr(43),$+(%,2B),$chr(42),$+(%,2A),$chr(41),$+(%,29),$chr(40),$+(%,28),$chr(39),$+(%,27),$chr(38),$+(%,26),$chr(36),$+(%,24),$chr(35),$+(%,23),$chr(33),$+(%,21),$chr(32),$+(%,20),$chr(9),$+(%,09),$chr(10),$+(%,0A),$chr(13),$+(%,0D),$chr(37),$+(%,25),$chr(96),$+(%,60),$chr(93),$+(%,5D),$chr(91),$+(%,5B),$chr(64),$+(%,40),$chr(63),$+(%,3F),$chr(61),$+(%,3D),$chr(59),$+(%,3B),$chr(58),$+(%,3A),$chr(47),$+(%,2F),$chr(44),$+(%,2C),$chr(43),$+(%,2B),$chr(42),$+(%,2A),$chr(41),$+(%,29),$chr(40),$+(%,28),$chr(39),$+(%,27),$chr(38),$+(%,26),$chr(36),$+(%,24),$chr(35),$+(%,23),$chr(33),$+(%,21),$chr(32),$+(%,20),$chr(9),$+(%,09),$chr(10),$+(%,0A),$chr(13),$+(%,0D))
+  return $replacex($1-,$chr(96),$+(%,60),$chr(93),$+(%,5D),$chr(91),$+(%,5B),$chr(64),$+(%,40),$chr(63),$+(%,3F),$chr(61),$+(%,3D),$chr(59),$+(%,3B),$chr(58),$+(%,3A),$chr(47),$+(%,2F),$chr(44),$+(%,2C),$chr(43),$+(%,2B),$chr(42),$+(%,2A),$chr(41),$+(%,29),$chr(40),$+(%,28),$chr(39),$+(%,27),$chr(38),$+(%,26),$chr(37),$+(%,25),$chr(37),$+(%,25),$chr(36),$+(%,24),$chr(35),$+(%,23),$chr(33),$+(%,21),$chr(32),$+(%,20),$chr(13),$+(%,0D),$chr(10),$+(%,0A),$chr(9),$+(%,09))
 
   :error
   echo 2 -s * $ $+ urlencode: $error
