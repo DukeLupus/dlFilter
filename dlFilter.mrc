@@ -42,21 +42,21 @@ dlFilter uses the following code from other people:
   Immediate TODO
       Test location and filename for oNotice log files
       Test window highlighting (flashing etc.) - define rules.
-      Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
 
   Ideas for possible future enhancements
+      Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
       Implement toolbar functionality with right click menu
-      Check mIRC security settings not too lax
+      mIRC security wizard to check that mIRC settings are not too lax
       Manage filetype ignore list like trust list i.e. temp add for requested filetypes.
       Advertising for sbClient for @search + option (await sbClient remediation).
       Better icon file
-      Right click channel line menu-items for adding to custom filter (if possible since not a list window)
       More menu options equivalent to dialog options
       Make it work on AdiIRC and update version check handle AdiIRC.
       Merge in sbClient functionality
       Trim lines from Ads window for servers which have been offline for xx hours.
       Configurable F1 etc. aliases to toggle Options, Ads, Filters, Catch-all by F key or other keys.
         (Use On Keydown to capture and check keystrokes, have a key field for each of the options to toggle.)
+        (Might be better as a separate script with documented commands you can paste in.
       Add right click menu items to @find windows to re-sort list by trigger and filename.
       Request and store searchbot triggers to determine @search command validity
 
@@ -77,12 +77,14 @@ alias -l DLF.mIRCversion {
   if ($left(%app,6) == AdiIRC) {
     if ($version >= 2.8) return 0
     %DLF.enabled = 0
+    DLF.Groups.Events
     return AidIRC 2.8
   }
   ; mirc - We need returnex first implemented in 6.17
   ; mirc - We need regex /F first implemented in 7.44
   elseif ($version >= 7.44) return 0
   %DLF.enabled = 0
+  DLF.Groups.Events
   return mIRC 7.44
 }
 
@@ -131,6 +133,7 @@ alias -l DLF.RenameVar {
 
 on *:signal:DLF.Initialise: { DLF.Initialise $1- }
 alias DLF.Initialise {
+  DLF.Watch.Called DLF.Initialise
   ; Handle obsolete variables
   .unset %DLF.custom.selected
   .unset %DLF.filtered.limit
@@ -218,7 +221,7 @@ on *:unload: {
 ; ========== Main popup menus ==========
 menu menubar {
   dlFilter
-  .$iif(%DLF.filter.controlcodes,Don't filter,Filter) coloured messages: DLF.Options.ToggleOption filter.controlcodes 345
+  .$iif(%DLF.filter.controlcodes,Don't filter,Filter) coloured messages: DLF.Options.ToggleOption filter.controlcodes 340
   .$iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Options.ToggleShowFilter
   .$iif(%DLF.serverads,Hide,Show) ads window(s): DLF.Options.ToggleShowAds
   .Options: DLF.Options.Show
@@ -229,7 +232,7 @@ menu menubar {
 
 menu status {
   dlFilter
-  .$iif(%DLF.filter.controlcodes,Don't filter,Filter) coloured messages: DLF.Options.ToggleOption filter.controlcodes 345
+  .$iif(%DLF.filter.controlcodes,Don't filter,Filter) coloured messages: DLF.Options.ToggleOption filter.controlcodes 340
   .$iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Options.ToggleShowFilter
   .$iif(%DLF.serverads,Hide,Show) ads window(s): DLF.Options.ToggleShowAds
   .Options: DLF.Options.Show
@@ -249,7 +252,7 @@ menu channel {
   }
   .-
   .$iif($DLF.Trivia.IsTriviaChan($menu),$iif(%DLF.filter.trivia,Don't filter,Filter) trivia questions): DLF.Options.ToggleOption filter.trivia 330
-  .$iif(%DLF.filter.controlcodes,Don't filter,Filter) coloured messages: DLF.Options.ToggleOption filter.controlcodes 345
+  .$iif(%DLF.filter.controlcodes,Don't filter,Filter) coloured messages: DLF.Options.ToggleOption filter.controlcodes 340
   .$iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Options.ToggleShowFilter
   .$iif(%DLF.serverads,Hide,Show) ads window(s): DLF.Options.ToggleShowAds
   .Options: DLF.Options.Show
@@ -797,7 +800,7 @@ alias -l DLF.Chan.Text {
     }
     if ($hiswm(chantext.trivia,%txt)) DLF.Trivia.Filter $1-
   }
-  elseif (($DLF.Trivia.IsTriviachan) && (%DLF.filter.trivia == 1)) DLF.Trivia.Answer $1-
+  elseif ($DLF.Trivia.IsTriviachan) DLF.Trivia.Answer $1-
   DLF.Chan.ControlCodes $1-
 }
 
@@ -1016,15 +1019,14 @@ alias DLF.Trivia.Hint {
 }
 
 alias -l DLF.Trivia.HintMatch {
-  if ($1 iswm $2) {
-    DLF.Watch.Log Trivia: Answer $qt($2-) $3 matches mask $1
-    if (%DLF.filter.trivia == 1) DLF.Win.Filter $2-
-    return $true
-  }
-  return $false
+  if ($1 !iswm $2) return $false
+  DLF.Watch.Log Trivia: Answer $qt($2-) $3 matches mask $1
+  if (%DLF.filter.trivia == 1) DLF.Win.Filter $2-
+  return $true
 }
 
 alias -l DLF.Trivia.Answer {
+  ;if (%DLF.filter.trivia != 1) return
   DLF.Watch.Called DLF.Trivia.Answer
   var %match = $+($network,$chan,@,*)
   var %i $hfind(DLF.trivia.hints,%match,0,w)
@@ -1033,16 +1035,18 @@ alias -l DLF.Trivia.Answer {
     var %masks $hget(DLF.trivia.hints,%idx)
     var %j $numtok(%masks,$asc(|))
     while (%j) {
-      var %wm $gettok(%masks,%j,$asc(|))
-      if ($DLF.Trivia.HintMatch(%wm,$1-)) return
+      var %m $gettok(%masks,%j,$asc(|))
+      if ($DLF.Trivia.HintMatch(%m,$1-)) return
       ; Not an exact match - possibly a typo with 1 greater or fewer letter
-      var %k = $numtok(%wm,$asc($space))
+      ;echo 7 $chan Trying to fuzzy match $qt($1-) with %m
+      var %k $numtok(%m,$asc($space))
       while (%k) {
-        if ($DLF.Trivia.HintMatch($puttok(%wm,$left($gettok(%wm,%k,$asc($space)),-1),%k,$asc($space)),$1-,fuzzy)) return
-        if ($DLF.Trivia.HintMatch($puttok(%wm,$gettok(%wm,%k,$asc($space)) $+ ?,%k,$asc($space)),$1-,fuzzy)) return
+        var %w $gettok(%m,%k,$asc($space))
+        if ($DLF.Trivia.HintMatch($puttok(%m,$left(%w,-1),%k,$asc($space)),$1-,fuzzy)) return
+        if ($DLF.Trivia.HintMatch($puttok(%m, %w $+ ?,%k,$asc($space)),$1-,fuzzy)) return
         dec %k
       }
-      ;echo 7 $chan Answer $qt($1-) did not match %masks
+      ;echo 7 $chan Answer $qt($1-) did not match %m
       dec %j
     }
     DLF.Watch.Log Trivia: Answer $qt($1-) does not match any masks
@@ -1325,7 +1329,8 @@ on *:signal:DLF.Ops.AdvertChan: { DLF.Ops.AdvertChan $1- }
 alias -l DLF.Ops.AdvertChan { scon -a DLF.Ops.AdvertChanNet }
 
 alias -l DLF.Ops.AdvertChanNet {
-  if ($server == $null) continue
+  if ($server == $null) return
+  DLF.Watch.Called DLF.Ops.AdvertChanNet $network $server
   var %i $chan(0)
   while (%i) {
     var %c $chan(%i)
@@ -1372,6 +1377,7 @@ alias -l DLF.Ops.NickChg {
 on *:signal:DLF.Ops.RequestVersion: { DLF.Ops.RequestVersion $1- }
 alias -l DLF.Ops.RequestVersion {
   if (%DLF.ops.advertpriv == 0) return
+  DLF.Watch.Called DLF.Ops.RequestVersion
   if ($1 == $me) return
   if ($DLF.IsRegularUser($1) == $false) return
   DLF.Watch.Called DLF.Ops.RequestVersion
@@ -1704,8 +1710,8 @@ alias -l DLF.DccSend.TrustAdd {
 
 on *:signal:DLF.DccSend.TrustRemove: DLF.DccSend.TrustRemove $1-
 alias -l DLF.DccSend.TrustRemove {
+  DLF.Watch.Called DLF.DccSend.TrustRemove $1 $+ : $2-
   .dcc trust -r $1
-  DLF.Watch.Log Trust: Removed $2-
 }
 
 alias -l DLF.DccSend.TrustTimer { return DLFRemoveTrust $+ $DLF.TimerAddress }
@@ -2527,6 +2533,7 @@ alias DLF.Ads.Close {
 
 on *:signal:DLF.Ads.CloseRen: { DLF.Ads.CloseRen $1- }
 alias DLF.Ads.CloseRen {
+  DLF.Watch.Called DLF.Ads.CloseRen $1-
   if ($window($2)) close -@ $2
   if ($window($1)) renwin $1 $2
 }
@@ -3148,6 +3155,7 @@ dialog -l DLF.Options.GUI {
   title dlFilter v $+ $DLF.SetVersion
   size -1 -1 168 218
   option dbu notheme
+  link "Help", 15, 153 2 12 7, right
   text "", 20, 67 2 98 7, right hide
   check "&Enable/disable dlFilter", 10, 2 2 62 8
   tab "Channels", 1, 1 9 166 193
@@ -3172,17 +3180,18 @@ dialog -l DLF.Options.GUI {
   button "Update dlFilter", 180, 86 175 74 11, tab 1 flat disable
   check "Check for &beta versions", 190, 7 189 155 6, tab 1
   ; tab Filters
-  box " General ", 305, 4 23 160 118, tab 3
+  box " Channel messages ", 305, 4 23 160 73, tab 3
   check "Filter other users @search / @file / @locator / !get requests", 310, 7 32 155 6, tab 3
   check "Filter server adverts and announcements", 315, 7 41 155 6, tab 3
   check "Filter channel topic updates", 320, 7 50 155 6, tab 3
   check "Filter channel mode changes (e.g. maximum user limits)", 325, 7 59 155 6, tab 3
   check "Filter trivia games", 330, 7 68 155 6, tab 3
-  check "Filter coloured messages (filter of last resort)", 345, 7 86 155 6, tab 3
-  check "Filter server responses to my requests to separate window", 355, 7 104 155 6, tab 3
-  check "Separate dlF windows per connection", 365, 7 122 155 6, tab 3
-  check "Keep Filter windows active in background", 370, 7 131 155 6, tab 3
-  box " Filter user events ", 375, 4 142 160 57, tab 3
+  check "Filter server responses to my requests to separate window", 335, 7 77 155 6, tab 3
+  check "Filter ALL coloured messages (last resort - use cautiously)", 340, 7 86 155 6, tab 3
+  box " Advert / Filter Windows ", 360, 4 97 160 28, tab 3
+  check "Separate dlF windows per connection", 365, 7 106 155 6, tab 3
+  check "Keep Filter windows active in background", 370, 7 115 155 6, tab 3
+  box " User events ", 375, 4 142 160 57, tab 3
   check "Joins …", 380, 7 152 53 6, tab 3
   check "Parts …", 382, 66 152 53 6, tab 3
   check "Quits …", 384, 120 152 53 6, tab 3
@@ -3190,12 +3199,12 @@ dialog -l DLF.Options.GUI {
   check "Kicks …", 388, 66 161 53 6, tab 3
   check "Away and thank-you messages", 390, 7 170 155 6, tab 3
   check "User mode changes", 395, 7 179 155 6, tab 3
-  check "Filter user events for non-regular users", 397, 7 188 155 6, tab 3
+  check "Filter above user events for non-regular users", 397, 7 188 155 6, tab 3
   ; Tab Other
   box " Extra functions ", 505, 4 23 160 37, tab 5
   check "Collect @find/@locator results into a single window", 510, 7 32 155 6, tab 5
-  check "Display dlFilter channel efficiency in title bar", 525, 7 41 155 6, tab 5
-  check "Colour uncoloured fileservers in nickname list", 530, 7 50 155 6, tab 5
+  check "Display dlFilter channel efficiency in title bar", 515, 7 41 155 6, tab 5
+  check "Colour uncoloured fileservers in nickname list", 520, 7 50 155 6, tab 5
   box " File requests ", 535, 4 61 160 73, tab 5
   check "Auto accept files you have specifically requested", 540, 7 70 155 6, tab 5
   check "Block ALL files you have NOT specifically requested. Or:", 545, 7 79 155 6, tab 5
@@ -3206,7 +3215,7 @@ dialog -l DLF.Options.GUI {
   check "Retry incomplete file requests (up to 3 times)", 570, 7 124 155 6, tab 5
   box " mIRC-wide ", 605, 4 135 160 64, tab 5
   check "Check mIRC settings are secure (future enhancement)", 610, 7 144 155 6, tab 5 disable
-  check "Filter private spam", 335, 7 153 155 6, tab 5
+  check "Filter private spam", 615, 7 153 155 6, tab 5
   check "Filter private messages from users not in a common channel", 620, 7 162 155 6, tab 5
   check "Filter private messages from regular users", 625, 7 171 155 6, tab 5
   check "Block channel CTCP requests unless from an op", 655, 7 180 155 6, tab 5
@@ -3215,8 +3224,8 @@ dialog -l DLF.Options.GUI {
   text "These options are only enabled if you are an op on a filtered channel.", 705, 4 25 160 12, tab 7 multi
   box " Channel Ops ", 710, 4 38 160 38, tab 7
   check "Filter oNotices to separate @#window (OpsTalk)", 715, 7 48 155 6, tab 7
-  check "On channel spam, oNotify if you are an op", 725, 7 57 155 6, tab 7
-  check "On private spam, oNotify if you are op in a common channel", 730, 7 66 155 6, tab 7
+  check "On channel spam, oNotify other ops", 725, 7 57 155 6, tab 7
+  check "On private spam, oNotify other ops in common channels", 730, 7 66 155 6, tab 7
   box " dlFilter promotion ", 755, 4 77 160 38, tab 7
   check "Advertise dlFilter in channels every", 760, 7 87 93 6, tab 7
   edit "60", 765, 101 85 12 10, tab 7 right limit 2
@@ -3246,6 +3255,8 @@ alias -l DLF.Options.SetLinkedFields {
 ; Initialise dialog
 on *:dialog:DLF.Options.GUI:init:0: DLF.Options.Init
 ; Channel text box typed or clicked - Enable / disable Add channel button
+on *:dialog:DLF.Options.GUI:sclick:15: url -a https://github.com/DukeLupus/dlFilter/blob/master/options-help.md
+; Channel text box typed or clicked - Enable / disable Add channel button
 on *:dialog:DLF.Options.GUI:edit:120: DLF.Options.SetAddChannelButton
 on *:dialog:DLF.Options.GUI:sclick:120: DLF.Options.SetAddChannelButton
 ; Channel Add button clicked
@@ -3265,7 +3276,7 @@ on *:dialog:DLF.Options.GUI:sclick:365: DLF.Options.PerConnection
 ; Background Ads / Filter option clicked
 on *:dialog:DLF.Options.GUI:sclick:365: DLF.Options.Background
 ; Titlebar option clicked
-on *:dialog:DLF.Options.GUI:sclick:525: DLF.Options.Titlebar
+on *:dialog:DLF.Options.GUI:sclick:515: DLF.Options.Titlebar
 ; oNotice option clicked
 on *:dialog:DLF.Options.GUI:sclick:715: DLF.Options.oNotice
 ; Advertising period changed
@@ -3282,6 +3293,8 @@ on *:dialog:DLF.Options.GUI:sclick:860: DLF.Options.RemoveCustom
 on *:dialog:DLF.Options.GUI:sclick:870: DLF.Options.SetRemoveCustomButton
 ; Double click on custom text line removes line but puts it into Add box for editing and re-adding.
 on *:dialog:DLF.Options.GUI:dclick:870: DLF.Options.EditCustom
+; Click on links
+on *:dialog:DLF.Options.GUI:sclick:985,995: url -a $did(DLF.Options.GUI,$did)
 ; Handle all other checkbox clicks and save
 ; Should go last so that sclick for specific fields take precedence
 on *:dialog:DLF.Options.GUI:sclick:10-999: DLF.Options.ClickOption
@@ -3429,12 +3442,11 @@ alias -l DLF.Options.Init {
   if (%DLF.update.betas == 1) did -c DLF.Options.GUI 190
   if (%DLF.filter.requests == 1) did -c DLF.Options.GUI 310
   if (%DLF.filter.ads == 1) did -c DLF.Options.GUI 315
+  if (%DLF.filter.topic == 1) did -c DLF.Options.GUI 320
   if (%DLF.filter.modeschan == 1) did -c DLF.Options.GUI 325
   if (%DLF.filter.trivia == 1) did -c DLF.Options.GUI 330
-  if (%DLF.filter.spampriv == 1) did -c DLF.Options.GUI 335
-  if (%DLF.filter.controlcodes == 1) did -c DLF.Options.GUI 345
-  if (%DLF.filter.topic == 1) did -c DLF.Options.GUI 320
-  if (%DLF.serverwin == 1) did -c DLF.Options.GUI 355
+  if (%DLF.serverwin == 1) did -c DLF.Options.GUI 335
+  if (%DLF.filter.controlcodes == 1) did -c DLF.Options.GUI 340
   if (%DLF.perconnect == 1) did -c DLF.Options.GUI 365
   if (%DLF.background == 1) did -c DLF.Options.GUI 370
   if (%DLF.filter.joins == 1) did -c DLF.Options.GUI 380
@@ -3446,8 +3458,8 @@ alias -l DLF.Options.Init {
   if (%DLF.filter.modesuser == 1) did -c DLF.Options.GUI 395
   if (%DLF.filter.regular == 1) did -c DLF.Options.GUI 397
   if (%DLF.searchresults == 1) did -c DLF.Options.GUI 510
-  if (%DLF.titlebar.stats == 1) did -c DLF.Options.GUI 525
-  if (%DLF.colornicks == 1) did -c DLF.Options.GUI 530
+  if (%DLF.titlebar.stats == 1) did -c DLF.Options.GUI 515
+  if (%DLF.colornicks == 1) did -c DLF.Options.GUI 520
   if (%DLF.dccsend.autoaccept == 1) did -c DLF.Options.GUI 540
   if (%DLF.dccsend.requested == 1) {
     did -c DLF.Options.GUI 545
@@ -3462,6 +3474,7 @@ alias -l DLF.Options.Init {
   if (%DLF.dccsend.regular == 1) did -c DLF.Options.GUI 565
   if (%DLF.serverretry == 1) did -c DLF.Options.GUI 570
   if (%DLF.checksecurity == 1) did -c DLF.Options.GUI 610
+  if (%DLF.filter.spampriv == 1) did -c DLF.Options.GUI 615
   if (%DLF.private.nocomchan == 1) did -c DLF.Options.GUI 620
   if (%DLF.private.regular == 1) did -c DLF.Options.GUI 625
   if (%DLF.chanctcp == 1) did -c DLF.Options.GUI 655
@@ -3494,16 +3507,15 @@ alias -l DLF.Options.Save {
   %DLF.enabled = $did(DLF.Options.GUI,10).state
   DLF.Groups.Events
   %DLF.showfiltered = $did(DLF.Options.GUI,30).state
+  %DLF.serverads = $did(DLF.Options.GUI,40).state
   %DLF.update.betas = $did(DLF.Options.GUI,190).state
   %DLF.filter.requests = $did(DLF.Options.GUI,310).state
   %DLF.filter.ads = $did(DLF.Options.GUI,315).state
-  %DLF.serverads = $did(DLF.Options.GUI,40).state
+  %DLF.filter.topic = $did(DLF.Options.GUI,320).state
   %DLF.filter.modeschan = $did(DLF.Options.GUI,325).state
   %DLF.filter.trivia = $did(DLF.Options.GUI,330).state
-  %DLF.filter.spampriv = $did(DLF.Options.GUI,335).state
-  %DLF.filter.controlcodes = $did(DLF.Options.GUI,345).state
-  %DLF.filter.topic = $did(DLF.Options.GUI,320).state
-  %DLF.serverwin = $did(DLF.Options.GUI,355).state
+  %DLF.serverwin = $did(DLF.Options.GUI,335).state
+  %DLF.filter.controlcodes = $did(DLF.Options.GUI,340).state
   %DLF.perconnect = $did(DLF.Options.GUI,365).state
   %DLF.background = $did(DLF.Options.GUI,370).state
   %DLF.filter.joins = $did(DLF.Options.GUI,380).state
@@ -3515,8 +3527,8 @@ alias -l DLF.Options.Save {
   %DLF.filter.modesuser = $did(DLF.Options.GUI,395).state
   %DLF.filter.regular = $did(DLF.Options.GUI,397).state
   %DLF.searchresults = $did(DLF.Options.GUI,510).state
-  %DLF.titlebar.stats = $did(DLF.Options.GUI,525).state
-  %DLF.colornicks = $did(DLF.Options.GUI,530).state
+  %DLF.titlebar.stats = $did(DLF.Options.GUI,515).state
+  %DLF.colornicks = $did(DLF.Options.GUI,520).state
   %DLF.dccsend.autoaccept = $did(DLF.Options.GUI,540).state
   %DLF.dccsend.requested = $did(DLF.Options.GUI,545).state
   %DLF.dccsend.dangerous = $did(DLF.Options.GUI,550).state
@@ -3525,6 +3537,7 @@ alias -l DLF.Options.Save {
   %DLF.dccsend.regular = $did(DLF.Options.GUI,565).state
   %DLF.serverretry = $did(DLF.Options.GUI,570).state
   %DLF.checksecurity = $did(DLF.Options.GUI,610).state
+  %DLF.filter.spampriv = $did(DLF.Options.GUI,615).state
   %DLF.private.nocomchan = $did(DLF.Options.GUI,620).state
   %DLF.private.regular = $did(DLF.Options.GUI,625).state
   %DLF.chanctcp = $did(DLF.Options.GUI,655).state
@@ -4381,7 +4394,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *Creating Archive*Stand By For Download * OmeNTweaK v*
   DLF.hadd chantext.announce * has just received * files from me, a total sent of * files
   DLF.hadd chantext.announce * BORGserv - A BRAND NEW SCRIPT WITH A BRAND NEW APPROACH TO IRC FILESHARING! GET YOUR COPY RIGHT NOW!!! - BORGserv v*
-  DLF.hadd chantext.announce Dans Ma Liste D'attente J'ai * Personne(s) * Aujourd'hui J'ai Partagé * Fichier(s) * Hier J'ai Partagé * Fichier(s) * Au Total J'ai Partagé * Fichier(s)
+  DLF.hadd chantext.announce Dans Ma Liste D'attente J'ai * Personne(s) * Aujourd'hui J'ai Partagé *
   DLF.hadd chantext.announce ««º Thªñk$ ÐêªR * Fºr Thê HºñºuR º»»
   DLF.hadd chantext.announce QwIRC * server online * Pour ma Liste*@* files * MB*Slots: * in use  InQueue:*
   DLF.hadd chantext.announce Ce Système Utilise Un Serveur
@@ -4454,6 +4467,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia Please report incorrect Q&A WITH Question Number & Correction to *
   DLF.hadd chantext.trivia Trivia Starting in * seconds, get ready!!!
   DLF.hadd chantext.trivia Resetting * SCORES
+  DLF.hadd chantext.trivia Trivia Stopped by *
   ; Question end
   DLF.hadd chantext.trivia Times up! The answer was -> * <-
   DLF.hadd chantext.trivia TIMES UP! *The answers were [ * ][ * ]*
@@ -4475,6 +4489,10 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia * has won * in a row!! Total Points *
   DLF.hadd chantext.trivia * in a Row !!! I Think that * is * !!! Is Everybody Asleep!?*
   DLF.hadd chantext.trivia A Special Bonus of * Points is Awarded to * for getting * in a row!!!
+  DLF.hadd chantext.trivia Bad question! Summoning new one...
+  DLF.hadd chantext.trivia Resetting * SCORES* Please wait* Trivia will resume in * seconds
+  DLF.hadd chantext.trivia Cleared Top * Variables
+  DLF.hadd chantext.trivia Cleared Top * Scores
   ; French trivia
   DLF.hadd chantext.trivia Le Quizz démarre dans * secondes, préparez-vous!
   DLF.hadd chantext.trivia Les * meilleurs : 1.*
@@ -4945,7 +4963,7 @@ alias -l DLF.GetFileName {
   return $null
 }
 
-alias -l DLF.strip { return $replace($strip($1-),$tab,$space,$nbsp,$space,$chr(149),$space,$chr(152),$null,$chr(144),$null,$chr(8226),$space,$+($space,$space),$space) }
+alias -l DLF.strip { return $replace($strip($1-),$tab,$space,$nbsp,$space,$chr(149),$space,$chr(152),$null,$chr(144),$null,$+($space,$space),$space) }
 
 ; ========== mIRC extension identifiers ==========
 alias -l IdentifierCalledAsAlias {
@@ -5303,7 +5321,9 @@ alias -l DLF.Watch.Log {
     elseif ($1 == ->) %c = 12
     elseif ($1 == Halted:) %c = 4
     if ($1 isin <->) DLF.Watch.Offset
-    var %l $timestamp $+ $DLF.Watch.Offset $1-
+    var %eventid
+    if ($eventid) %eventid = $eventid
+    var %l $timestamp $+ $DLF.Watch.Offset %eventid $1-
     DLF.Search.Add $debug 1 %c %l
     aline -pi %c $debug $burko(%l)
   }
