@@ -1811,7 +1811,7 @@ alias -l DLF.Custom.Add {
   var %type $replace($1,$nbsp,$space)
   var %new = $trim($2-)
   if ($0 == 2) %new = $+(*,%new,*)
-  %new = $replace(%new,$comma,?,$+($space,$space,*),$+($space,*),$+(*,$space,$space),$+(*,$space),**,*)
+  %new = $replace(%new,$comma,?,$+($space,&,$space),$+($space,?,$space),$+($space,$space,*),$+($space,*),$+(*,$space,$space),$+(*,$space),**,*)
   if (%type == Channel text) DLF.Custom.Set chantext $addtok(%DLF.custom.chantext,%new,$asc($comma))
   elseif (%type == Channel action) DLF.Custom.Set chanaction $addtok(%DLF.custom.chanaction,%new,$asc($comma))
   elseif (%type == Channel notice) DLF.Custom.Set channotice $addtok(%DLF.custom.channotice,%new,$asc($comma))
