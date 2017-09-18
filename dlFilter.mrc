@@ -4399,6 +4399,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce QwIRC * server online * Pour ma Liste*@* files * MB*Slots: * in use  InQueue:*
   DLF.hadd chantext.announce Ce Système Utilise Un Serveur
   DLF.hadd chantext.announce Dans Ma Liste D'attente J'ai * Personne(s) * Aujourd'hui J'ai Partagé : * Fichier(s) *
+  DLF.hadd chantext.announce * Its not !find, use @find to find songs
   inc %matches $hget(DLF.chantext.announce,0).item
 
   DLF.hmake DLF.chantext.always
