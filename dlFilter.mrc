@@ -164,7 +164,7 @@ alias DLF.Initialise {
   DLF.RenameVar opwarning.spamchan chspam.opnotify
   DLF.RenameVar opwarning.spampriv privspam.opnotify
   DLF.RenameVar private.nocomchan nocomchan
-  DLF.RenameVar private.regular noregmsg
+  DLF.RenameVar filter.privother noregmsg
   DLF.RenameVar serverwin server
   DLF.RenameVar update.betas betas
   DLF.RenameVar win-filter.log filtered.log
@@ -1071,6 +1071,17 @@ alias -l DLF.Priv.Text {
   halt
 }
 
+alias -l DLF.Priv.Action {
+  DLF.Watch.Called DLF.Priv.Action
+  DLF.Priv.QueryOpen $1-
+  DLF.Custom.Filter $1-
+  if ((%DLF.filter.spampriv == 1) && ($hiswm(privaction.spam,%txt))) DLF.Priv.SpamFilter $1-
+  DLF.Priv.CommonChan $1-
+  DLF.Priv.RegularUser Action $1-
+  DLF.Win.Echo $event Private $nick $1-
+  halt
+}
+
 alias -l DLF.Priv.Notice {
   DLF.Watch.Called DLF.Priv.Notice
   DLF.@find.Response $1-
@@ -1097,13 +1108,26 @@ alias -l DLF.Priv.NoticeServices {
   }
 }
 
-alias -l DLF.Priv.Action {
-  DLF.Watch.Called DLF.Priv.Action
-  DLF.Priv.QueryOpen $1-
+alias -l DLF.Priv.ctcp {
+  DLF.Watch.Called DLF.Priv.ctcp
   DLF.Custom.Filter $1-
-  if ((%DLF.filter.spampriv == 1) && ($hiswm(privaction.spam,%txt))) DLF.Priv.SpamFilter $1-
+  DLF.Priv.QueryOpen $1-
   DLF.Priv.CommonChan $1-
-  DLF.Priv.RegularUser Action $1-
+  DLF.Priv.RegularUser ctcp $1-
+  DLF.Win.Echo $event Private $nick $1-
+  halt
+}
+
+alias -l DLF.Priv.ctcpReply {
+  DLF.Watch.Called DLF.Priv.ctcpReply
+  if ($1 == VERSION) {
+    DLF.Win.Echo $event Private $nick $1-
+    halt
+  }
+  if ($hiswm(ctcp.reply,$1-)) DLF.Win.Filter $1-
+  DLF.Priv.QueryOpen $1-
+  DLF.Priv.CommonChan $1-
+  DLF.Priv.RegularUser ctcpreply $1-
   DLF.Win.Echo $event Private $nick $1-
   halt
 }
@@ -1130,6 +1154,7 @@ alias -l DLF.Priv.CommonChan {
     var %msg Private $event from $nick with no common channel
     DLF.Watch.Log Blocked: %msg
     DLF.Status Blocked: %msg
+    DLF.Status Blocked: $1-
     DLF.Win.Log Filter Blocked Private $nick %msg $+ :
     DLF.Win.Filter $1-
   }
@@ -1152,42 +1177,31 @@ alias -l DLF.Priv.DollarDecode {
   DLF.Halt Halted: Probable mIRC worm infection attempt.
 }
 
-alias -l DLF.Priv.ctcp {
-  DLF.Watch.Called DLF.Priv.ctcp
-  DLF.Custom.Filter $1-
-  DLF.Priv.QueryOpen $1-
-  DLF.Priv.CommonChan $1-
-  DLF.Priv.RegularUser ctcp $1-
-  DLF.Win.Echo $event Private $nick $1-
-  halt
-}
-
-alias -l DLF.Priv.ctcpReply {
-  DLF.Watch.Called DLF.Priv.ctcpReply
-  if ($1 == VERSION) {
-    DLF.Win.Echo $event Private $nick $1-
-    halt
-  }
-  if ($hiswm(ctcp.reply,$1-)) DLF.Win.Filter $1-
-  DLF.Priv.QueryOpen $1-
-  DLF.Priv.CommonChan $1-
-  DLF.Priv.RegularUser ctcpreply $1-
-  DLF.Win.Echo $event Private $nick $1-
-  halt
-}
-
 alias -l DLF.Priv.RegularUser {
-  if (%DLF.private.regular != 1) return
   DLF.Watch.Called DLF.Priv.RegularUser
-  if ($DLF.IsRegularUser($nick)) {
-    var %type $lower($replace($1,-,$space))
-    if (%type isin normal text) %type = message
-    var %msg Private %type from regular user $nick $br($address)
-    DLF.Watch.Log Blocked: %msg
-    DLF.Status Blocked: %msg
-    DLF.Win.Log Filter Blocked Private $nick %msg $+ :
-    DLF.Win.Filter $2-
+  if ($comchan($nick,0) == 0) {
+    DLF.Watch.Log Not in common channel
+    return
   }
+  if (!$DLF.IsRegularUser($nick)) {
+    DLF.Watch.Log Not a regular user
+    return
+  }
+  if ($DLF.Chan.IsCommonDlfChan($nick)) {
+    DLF.Watch.Log Regular user in common DLF channel
+    if (%DLF.filter.privdlfchan == 0) return
+  }
+  else {
+    DLF.Watch.Log Regular user not in common DLF channel
+    if (%DLF.filter.privother == 0) return
+  }
+  var %type $lower($replace($1,-,$space))
+  if (%type isin normal text) %type = message
+  .DLF.notice $nick Your private %type has been blocked by the $DLF.logo firewall. If you want to contact me privately, please ask in channel.
+  var %msg Private %type from regular user $nick $br($address)
+  DLF.Watch.Log Blocked: %msg
+  DLF.Win.Log Filter Blocked Private $nick %msg $+ :
+  DLF.Win.Filter $2-
 }
 
 alias -l DLF.Priv.ctcpBlock {
@@ -3180,7 +3194,7 @@ dialog -l DLF.Options.GUI {
   button "Update dlFilter", 180, 86 175 74 11, tab 1 flat disable
   check "Check for &beta versions", 190, 7 189 155 6, tab 1
   ; tab Filters
-  box " Channel messages ", 305, 4 23 160 73, tab 3
+  box " Channel messages ", 305, 4 23 160 91, tab 3
   check "Filter other users @search / @file / @locator / !get requests", 310, 7 32 155 6, tab 3
   check "Filter server adverts and announcements", 315, 7 41 155 6, tab 3
   check "Filter channel topic updates", 320, 7 50 155 6, tab 3
@@ -3188,18 +3202,20 @@ dialog -l DLF.Options.GUI {
   check "Filter trivia games", 330, 7 68 155 6, tab 3
   check "Filter server responses to my requests to separate window", 335, 7 77 155 6, tab 3
   check "Filter ALL coloured messages (last resort - use cautiously)", 340, 7 86 155 6, tab 3
-  box " Advert / Filter Windows ", 360, 4 97 160 28, tab 3
-  check "Separate dlF windows per connection", 365, 7 106 155 6, tab 3
-  check "Keep Filter windows active in background", 370, 7 115 155 6, tab 3
-  box " User events ", 375, 4 142 160 57, tab 3
-  check "Joins …", 380, 7 152 53 6, tab 3
-  check "Parts …", 382, 66 152 53 6, tab 3
-  check "Quits …", 384, 120 152 53 6, tab 3
-  check "Nick changes …", 386, 7 161 53 6, tab 3
-  check "Kicks …", 388, 66 161 53 6, tab 3
-  check "Away and thank-you messages", 390, 7 170 155 6, tab 3
-  check "User mode changes", 395, 7 179 155 6, tab 3
-  check "Filter above user events for non-regular users", 397, 7 188 155 6, tab 3
+  check "Filter private msgs from regular users IN filtered channels", 345, 7 95 155 6, tab 3
+  check "Filter private msgs from regular users NOT IN filtered channels", 350, 7 104 155 6, tab 3
+  box " Advert / Filter Windows ", 360, 4 115 160 28, tab 3
+  check "Separate dlF windows per connection", 365, 7 124 155 6, tab 3
+  check "Keep Filter windows active in background", 370, 7 133 155 6, tab 3
+  box " User events ", 375, 4 144 160 55, tab 3
+  check "Joins …", 380, 7 153 53 6, tab 3
+  check "Parts …", 382, 66 153 53 6, tab 3
+  check "Quits …", 384, 120 153 53 6, tab 3
+  check "Nick changes …", 386, 7 162 53 6, tab 3
+  check "Kicks …", 388, 66 162 53 6, tab 3
+  check "Away and thank-you messages", 390, 7 171 155 6, tab 3
+  check "User mode changes", 395, 7 180 155 6, tab 3
+  check "Filter above user events for non-regular users", 397, 7 189 155 6, tab 3
   ; Tab Other
   box " Extra functions ", 505, 4 23 160 37, tab 5
   check "Collect @find/@locator results into a single window", 510, 7 32 155 6, tab 5
@@ -3217,9 +3233,8 @@ dialog -l DLF.Options.GUI {
   check "Check mIRC settings are secure (future enhancement)", 610, 7 144 155 6, tab 5 disable
   check "Filter private spam", 615, 7 153 155 6, tab 5
   check "Filter private messages from users not in a common channel", 620, 7 162 155 6, tab 5
-  check "Filter private messages from regular users", 625, 7 171 155 6, tab 5
-  check "Block channel CTCP requests unless from an op", 655, 7 180 155 6, tab 5
-  check "Block IRC Finger requests (which share personal information)", 660, 7 189 155 6, tab 5
+  check "Block channel CTCP requests unless from an op", 655, 7 171 155 6, tab 5
+  check "Block IRC Finger requests (which share personal information)", 660, 7 180 155 6, tab 5
   ; tab Ops
   text "These options are only enabled if you are an op on a filtered channel.", 705, 4 25 160 12, tab 7 multi
   box " Channel Ops ", 710, 4 38 160 38, tab 7
@@ -3326,6 +3341,8 @@ alias -l DLF.Options.Initialise {
   DLF.Options.InitOption filter.trivia 0
   DLF.Options.InitOption filter.spampriv 1
   DLF.Options.InitOption filter.controlcodes 0
+  DLF.Options.InitOption filter.privdlfchan 0
+  DLF.Options.InitOption filter.privother 0
   DLF.Options.InitOption filter.topic 0
   DLF.Options.InitOption serverwin 0
   DLF.Options.InitOption perconnect 1
@@ -3356,7 +3373,6 @@ alias -l DLF.Options.Initialise {
   ; Other tab mIRC-wide box
   DLF.Options.InitOption checksecurity 1
   DLF.Options.InitOption private.nocomchan 1
-  DLF.Options.InitOption private.regular 1
   DLF.Options.InitOption chanctcp 1
   DLF.Options.InitOption nofingers 1
 
@@ -3447,6 +3463,8 @@ alias -l DLF.Options.Init {
   if (%DLF.filter.trivia == 1) did -c DLF.Options.GUI 330
   if (%DLF.serverwin == 1) did -c DLF.Options.GUI 335
   if (%DLF.filter.controlcodes == 1) did -c DLF.Options.GUI 340
+  if (%DLF.filter.privdlfchan == 1) did -c DLF.Options.GUI 345
+  if (%DLF.filter.privother == 1) did -c DLF.Options.GUI 350
   if (%DLF.perconnect == 1) did -c DLF.Options.GUI 365
   if (%DLF.background == 1) did -c DLF.Options.GUI 370
   if (%DLF.filter.joins == 1) did -c DLF.Options.GUI 380
@@ -3476,7 +3494,6 @@ alias -l DLF.Options.Init {
   if (%DLF.checksecurity == 1) did -c DLF.Options.GUI 610
   if (%DLF.filter.spampriv == 1) did -c DLF.Options.GUI 615
   if (%DLF.private.nocomchan == 1) did -c DLF.Options.GUI 620
-  if (%DLF.private.regular == 1) did -c DLF.Options.GUI 625
   if (%DLF.chanctcp == 1) did -c DLF.Options.GUI 655
   if (%DLF.nofingers == 1) did -c DLF.Options.GUI 660
   if (%DLF.win-onotice.enabled == 1) did -c DLF.Options.GUI 715
@@ -3516,6 +3533,8 @@ alias -l DLF.Options.Save {
   %DLF.filter.trivia = $did(DLF.Options.GUI,330).state
   %DLF.serverwin = $did(DLF.Options.GUI,335).state
   %DLF.filter.controlcodes = $did(DLF.Options.GUI,340).state
+  %DLF.filter.privdlfchan = $did(DLF.Options.GUI,345).state
+  %DLF.filter.privother = $did(DLF.Options.GUI,350).state
   %DLF.perconnect = $did(DLF.Options.GUI,365).state
   %DLF.background = $did(DLF.Options.GUI,370).state
   %DLF.filter.joins = $did(DLF.Options.GUI,380).state
@@ -3539,7 +3558,6 @@ alias -l DLF.Options.Save {
   %DLF.checksecurity = $did(DLF.Options.GUI,610).state
   %DLF.filter.spampriv = $did(DLF.Options.GUI,615).state
   %DLF.private.nocomchan = $did(DLF.Options.GUI,620).state
-  %DLF.private.regular = $did(DLF.Options.GUI,625).state
   %DLF.chanctcp = $did(DLF.Options.GUI,655).state
   %DLF.nofingers = $did(DLF.Options.GUI,660).state
   %DLF.win-onotice.enabled = $did(DLF.Options.GUI,715).state
@@ -4400,6 +4418,8 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce Ce Système Utilise Un Serveur
   DLF.hadd chantext.announce Dans Ma Liste D'attente J'ai * Personne(s) * Aujourd'hui J'ai Partagé : * Fichier(s) *
   DLF.hadd chantext.announce * Its not !find, use @find to find songs
+  DLF.hadd chantext.announce ====================*
+  DLF.hadd chantext.announce ?:\*\*\
   inc %matches $hget(DLF.chantext.announce,0).item
 
   DLF.hmake DLF.chantext.always
