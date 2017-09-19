@@ -4248,7 +4248,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads * To request a file, type  *
   DLF.hadd chantext.ads * To request details, type  *
   DLF.hadd chantext.ads En attente de joueurs, tapez !* pour lancer le Quizz!
-  DLF.hadd chantext.ads @* = * songs & * movies *
+  DLF.hadd chantext.ads @* = * songs ? * movies *
   inc %matches $hget(DLF.chantext.ads,0).item
 
   DLF.hmake DLF.chantext.announce
@@ -4401,11 +4401,11 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce Please *don*t flood our servers.
   DLF.hadd chantext.announce Need Help with a Command type *
   DLF.hadd chantext.announce No Flooding *Flooding is defined as *
-  DLF.hadd chantext.announce Hints & Tips *
+  DLF.hadd chantext.announce Hints ? Tips *
   DLF.hadd chantext.announce Do Not Ask For OPs *
   DLF.hadd chantext.announce No Pornography *
   DLF.hadd chantext.announce No Spamming *
-  DLF.hadd chantext.announce No Racism & Nazism *
+  DLF.hadd chantext.announce No Racism ? Nazism *
   DLF.hadd chantext.announce Do Not Attempt To Get Past Channel Bans *
   DLF.hadd chantext.announce Want the FileServ Serv*ing Bot *
   DLF.hadd chantext.announce *List: * Search: * Mode: *
@@ -4467,7 +4467,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia BogusTrivia v*
   DLF.hadd chantext.trivia *TrivBot2001*
   DLF.hadd chantext.trivia *WQuizz 2*
-  DLF.hadd chantext.trivia Public Commands: .* .* & .*
+  DLF.hadd chantext.trivia Public Commands: .* .* ? .*
   DLF.hadd chantext.trivia Trivia Commands: *
   DLF.hadd chantext.trivia Welcome to *, kick back and play some Trivia!!
   DLF.hadd chantext.trivia PLAY it's what i'm here for!
@@ -4476,7 +4476,6 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia * JACKPOT Points *have been returned to JACKPOT
   DLF.hadd chantext.trivia Top* Players *are Auto-Voiced
   DLF.hadd chantext.trivia Watch for the * BONUS Questions !!!
-  DLF.hadd chantext.trivia Please report incorrect Q&A WITH Question Number & Correction to a Channel OP
   DLF.hadd chantext.trivia If you think a Q&A is wrong, please check it at *
   DLF.hadd chantext.trivia Please refrain from using Extreme Bad Language
   DLF.hadd chantext.trivia For The Competitive Edge type*
@@ -4485,7 +4484,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia Please remember this is a FREE service, Please do not complain*
   DLF.hadd chantext.trivia We feature over * Q&A !
   DLF.hadd chantext.trivia If you think a Q&A is wrong, please leave * a msg with Q number and correct Answer.
-  DLF.hadd chantext.trivia Please report incorrect Q&A WITH Question Number & Correction to *
+  DLF.hadd chantext.trivia Please report incorrect Q&A WITH Question Number ? Correction to *
   DLF.hadd chantext.trivia Trivia Starting in * seconds, get ready!!!
   DLF.hadd chantext.trivia Resetting * SCORES
   DLF.hadd chantext.trivia Trivia Stopped by *
@@ -4534,13 +4533,13 @@ alias -l DLF.CreateHashTables {
   inc %matches $hget(DLF.chantext.trivia,0).item
 
   DLF.hmake DLF.chanaction.trivia
-  DLF.hadd chanaction.trivia passes * a Pepsi & Dinner for one for getting * wins!! way to go *!!!
+  DLF.hadd chanaction.trivia passes * a Pepsi ? Dinner for one for getting * wins!! way to go *!!!
   DLF.hadd chanaction.trivia passes * a ice cold beer and large pizza for getting * wins!! way to go *!!!
   DLF.hadd chanaction.trivia awards * with a +v for having over * points
   inc %matches $hget(DLF.chanaction.trivia,0).item
 
   DLF.hmake DLF.channotice.trivia
-  DLF.hadd channotice.trivia Welcome To * Please Enjoy Your Stay. Grab Some Files Play Some Trivia & Just Have Fun.*
+  DLF.hadd channotice.trivia Welcome To * Please Enjoy Your Stay. Grab Some Files Play Some Trivia ? Just Have Fun.*
   DLF.hadd channotice.trivia *'s Stats: *Points (answers)* Total Ever: *
   inc %matches $hget(DLF.channotice.trivia,0).item
 
