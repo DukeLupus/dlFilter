@@ -184,7 +184,7 @@ alias DLF.Initialise {
   if (%DLF.JustLoaded) var %init Loading
   else var %init Starting
   DLF.StatusAll %init $c(4,version $DLF.SetVersion) by DukeLupus & Sophist.
-  DLF.StatusAll Please check dlFilter homepage $br($c(12,9,$u(https://github.com/DukeLupus/dlFilter/issues))) for help.
+  DLF.StatusAll Please visit dlFilter homepage $br($c(12,9,$u(https://github.com/DukeLupus/dlFilter))) for help.
   ;DLF.CreateGif
   hfree -w DLF.*
   DLF.CreateHashTables
@@ -760,6 +760,7 @@ alias -l DLF.Chan.IsUserEvent {
 }
 
 alias -l DLF.Chan.Text {
+  if (bad question isin $strip($1-)) echo 7 $chan $burko($1-)
   DLF.Watch.Called DLF.Chan.Text
   ; Remove leading and double spaces
   var %txt $DLF.strip($1-)
@@ -4420,6 +4421,9 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce * Its not !find, use @find to find songs
   DLF.hadd chantext.announce ====================*
   DLF.hadd chantext.announce ?:\*\*\
+  DLF.hadd chantext.announce *I have sent a total of * in * files since *
+  DLF.hadd chantext.announce * Transfert Terminé De: * \ À: *
+  DLF.hadd chantext.announce Welcome &
   inc %matches $hget(DLF.chantext.announce,0).item
 
   DLF.hmake DLF.chantext.always
@@ -4448,7 +4452,12 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.fileserv * Bandwidth Usage * Current: *, Record: *
   DLF.hadd chantext.fileserv * Total Offered: *, Total Transferred (since *): *
   DLF.hadd chantext.fileserv * packs * of * slots open Queue: *, Priority queue: *
-  inc %matches $hget(DLF.chantext.always,0).item
+  DLF.hadd chantext.fileserv added [*] * /MSG * XDCC SEND *
+  DLF.hadd chantext.fileserv added [*] * /MSG * XDCC SEND *
+  DLF.hadd chantext.fileserv ? *.avi
+  DLF.hadd chantext.fileserv ?? *.avi
+  DLF.hadd chantext.fileserv ??? *.avi
+  inc %matches $hget(DLF.chantext.fileserv,0).item
 
   DLF.hmake DLF.chantext.trivia
   DLF.hadd chantext.trivia KAOS: * Question Value : *
@@ -4513,6 +4522,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia Resetting * SCORES* Please wait* Trivia will resume in * seconds
   DLF.hadd chantext.trivia Cleared Top * Variables
   DLF.hadd chantext.trivia Cleared Top * Scores
+  DLF.hadd chantext.trivia *Trivia* Loading...
   ; French trivia
   DLF.hadd chantext.trivia Le Quizz démarre dans * secondes, préparez-vous!
   DLF.hadd chantext.trivia Les * meilleurs : 1.*
@@ -4553,30 +4563,31 @@ alias -l DLF.CreateHashTables {
   DLF.hmake DLF.chanaction.away
   DLF.hadd chanaction.away *asculta*
   DLF.hadd chanaction.away *Avertisseur*Journal*
-  DLF.hadd chanaction.away *está away*pager*
-  DLF.hadd chanaction.away *has returned from*I was gone for*
-  DLF.hadd chanaction.away *has stumbled to the channel couch*Couch v*by Kavey*
-  DLF.hadd chanaction.away *has taken a seat on the channel couch*Couch v*by Kavey*
+  DLF.hadd chanaction.away está away*pager*
   DLF.hadd chanaction.away *I Have Send My List*Times*Files*Times*
-  DLF.hadd chanaction.away *I-n-v-i-s-i-o-n*
-  DLF.hadd chanaction.away *is AWAY*auto-away*
-  DLF.hadd chanaction.away *is away*Reason*since*
-  DLF.hadd chanaction.away *is BACK from*away*
-  DLF.hadd chanaction.away *is back from*Gone*
-  DLF.hadd chanaction.away *is currently boogying away to*
-  DLF.hadd chanaction.away *is gone. Away after*minutes of inactivity*
-  DLF.hadd chanaction.away *is listening to*Kbps*KHz*
-  DLF.hadd chanaction.away *Now*Playing*Kbps*KHz*
-  DLF.hadd chanaction.away *sets away*Auto Idle Away after*
-  DLF.hadd chanaction.away *Type Or Copy*Paste*To Get This Song*
+  DLF.hadd chanaction.away is away*autoaway*
+  DLF.hadd chanaction.away is away*auto-away*
+  DLF.hadd chanaction.away is away*Reason*since*
+  DLF.hadd chanaction.away is away: *
+  DLF.hadd chanaction.away sets away*Auto Idle Away after*
+  DLF.hadd chanaction.away is back from*away*
+  DLF.hadd chanaction.away is back from*Gone*
+  DLF.hadd chanaction.away is back from: *
+  DLF.hadd chanaction.away is gone. Away after*minutes of inactivity*
+  DLF.hadd chanaction.away has returned. [gone:*]
+  DLF.hadd chanaction.away has returned from*I was gone for*
+  DLF.hadd chanaction.away has stumbled to the channel couch*Couch v*by Kavey*
+  DLF.hadd chanaction.away has taken a seat on the channel couch*Couch v*by Kavey*
+  DLF.hadd chanaction.away is currently boogying away to*
+  DLF.hadd chanaction.away is listening to*Kbps*KHz*
   DLF.hadd chanaction.away *uses cracked software*I will respond to the following commands*
   DLF.hadd chanaction.away *way*since*pager*
-  DLF.hadd chanaction.away *[Backing Up]*
-  DLF.hadd chanaction.away is BACK from: *
-  DLF.hadd chanaction.away is AWAY: *
   inc %matches $hget(DLF.chanaction.away,0).item
 
   DLF.hmake DLF.chanaction.spam
+  DLF.hadd chanaction.spam *Type Or Copy*Paste*To Get This Song*
+  DLF.hadd chanaction.spam *Now*Playing*Kbps*KHz*
+  DLF.hadd chanaction.spam *[Backing Up]*
   DLF.hadd chanaction.spam *FTP*port*user*pass*
   DLF.hadd chanaction.spam *get AMIP*plug-in at http*amip.tools-for.net*
   DLF.hadd chanaction.spam is dAnCiNg ArOuNd *ThE *RoOm (_\_)(_/_)(_\_) MovInG' iT (_\_)(_/_)(_\_) *ShAkeN' *iT (_\_)(_/_)(_\_) *WiggLiNg' *iT (_\_)(_/_)(_\_) *JuSt *LeTTinG *iT aLL *fLoW (_\_)(_/_)(_\_)
