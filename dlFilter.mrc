@@ -42,6 +42,7 @@ dlFilter uses the following code from other people:
   Immediate TODO
       Test location and filename for oNotice log files
       Test window highlighting (flashing etc.) - define rules.
+      Close @dlf windows automatically with -v
 
   Ideas for possible future enhancements
       Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
@@ -66,7 +67,7 @@ dlFilter uses the following code from other people:
 */
 
 alias -l DLF.SetVersion {
-  %DLF.version = 1.181
+  %DLF.version = 1.19
   return %DLF.version
 }
 
@@ -270,7 +271,6 @@ ctcp ^*:VERSION*:?: {
   elseif (%DLF.enabled) DLF.Priv.ctcpBlock $1-
 }
 
-on *:close:Status Window: { DLF.Win.CloseServer }
 on *:close:@#*: { DLF.oNotice.Close $target }
 
 ; Send SNOTICES always to Status
@@ -558,7 +558,7 @@ alias -l DLF.Event.MeQuit {
 alias -l DLF.Event.MeConnect {
   DLF.Watch.Called DLF.Event.MeConnect $1-
   set -ez [ [ $+(%,DLF.CONNECT.CID,$cid) ] ] 40
-  DLF.Win.CloseServer
+  DLF.Win.ChangeNetwork
   DLF.Update.Check
 }
 
@@ -2047,6 +2047,7 @@ alias -l DLF.Win.WinOpen {
   var %lfn $DLF.Win.LogName(%win)
   var %switches $2
   if (%DLF.perconnect == 0) %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ iz,1,$asc($space))
+  else %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ v,1,$asc($space))
   if ((%DLF.background == 1) && ($4 == 0)) %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ h,1,$asc($space))
   window %switches %win
   if (($3) && ($isfile(%lfn))) loadbuf $windowbuffer -rpi %win %lfn
@@ -2207,16 +2208,14 @@ alias -l DLF.Win.CustomTrim {
   if ($line($1,0) >= %max) dline $1 $+(1-,%del)
 }
 
-alias -l DLF.Win.CloseServer {
+; Close custom windows if this connection is connecting to a different network
+alias -l DLF.Win.ChangeNetwork {
   if (($event == connect) && (%DLF.perconnect == 0)) return
-  DLF.Watch.Called DLF.Win.CloseServer
+  DLF.Watch.Called DLF.Win.ChangeNetwork
   var %i $window(@DLF.*,0)
   while (%i) {
     var %win $window(@DLF.*,%i)
-    if ($window(%win).cid == $cid) {
-      if (($event == close) && ($gettok(%win,-1,$asc(.)) == $network)) close -@ %win
-      elseif (($event == connect) && ($gettok(%win,-1,$asc(.)) != $network)) close -@ %win
-    }
+    if (($window(%win).cid == $cid) && ($gettok(%win,-1,$asc(.)) != $network)) close -@ %win
     dec %i
   }
 }
@@ -4147,7 +4146,12 @@ alias -l DLF.Socket.Headers {
   }
 }
 
-alias -l DLF.Socket.SockErr DLF.Socket.Error $1: $sock($sockname).wsmsg
+alias -l DLF.Socket.SockErr {
+  var %err
+  if ($sockerr == 3) %err = Failed to establish socket connection:
+  elseif ($sockerr == 4) %err = DNS error resolving hostname:
+  DLF.Socket.Error $1: %err $sock($sockname).wsmsg
+}
 
 alias -l DLF.Socket.Error {
   if ($sockname) {
@@ -4504,7 +4508,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia NOBODY GOT ANY OF THE ANSWERS !!!
   DLF.hadd chantext.trivia You've Guessed Them All !!! *The answers were [ * ][ * ]*
   DLF.hadd chantext.trivia Total Number Answered Correctly: * from a possible * !
-  DLF.hadd chantext.trivia YES, *!!!  got the answer -> * <-  in * secs, and gets * Points
+  DLF.hadd chantext.trivia YES, *  got the answer -> * <-  in * secs, and gets * points
   DLF.hadd chantext.trivia You got it *! The answer was "*". You got it in * seconds and are awarded * Points
   DLF.hadd chantext.trivia Unbelievable!! * got the answer "*" in only * seconds earning * Points
   DLF.hadd chantext.trivia That's the way *! The answer was "*". You got it in * seconds, scooping up * Points
@@ -4515,7 +4519,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia Congratulations *! The answer was "*". You got it in * seconds, raising your score by * Points
   DLF.hadd chantext.trivia Way to go *!! You answered "*" in * seconds for * Points
   DLF.hadd chantext.trivia * wins * Points for *
-  DLF.hadd chantext.trivia * has won * in a row!! Total Points *
+  DLF.hadd chantext.trivia * has won * in a row!* Total Points *
   DLF.hadd chantext.trivia * in a Row !!! I Think that * is * !!! Is Everybody Asleep!?*
   DLF.hadd chantext.trivia A Special Bonus of * Points is Awarded to * for getting * in a row!!!
   DLF.hadd chantext.trivia Bad question! Summoning new one...
