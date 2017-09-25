@@ -425,17 +425,21 @@ raw 005:*: { DLF.iSupport.Raw005 $1- }
 raw 301:*: { DLF.Away.Filter $1- }
 
 ; Show messages in status AND active windows (rather than just status)
-; Unknown command / No such nick/channel / Nick change too fast
+; Unknown command / No such nick/channel / Nickname is already in use / Nick change too fast
 raw 401:*: {
-  echo -ast $2-
+  echo -astc Info * $2-
   halt
 }
 raw 421:*: {
-  echo -ast $2-
+  echo -astc Info * $2-
+  halt
+}
+raw 433:*: {
+  echo -astc Info * $2-
   halt
 }
 raw 438:*: {
-  echo -ast $2-
+  echo -astc Info * $2-
   halt
 }
 
@@ -760,7 +764,6 @@ alias -l DLF.Chan.IsUserEvent {
 }
 
 alias -l DLF.Chan.Text {
-  if (bad question isin $strip($1-)) echo 7 $chan $burko($1-)
   DLF.Watch.Called DLF.Chan.Text
   ; Remove leading and double spaces
   var %txt $DLF.strip($1-)
@@ -786,20 +789,20 @@ alias -l DLF.Chan.Text {
   if ($hiswm(chantext.announce,%txt)) DLF.Win.AdsAnnounce $1-
   if ($hiswm(chantext.spam,%txt)) DLF.Chan.SpamFilter $1
   if ($hiswm(chantext.always,%txt)) DLF.Win.Filter $1-
+  if ($hiswm(chantext.trivia,%txt)) DLF.Trivia.Filter $1-
   if (%txt != $1-) {
     if ($hiswm(chantext.fileserv,%txt)) DLF.Win.AdsAnnounce $1-
     if ($DLF.Trivia.IsTriviaBot) {
-      if ($istok(1st hint:|2nd hint:|3rd hint:,$gettok(%txt,1-2,$asc($space)),$asc(|))) DLF.Trivia.Hint $1-
-      if (($space !isin %txt) && ($len(%txt) > 10) && ($left($right(%txt,2),1) == ?)) {
+      if ($hiswm(chantext.triviahint,%txt)) DLF.Trivia.Hint $1-
+      elseif (($space !isin %txt) && ($len(%txt) > 10) && ($left($right(%txt,2),1) == ?)) {
         DLF.Watch.Log Obfuscated trivia question
         if (%DLF.filter.trivia == 1) DLF.Win.Filter $1-
       }
-      elseif ($gettok(%txt,-1,$asc($space)) == ?) {
+      elseif ($right(%txt,1) == ?) {
         DLF.Watch.Log Trivia question
         if (%DLF.filter.trivia == 1) DLF.Win.Filter $1-
       }
     }
-    if ($hiswm(chantext.trivia,%txt)) DLF.Trivia.Filter $1-
   }
   elseif ($DLF.Trivia.IsTriviachan) DLF.Trivia.Answer $1-
   DLF.Chan.ControlCodes $1-
@@ -989,31 +992,32 @@ alias -l DLF.Trivia.IsTriviaBot {
 alias DLF.Trivia.Hint {
   DLF.Watch.Called DLF.Trivia.Hint
   var %hint $DLF.strip($1-)
-  var %reletter $+([*.'"&a-z0-9,$comma,])
-  var %restar $+([*.'"&a-z0-9]*[*],%reletter,*)
-  var %rehint ( $+ (?:\s+ $+ %reletter $+ *)*(?:\s+ $+ %restar $+ )+)
+  var %reletter $+([-*.'"&a-z0-9,$comma,])
+  var %restar $+([-*.'"&a-z0-9]*[*],%reletter,*)
+  var %rehint ((?:\s+ $+ %reletter $+ *)*(?:\s+ $+ %restar $+ )+)
   var %resecs (?:\s+([\d.]+)\s+secs)?
-  var %renorm /\S+\s+Hint: $+ %rehint $+ %resecs $+ /Fi
+  var %renorm / $+ %rehint $+ %resecs $+ /Fi
   var %rekaos /(?:\s+[[]((?:\s* $+ %reletter $+ +)+)\s*[]]) $+ %resecs $+ /Fig
   var %i $regex(DLF.Trivia.Hint,%hint,%rekaos)
   if (%i == 0) %i = $regex(DLF.Trivia.Hint,%hint,%renorm)
-  if (%i == 0) return
-  var %masks, %secs 55
-  %i = $regml(DLF.Trivia.Hint,0)
-  while (%i) {
-    var %txt $regml(DLF.Trivia.Hint,%i)
-    var %grp $regml(DLF.Trivia.Hint,%i).group
-    if (%grp == 2) %secs = %txt + 10
-    else {
-      %txt = $regsubex(%txt,/([^ ])/g,?)
-      %masks = $addtok(%masks,$trim(%txt),$asc(|))
+  if (%i > 0) {
+    var %masks, %secs 55
+    %i = $regml(DLF.Trivia.Hint,0)
+    while (%i) {
+      var %txt $regml(DLF.Trivia.Hint,%i)
+      var %grp $regml(DLF.Trivia.Hint,%i).group
+      if (%grp == 2) %secs = %txt + 10
+      else {
+        %txt = $regsubex(%txt,/([^ ])/g,?)
+        %masks = $addtok(%masks,$trim(%txt),$asc(|))
+      }
+      dec %i
     }
-    dec %i
-  }
-  if (%masks) {
-    var %idx $+($network,$chan,@,$nick)
-    hadd -mu $+ %secs DLF.trivia.hints %idx %masks
-    DLF.Watch.Log Trivia: Question start
+    if (%masks) {
+      var %idx $+($network,$chan,@,$nick)
+      hadd -mu $+ %secs DLF.trivia.hints %idx %masks
+      DLF.Watch.Log Trivia: Question start
+    }
   }
   ;echo 7 $chan Hint: %masks
   DLF.Trivia.Filter $1-
@@ -2128,19 +2132,25 @@ alias -l DLF.Win.Echo {
     DLF.Watch.Log Echoed: To $2
   }
   else {
-    var %sent
-    var %i $comchan($3,0)
-    if ((%i == 0) || ($3 == $me) || (($2 == Private) && ($notify($3)))) {
-      if (($window($active).type !isin custom listbox) && ((($DLF.IsServiceUser($3)) && (!$DLF.Event.JustConnected)) || ($3 == $me))) {
-        echo -atci2 %col %pref %line
-        DLF.Watch.Log Echoed: To active window $active
+    var %i $comchan($3,0), %su $DLF.IsServiceUser($3)
+    if ((%i == 0) || ($3 == $me)) {
+      if ((($window($active).type !isin custom listbox) || ($left($active,2) == @#)) $&
+       && (((%su) && (!$DLF.Event.JustConnected)) || ($3 == $me))) {
+        if ($3 == $me) {
+          echo -atci2 %col %pref %line
+          DLF.Watch.Log Echoed: To active window $active
+        }
+        else {
+          echo -astci2 %col %pref %line
+          DLF.Watch.Log Echoed: To status window and active window $active
+        }
       }
       elseif ($query($3)) {
         if ($2 == Private) %pref = $null
         echo -tci2 %col $2 %pref %line
         DLF.Watch.Log Echoed: To query window
       }
-      elseif (($usesinglemsg == 0) || ($DLF.IsServiceUser($3))) {
+      elseif (($usesinglemsg == 0) || (%su)) {
         if ($2 == Private) %pref = $null
         echo -stci2 %col %pref %line
         DLF.Watch.Log Echoed: To status window
@@ -2152,6 +2162,7 @@ alias -l DLF.Win.Echo {
       }
       return
     }
+    var %sent
     while (%i) {
       var %chan $comchan($3,%i)
       echo -tci2 %col %chan %pref %line
@@ -3203,7 +3214,7 @@ dialog -l DLF.Options.GUI {
   check "Filter server responses to my requests to separate window", 335, 7 77 155 6, tab 3
   check "Filter ALL coloured messages (last resort - use cautiously)", 340, 7 86 155 6, tab 3
   check "Filter private msgs from regular users IN filtered channels", 345, 7 95 155 6, tab 3
-  check "Filter private msgs from regular users NOT IN filtered channels", 350, 7 104 155 6, tab 3
+  check "Filter private msgs from reg. users NOT IN filtered channels", 350, 7 104 155 6, tab 3
   box " Advert / Filter Windows ", 360, 4 115 160 28, tab 3
   check "Separate dlF windows per connection", 365, 7 124 155 6, tab 3
   check "Keep Filter windows active in background", 370, 7 133 155 6, tab 3
@@ -4254,6 +4265,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads * To request details, type  *
   DLF.hadd chantext.ads En attente de joueurs, tapez !* pour lancer le Quizz!
   DLF.hadd chantext.ads @* = * songs ? * movies *
+  DLF.hadd chantext.ads For a listing type..::*::.. *«UPP»*
   inc %matches $hget(DLF.chantext.ads,0).item
 
   DLF.hmake DLF.chantext.announce
@@ -4428,6 +4440,9 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *I have sent a total of * in * files since *
   DLF.hadd chantext.announce * Transfert Terminé De: * \ À: *
   DLF.hadd chantext.announce Welcome &
+  DLF.hadd chantext.announce ??? XDCC ??? Server Is *
+  DLF.hadd chantext.announce * Trigger..::*::.. Size..::*::.. Description..::*::.. Record CPS..::*::.. Sends..::*::.. Queues..::*::..*«UPP»*
+  DLF.hadd chantext.announce * Offering..::* in * packs::.. Bandwidth..::*
   inc %matches $hget(DLF.chantext.announce,0).item
 
   DLF.hmake DLF.chantext.always
@@ -4463,13 +4478,17 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.fileserv ??? *.avi
   inc %matches $hget(DLF.chantext.fileserv,0).item
 
+  DLF.hmake DLF.chantext.triviahint
+  DLF.hadd chantext.triviahint 1st Hint: *
+  DLF.hadd chantext.triviahint 2nd Hint: *
+  DLF.hadd chantext.triviahint 3rd Hint: *
+  DLF.hadd chantext.triviahint Answer: *
+  inc %matches $hget(DLF.chantext.triviahint,0).item
+
   DLF.hmake DLF.chantext.trivia
   DLF.hadd chantext.trivia KAOS: * Question Value : *
   DLF.hadd chantext.trivia KAOS * Answers
   DLF.hadd chantext.trivia ???.*
-  DLF.hadd chantext.trivia 1st Hint: *
-  DLF.hadd chantext.trivia 2nd Hint: *
-  DLF.hadd chantext.trivia 3rd Hint: *
   DLF.hadd chantext.trivia *S Top * #*: *
   DLF.hadd chantext.trivia *S Ago* Top * #*: *
   DLF.hadd chantext.trivia This * Top * #*: *
@@ -4544,6 +4563,40 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia Correct! La réponse est: *. Continue comme çà, * ! *
   DLF.hadd chantext.trivia Le délai est bientot écoulé!
   DLF.hadd chantext.trivia Tapez * pour connaitre les commandes que le Quizz reconnait
+  ; TriviaOasis
+  DLF.hadd chantext.trivia Welcome To * Triviabot, v*
+  DLF.hadd chantext.trivia The bonus pot is * points!*
+  DLF.hadd chantext.trivia Question * of *, worth * points:
+  DLF.hadd chantext.trivia *BONUS QUESTION * of *, worth * points:*
+  DLF.hadd chantext.trivia Clue: *
+  DLF.hadd chantext.trivia Congratulations *! You got the answer *-> * <-   in * seconds and receive * points! Way to go!
+  DLF.hadd chantext.trivia * has won * times in a row! C'mon everyone...Break the winning streak!
+  DLF.hadd chantext.trivia * receives a * point bonus for his or her winning streak! Well done *!
+  DLF.hadd chantext.trivia * needs * more points to take over position * this month!
+  DLF.hadd chantext.trivia Down to * points: *
+  DLF.hadd chantext.trivia Time's up! *: *!
+  DLF.hadd chantext.trivia Since nobody answered correctly another * points are going into the BONUS POT, making it * points!
+  DLF.hadd chantext.trivia *'s Top * Players:  1st: *
+  DLF.hadd chantext.trivia Nobody seems to be playing anymore...off I go...?Zzzzzzzzzzzzzz?
+  DLF.hadd chantext.trivia The Triviabot has gone to sleep...type !start to wake it again!*
+  DLF.hadd chantext.trivia * is now updated with the latest scores...enjoy!
+  DLF.hadd chantext.trivia * Out of * mIRC'ers play our Trivia!*
+  DLF.hadd chantext.trivia Type !won NICK To See A Specific User's Complete Trivia Score Info *
+  DLF.hadd chantext.trivia Congratulations to * for winning the last Daily Jackpot of * points!*
+  DLF.hadd chantext.trivia *Type !repeat to see the current question*
+  DLF.hadd chantext.trivia Type !lastanswer To View The Previous Question's Answer!
+  DLF.hadd chantext.trivia Type * displays the current daily, weekly, and monthly position of NICK!
+  DLF.hadd chantext.trivia visit *trivia* To See The Web Site
+  DLF.hadd chantext.trivia Type * To * Top *
+  DLF.hadd chantext.trivia Trivia: Now for something a little different!*
+  DLF.hadd chantext.trivia There goes your streak of *
+  DLF.hadd chantext.trivia * receives a prize for that answer!
+  DLF.hadd chantext.trivia Typing * correct answer reports an error so we can fix it!
+  DLF.hadd chantext.trivia *A Genuine pair of Smoking Mittens! Your hands stay warm in freezing weather and you can still hold your cigarette because one of the mittens has a grometted hole in it*
+  DLF.hadd chantext.trivia *(Containing * questions with very few repeats!)
+  DLF.hadd chantext.trivia *...Let's play!
+  DLF.hadd chantext.trivia Type !server To See What Server The Triviabot Is Playing On!
+  DLF.hadd chantext.trivia *...Nice to see you again!
   inc %matches $hget(DLF.chantext.trivia,0).item
 
   DLF.hmake DLF.chanaction.trivia
