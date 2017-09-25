@@ -4582,29 +4582,28 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia The Triviabot has gone to sleep...type !start to wake it again!*
   DLF.hadd chantext.trivia * is now updated with the latest scores...enjoy!
   DLF.hadd chantext.trivia * Out of * mIRC'ers play our Trivia!*
-  DLF.hadd chantext.trivia Type !won NICK To See A Specific User's Complete Trivia Score Info *
   DLF.hadd chantext.trivia Congratulations to * for winning the last Daily Jackpot of * points!*
-  DLF.hadd chantext.trivia *Type !repeat to see the current question*
-  DLF.hadd chantext.trivia Type !lastanswer To View The Previous Question's Answer!
-  DLF.hadd chantext.trivia Type * displays the current daily, weekly, and monthly position of NICK!
   DLF.hadd chantext.trivia visit *trivia* To See The Web Site
-  DLF.hadd chantext.trivia Type * To * Top *
   DLF.hadd chantext.trivia Trivia: Now for something a little different!*
   DLF.hadd chantext.trivia There goes your streak of *
   DLF.hadd chantext.trivia * receives a prize for that answer!
   DLF.hadd chantext.trivia Typing * correct answer reports an error so we can fix it!
-  DLF.hadd chantext.trivia *A Genuine pair of Smoking Mittens! Your hands stay warm in freezing weather and you can still hold your cigarette because one of the mittens has a grometted hole in it*
   DLF.hadd chantext.trivia *(Containing * questions with very few repeats!)
   DLF.hadd chantext.trivia *...Let's play!
-  DLF.hadd chantext.trivia Type !server To See What Server The Triviabot Is Playing On!
   DLF.hadd chantext.trivia *...Nice to see you again!
+  DLF.hadd chantext.trivia *...Let's play some trivia!
   DLF.hadd chantext.trivia * wins the BONUS POT of * points with that answer!*
   DLF.hadd chantext.trivia Remember to keep the same nick when playing to keep increasing your score!
   DLF.hadd chantext.trivia * is in 1st place for this month! Good job *!
   DLF.hadd chantext.trivia * is * points ahead for keeping * place this month!
   DLF.hadd chantext.trivia * just destroyed *'s winning streak of *!
   DLF.hadd chantext.trivia Watch for the * point* BONUS QUESTIONS *
-  DLF.hadd chantext.trivia Type * To Send The Triviabot Some Trivia!
+  DLF.hadd chantext.trivia Type !won NICK To See A Specific User's Complete Trivia Score Info *
+  DLF.hadd chantext.trivia *Type !repeat to see the current question*
+  DLF.hadd chantext.trivia Type !lastanswer To View The Previous Question's Answer!
+  DLF.hadd chantext.trivia Type * displays the current daily, weekly, and monthly position of NICK!
+  DLF.hadd chantext.trivia Type * To * Top *
+  DLF.hadd chantext.trivia Type * The Triviabot*
   DLF.hadd chantext.trivia ?~?~?*?~?~?
   inc %matches $hget(DLF.chantext.trivia,0).item
 
