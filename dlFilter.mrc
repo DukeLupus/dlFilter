@@ -4443,6 +4443,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce ??? XDCC ??? Server Is *
   DLF.hadd chantext.announce * Trigger..::*::.. Size..::*::.. Description..::*::.. Record CPS..::*::.. Sends..::*::.. Queues..::*::..*«UPP»*
   DLF.hadd chantext.announce * Offering..::* in * packs::.. Bandwidth..::*
+  DLF.hadd chantext.announce Welcome Back *
   inc %matches $hget(DLF.chantext.announce,0).item
 
   DLF.hmake DLF.chantext.always
@@ -4597,6 +4598,14 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia *...Let's play!
   DLF.hadd chantext.trivia Type !server To See What Server The Triviabot Is Playing On!
   DLF.hadd chantext.trivia *...Nice to see you again!
+  DLF.hadd chantext.trivia * wins the BONUS POT of * points with that answer!*
+  DLF.hadd chantext.trivia Remember to keep the same nick when playing to keep increasing your score!
+  DLF.hadd chantext.trivia * is in 1st place for this month! Good job *!
+  DLF.hadd chantext.trivia * is * points ahead for keeping * place this month!
+  DLF.hadd chantext.trivia * just destroyed *'s winning streak of *!
+  DLF.hadd chantext.trivia Watch for the * point* BONUS QUESTIONS *
+  DLF.hadd chantext.trivia Type * To Send The Triviabot Some Trivia!
+  DLF.hadd chantext.trivia ?~?~?*?~?~?
   inc %matches $hget(DLF.chantext.trivia,0).item
 
   DLF.hmake DLF.chanaction.trivia
