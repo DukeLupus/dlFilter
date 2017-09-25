@@ -1595,10 +1595,10 @@ alias -l DLF.DccSend.Send {
     if (%DLF.dccsend.dangerous == 1) {
       var %ext $nopath($filename)
       var %ext $gettok(%ext,-1,$asc(.))
-      var %bad exe pif application gadget msi msp com scr hta cpl msc jar bat cmd vb vbs vbe js jse ws wsf mrc doc wsc wsh ps1 ps1xml ps2 ps2xml psc1 psc2 msh msh1 msh2 mshxml msh1xml msh2xml scf lnk inf reg doc xls ppt docm dotm xlsm xltm xlam pptm potm ppam ppsm sldm
+      var %bad exe pif application gadget msi msp com scr hta cpl msc jar bat cmd vb vbs vbe js jse ws wsf mrc wsc wsh ps1 ps1xml ps2 ps2xml psc1 psc2 msh msh1 msh2 mshxml msh1xml msh2xml scf lnk inf reg doc xls ppt docm dotm xlsm xltm xlam pptm potm ppam ppsm sldm
       if ($istok(%bad,%ext,$asc($space))) DLF.DccSend.Block dangerous filetype
     }
-    if (%DLF.dccsend.trusted == 1) DLF.DccSend.Block the user is not in your DCC Get trust list
+    if (%DLF.dccsend.untrusted == 1) DLF.DccSend.Block the user is not in your DCC Get trust list
     if ((%DLF.dccsend.nocomchan == 1) && ($comchan($nick,0) == 0)) DLF.DccSend.Block the user is not in a common channel
     if ((%DLF.dccsend.regular == 1) && ($DLF.IsRegularUser($nick)) DLF.DccSend.Block the user is a regular user
   }
@@ -4577,7 +4577,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia Down to * points: *
   DLF.hadd chantext.trivia Time's up! *: *!
   DLF.hadd chantext.trivia Since nobody answered correctly another * points are going into the BONUS POT, making it * points!
-  DLF.hadd chantext.trivia *'s Top * Players:  1st: *
+  DLF.hadd chantext.trivia * Top * Players:  1st: *
   DLF.hadd chantext.trivia Nobody seems to be playing anymore...off I go...?Zzzzzzzzzzzzzz?
   DLF.hadd chantext.trivia The Triviabot has gone to sleep...type !start to wake it again!*
   DLF.hadd chantext.trivia * is now updated with the latest scores...enjoy!
@@ -4604,6 +4604,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia Type * displays the current daily, weekly, and monthly position of NICK!
   DLF.hadd chantext.trivia Type * To * Top *
   DLF.hadd chantext.trivia Type * The Triviabot*
+  DLF.hadd chantext.trivia * has * points so far today, * points so far this week, * points so far this month*
   DLF.hadd chantext.trivia ?~?~?*?~?~?
   inc %matches $hget(DLF.chantext.trivia,0).item
 
