@@ -42,7 +42,7 @@ dlFilter uses the following code from other people:
   Immediate TODO
       Test location and filename for oNotice log files
       Test window highlighting (flashing etc.) - define rules.
-      Close @dlf windows automatically with -v
+      Decide what to do about highlight users.
 
   Ideas for possible future enhancements
       Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
@@ -952,6 +952,7 @@ alias -l DLF.Chan.EditSend {
 
 alias -l DLF.Chan.ctcpBlock {
   if ($nick isop $chan) return
+  if (%DLF.chanctcp != 1) return
   DLF.Watch.Called DLF.Chan.ctcpBlock Blocked: $1-
   DLF.Win.Echo Blocked $chan $nick Channel ctcp $1 from $nick
   if ($DLF.Chan.IsDlfChan($chan)) {
@@ -3378,7 +3379,7 @@ alias -l DLF.Options.Initialise {
   DLF.Options.InitOption dccsend.requested 1
   DLF.Options.InitOption dccsend.dangerous 1
   DLF.Options.InitOption dccsend.nocomchan 1
-  DLF.Options.InitOption dccsend.untrusted 1
+  DLF.Options.InitOption dccsend.untrusted 0
   DLF.Options.InitOption dccsend.regular 1
   DLF.Options.InitOption serverretry 1
   ; Other tab mIRC-wide box
@@ -3494,7 +3495,7 @@ alias -l DLF.Options.Init {
     did -c DLF.Options.GUI 545
     %DLF.dccsend.dangerous = 1
     %DLF.dccsend.nocomchan = 1
-    %DLF.dccsend.untrusted = 1
+    %DLF.dccsend.untrusted = 0
     %DLF.dccsend.regular = 1
   }
   if (%DLF.dccsend.dangerous == 1) did -c DLF.Options.GUI 550
