@@ -42,7 +42,9 @@ dlFilter uses the following code from other people:
   Immediate TODO
       Test location and filename for oNotice log files
       Test window highlighting (flashing etc.) - define rules.
-      Decide what to do about highlight users.
+      Decide what to do (if anything) about highlight users.
+      Don't block private messages from users not in common channel.
+        (Either filter or send to single message / status window.)
 
   Ideas for possible future enhancements
       Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
@@ -187,7 +189,8 @@ alias DLF.Initialise {
   DLF.StatusAll %init $c(4,version $DLF.SetVersion) by DukeLupus & Sophist.
   DLF.StatusAll Please visit dlFilter homepage $br($c(12,9,$u(https://github.com/DukeLupus/dlFilter))) for help.
   ;DLF.CreateGif
-  hfree -w DLF.*
+  hfree -w dlf.chan*
+  hfree -w dlf.priv*
   DLF.CreateHashTables
   DLF.Options.Initialise
   DLF.Groups.Events
@@ -262,12 +265,12 @@ menu channel {
 ; ============================== Event catching ==============================
 ; ========= Always events ==========
 ctcp ^*:VERSION*:#: {
-  if (($nick isop $chan) && ($DLF.Chan.IsDlfChan($chan))) DLF.Priv.ctcpreplyVersion
+  if (($nick isop $chan) && ($DLF.Chan.IsDlfChan($chan))) DLF.Priv.ctcpReply.Version
   elseif (%DLF.enabled) DLF.Chan.ctcpBlock $1-
 }
 
 ctcp ^*:VERSION*:?: {
-  if (($query($nick)) || ($chat($nick,0)) || ($comchan($nick,0) > 0)) DLF.Priv.ctcpreplyVersion
+  if (($query($nick)) || ($chat($nick,0)) || ($comchan($nick,0) > 0)) DLF.Priv.ctcpReply.Version
   elseif (%DLF.enabled) DLF.Priv.ctcpBlock $1-
 }
 
@@ -951,6 +954,11 @@ alias -l DLF.Chan.EditSend {
 }
 
 alias -l DLF.Chan.ctcpBlock {
+  if (($1 == FINGER) && (%DLF.nofingers == 1)) {
+    DLF.Win.Echo Blocked $chan $nick CTCP $1-
+    DLF.Status Blocked: ctcp finger from $nick in $chan
+    DLF.Halt Halted: ctcp finger blocked
+  }
   if ($nick isop $chan) return
   if (%DLF.chanctcp != 1) return
   DLF.Watch.Called DLF.Chan.ctcpBlock Blocked: $1-
@@ -1216,7 +1224,7 @@ alias -l DLF.Priv.ctcpBlock {
   ; Block finger requests
   if (($1 == FINGER) && (%DLF.nofingers == 1)) {
     while (%comchan) {
-      DLF.Win.Echo Blocked $comchan($nick,%i) $nick ctcp finger
+      DLF.Win.Echo Blocked $comchan($nick,%i) $nick CTCP $1-
       dec %comchan
     }
     DLF.Status Blocked: ctcp finger from $nick
@@ -1228,7 +1236,7 @@ alias -l DLF.Priv.ctcpBlock {
   DLF.Win.Filter $1-
 }
 
-alias -l DLF.Priv.ctcpreplyVersion {
+alias -l DLF.Priv.ctcpReply.Version {
   var %msg VERSION $c(1,9,$DLF.logo Version $DLF.SetVersion by DukeLupus & Sophist.) $+ $c(1,15,$space $+ Get it from $c(12,15,$u(https://github.com/DukeLupus/dlFilter/)))
   .DLF.ctcpreply $nick %msg
   DLF.Win.Log Filter ctcpsend Private $nick %msg
@@ -4445,6 +4453,21 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce * Trigger..::*::.. Size..::*::.. Description..::*::.. Record CPS..::*::.. Sends..::*::.. Queues..::*::..*«UPP»*
   DLF.hadd chantext.announce * Offering..::* in * packs::.. Bandwidth..::*
   DLF.hadd chantext.announce Welcome Back *
+  DLF.hadd chantext.announce Listing requests on #* ...
+  DLF.hadd chantext.announce No requests found!
+  DLF.hadd chantext.announce Please use !REQUEST ADD request to add a request! (!REQUEST COMMANDS for available commands)
+  DLF.hadd chantext.announce Command syntax: !REQUEST ADD|FILL|UNFILL|DEL|LIST|CONFIRM|COMMANDS [parameters]
+  DLF.hadd chantext.announce Aflaaaaaac!
+  DLF.hadd chantext.announce meeeow!
+  DLF.hadd chantext.announce Grrrrrrrreaaaaattt!
+  DLF.hadd chantext.announce KFC!
+  DLF.hadd chantext.announce eeek!
+  DLF.hadd chantext.announce chirp chirp!
+  DLF.hadd chantext.announce Yummmm!!!
+  DLF.hadd chantext.announce ribbit!
+  DLF.hadd chantext.announce arrrf!
+  DLF.hadd chantext.announce oink oink!
+  DLF.hadd chantext.announce Moooo
   inc %matches $hget(DLF.chantext.announce,0).item
 
   DLF.hmake DLF.chantext.always
@@ -4529,7 +4552,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia NOBODY GOT ANY OF THE ANSWERS !!!
   DLF.hadd chantext.trivia You've Guessed Them All !!! *The answers were [ * ][ * ]*
   DLF.hadd chantext.trivia Total Number Answered Correctly: * from a possible * !
-  DLF.hadd chantext.trivia YES, *  got the answer -> * <-  in * secs, and gets * points
+  DLF.hadd chantext.trivia YES, *  got the answer -> * <-  in * sec*s, and gets * points
   DLF.hadd chantext.trivia You got it *! The answer was "*". You got it in * seconds and are awarded * Points
   DLF.hadd chantext.trivia Unbelievable!! * got the answer "*" in only * seconds earning * Points
   DLF.hadd chantext.trivia That's the way *! The answer was "*". You got it in * seconds, scooping up * Points
@@ -4812,11 +4835,11 @@ alias -l DLF.CreateHashTables {
   DLF.hadd privnotice.dnd *SLOTS My mom always told me not to talk to strangers*
   inc %matches $hget(DLF.privnotice.dnd,0).item
 
-  DLF.hmake DLF.Priv.ctcpReply
+  DLF.hmake DLF.ctcp.reply
   DLF.hadd ctcp.reply ERRMSG*
   DLF.hadd ctcp.reply MP3*
   DLF.hadd ctcp.reply SLOTS*
-  inc %matches $hget(DLF.Priv.ctcpReply,0).item
+  inc %matches $hget(DLF.ctcp.reply,0).item
 
   DLF.hmake DLF.find.header
   DLF.hadd find.header *«SoftServe»*
@@ -4890,12 +4913,13 @@ alias -l DLF.CreateHashTables {
 
 ; ========== Status and error messages ==========
 alias -l DLF.logo return $rev([dlFilter])
-alias -l DLF.StatusAll { scon -a DLF.Status $1- }
-alias -l DLF.Status echo -tsf $c(1,9,$DLF.logo $1-)
-alias -l DLF.Warning {
-  echo -taf $c(1,9,$DLF.logo Warning: $1-)
-  DLF.StatusAll Warning: $1-
+alias -l DLF.StatusAll {
+  var %m $c(1,9,$DLF.logo $1-)
+  scon -a echo -tsf %m
+  echo -tafi2 %m
 }
+alias -l DLF.Status { echo -tsf $c(1,9,$DLF.logo $1-) }
+alias -l DLF.Warning { DLF.StatusAll $c(1,9,$DLF.logo Warning: $1-) }
 alias -l DLF.Error {
   echo -tabf $c(1,9,$DLF.logo $c(4,$b(Error:)) $1-)
   DLF.StatusAll $c(4,$b(Error:)) $1-
