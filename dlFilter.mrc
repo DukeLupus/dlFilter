@@ -65,6 +65,7 @@ dlFilter uses the following code from other people:
 
 1.19  Enhancements & fixes
       Add filtering for trivia bots
+      Request and process @SearchBot-Trigger and use to avoid hacker response to search request.
 
 */
 
@@ -835,6 +836,7 @@ alias -l DLF.Chan.Notice {
 
 alias -l DLF.Chan.ctcp {
   DLF.Watch.Called DLF.Chan.ctcp
+  if ($1 == SLOTS) DLF.SearchBot.GetTriggers
   DLF.Custom.Filter $1-
   if ($hiswm(chanctcp.spam,$1-)) DLF.Win.Filter $1-
   if ($hiswm(chanctcp.server,$1-)) DLF.Win.Server $1-
@@ -1124,6 +1126,7 @@ alias -l DLF.Priv.NoticeServices {
 
 alias -l DLF.Priv.ctcp {
   DLF.Watch.Called DLF.Priv.ctcp
+  if ($1 == TRIGGER) DLF.SearchBot.SetTriggers $1-
   DLF.Custom.Filter $1-
   DLF.Priv.QueryOpen $1-
   DLF.Priv.CommonChan $1-
@@ -1503,6 +1506,7 @@ alias -l DLF.Ops.AdvertPrivDLF {
 ; ========== DCC Send ==========
 alias -l DLF.DccSend.Request {
   DLF.Watch.Called DLF.DccSend.Request : $1-
+  DLF.SearchBot.GetTriggers
   var %trig $strip($1)
   var %fn $replace($strip($2-),$tab $+ $space,$space,$tab,$null)
   hadd -mz DLF.dccsend.requests $+($network,|,$chan,|,%trig,|,$replace(%fn,$space,_),|,$encode(%fn)) 86400
@@ -1513,17 +1517,15 @@ alias -l DLF.DccSend.GetRequest {
   var %fn $replace($noqt($DLF.GetFileName($1-)),$space,_)
   var %req $hfind(DLF.dccsend.requests,$+($network,|*|!,$nick,|,%fn,|*),1,w).item
   if (%req) return %req
-  if (*_results_for__*.txt.zip iswm %fn) {
-    var %srch $gettok(%fn,1,$asc(.))
-    var %pos 0 - $pos(%srch,__,1)
-    dec %pos
-    var %srch $right(%srch,%pos)
-    var %req $hfind(DLF.dccsend.requests,$+($network,|*|@search*|,%srch,|*),1,w).item
-    if (%req) return %req
+  var %sbresult $nick $+ _results_for_
+  if (%sbresult $+ *.txt.zip iswmcs %fn) {
+    var %trig $DLF.SearchBot.TriggerFromNick($nick)
+    var %srch $right($removecs($gettok(%fn,1,$asc(.)),%sbresult),-1)
+    return $hfind(DLF.dccsend.requests,$+($network,|*|,%trig,|,%srch,|*),1,w).item
   }
-  var %req $hfind(DLF.dccsend.requests,$+($network,|*|@,$nick,|*|*),1,w).item
+  var %req $hfind(DLF.dccsend.requests,$+($network,|*|@,$nick,||),1,w).item
   if (%req) return %req
-  return $hfind(DLF.dccsend.requests,$+($network,|*|@,$nick,-*|*|*),1,w).item
+  return $hfind(DLF.dccsend.requests,$+($network,|*|@,$nick,-*||),1,w).item
 }
 
 alias -l DLF.DccSend.IsRequest {
@@ -1531,10 +1533,10 @@ alias -l DLF.DccSend.IsRequest {
   var %req $DLF.DccSend.GetRequest(%fn)
   if (%req == $null) return $false
   var %trig $gettok(%req,3,$asc(|))
-  if (($left(%trig,1) == !) && ($right(%trig,-1) != $nick)) return $false
+  if (($left(%trig,1) == !) && ($right(%trig,-1) != $nick) && ($gettok($right(%trig,-1),1,$asc(-)) != $nick)) return $false
   if ($left(%trig,1) == @) {
     var %nick $right(%trig,-1)
-    if ((($left(%trig,7) != @search) || ($DLF.IsRegularUser($nick))) && (%nick != $nick) && ($gettok(%nick,1,$asc(-)) != $nick)) return $false
+    if (($DLF.SearchBot.TriggerFromNick($nick) == $null) && ($DLF.IsRegularUser($nick)) && (%nick != $nick) && ($gettok(%nick,1,$asc(-)) != $nick)) return $false
     if ($gettok(%fn,-1,$asc(.)) !isin txt zip rar 7z) return $false
   }
   DLF.Watch.Log File request found: %trig $1-
@@ -1571,7 +1573,7 @@ alias -l DLF.DccSend.Rejoin {
     if ($right(%trig,-1) != $nick) continue
     var %fn $decode($gettok(%item,5,$asc(|)))
     DLF.Chan.EditSend %chan %trig %fn
-    DLF.Watch.Log $nick rejoined $chan: Request resent: %trig %fn
+    DLF.Watch.Log $nick rejoined %chan $+ : Request resent: %trig %fn
   }
 }
 
@@ -1631,15 +1633,10 @@ alias -l DLF.DccSend.Receiving {
   var %origfn $decode($gettok(%req,5,$asc(|)))
   if (%origfn == $null) %origfn = $1-
   var %secs 86400 - $hget(DLF.dccsend.requests,%req)
-  DLF.Win.Log Server ctcp %chan $nick DCC Get of %origfn from $nick starting $br(waited $duration(%secs,3))
-}
-
-alias -l DLF.DccSend.Taskbar {
-  ;if ($gettok($titlebar,1-2,$asc($space)) == Get $get(-1)) titlebar $gettok($titlebar,3-,$asc($space))
+  DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick starting $br(waited $duration(%secs,3))
 }
 
 alias -l DLF.DccSend.FileRcvd {
-  DLF.DccSend.Taskbar
   var %fn $nopath($filename)
   DLF.Watch.Called DLF.DccSend.FileRcvd %fn
   var %req $DLF.DccSend.GetRequest(%fn)
@@ -1653,7 +1650,7 @@ alias -l DLF.DccSend.FileRcvd {
   var %hash $encode(%trig %origfn)
   if ($hget(DLF.dccsend.retries,%hash)) .hdel DLF.dccsend.retries %hash
   var %bytes $get(-1).rcvd / %dur
-  DLF.Win.Log Server ctcp %chan $nick DCC Get of %origfn from $nick complete $br($duration(%dur,3) $bytes(%bytes,3).suf $+ /Sec)
+  DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick complete $br($duration(%dur,3) $bytes(%bytes,3).suf $+ /Sec)
   ; Some servers change spaces to underscores
   ; But we cannot rename if Options / DCC / Folders / Command is set
   ; because it would run after this using the wrong filename
@@ -1694,7 +1691,6 @@ alias -l DLF.DccSend.IsNotGetCommand {
 }
 
 alias -l DLF.DccSend.GetFailed {
-  DLF.DccSend.Taskbar
   var %fn $nopath($filename)
   DLF.Watch.Called DLF.DccSend.GetFailed : %fn
   var %req $DLF.DccSend.GetRequest(%fn)
@@ -1816,6 +1812,38 @@ alias -l DLF.DccChat.Open {
   DLF.Watch.Called DLF.DccChat.Open
   echo -stf DLF.DccChat.Open called: target $target nick $nick args $1-
 }
+
+; ========== SearchBot Triggers ==========
+; hash table index network|channel|nick|trigger
+alias -l DLF.SearchBot.GetTriggers {
+  DLF.Watch.Called DLF.SearchBot.GetTriggers
+  var %nc = $hget(DLF.sbrequests,$+($network,$chan))
+  if (%nc != $null) return
+  DLF.Watch.Log SearchBot: Requesting Triggers
+  var %ttl $DLF.SearchBot.TTL
+  hadd -mzu $+ %ttl DLF.sbrequests $+($network,$chan) %ttl
+  hadd -mzu60 DLF.sbcurrentreqs $+($network,$chan) 60
+  msg $chan @SearchBot-Trigger
+}
+
+; ctcp TRIGGER network chan trigger
+alias -l DLF.SearchBot.SetTriggers {
+  DLF.Watch.Called DLF.SearchBot.SetTriggers $1-
+  var %ttl $DLF.SearchBot.TTL
+  hadd -mzu $+ %ttl DLF.searchbots $+($network,|,$3,|,$nick,|,$4) %ttl
+  if ($hget(DLF.sbcurrentreqs,$+($network,$chan)) != $null) DLF.Win.Filter $event Private $nick $1-
+}
+
+alias -l DLF.SearchBot.NickFromTrigger {
+  return $gettok($hfind(DLF.searchbots,$+($network,|*|*|,$1),1,w).item,3,$asc(|))
+}
+
+alias -l DLF.SearchBot.TriggerFromNick {
+  return $gettok($hfind(DLF.searchbots,$+($network,|*|,$1,|*),1,w).item,4,$asc(|))
+}
+
+; 24 hours = 86400s
+alias -l DLF.SearchBot.TTL { return 86400 }
 
 ; ========== Custom Filters ==========
 alias -l DLF.Custom.Filter {
@@ -4689,12 +4717,12 @@ alias -l DLF.CreateHashTables {
   inc %matches $hget(DLF.channotice.spam,0).item
 
   DLF.hmake DLF.chanctcp.spam
-  DLF.hadd chanctcp.spam ASF*
+  DLF.hadd chanctcp.spam ASF *
   DLF.hadd chanctcp.spam MP*
-  DLF.hadd chanctcp.spam RAR*
-  DLF.hadd chanctcp.spam SOUND*
-  DLF.hadd chanctcp.spam WMA*
-  DLF.hadd chanctcp.spam SLOTS*
+  DLF.hadd chanctcp.spam RAR *
+  DLF.hadd chanctcp.spam SOUND *
+  DLF.hadd chanctcp.spam WMA *
+  DLF.hadd chanctcp.spam SLOTS *
   inc %matches $hget(DLF.chanctcp.spam,0).item
 
   DLF.hmake DLF.chanctcp.server
@@ -5147,6 +5175,12 @@ alias -l urlencode {
   :error
   echo 2 -s * $ $+ urlencode: $error
   halt
+}
+
+; $startswith(string,start)
+alias -l startswith {
+  if ($left($1,$len($2)) == $2) return $true
+  return $false
 }
 
 ; Generate and run an identifier call from identifier name, parameters and property
