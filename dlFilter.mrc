@@ -1517,11 +1517,13 @@ alias -l DLF.DccSend.GetRequest {
   var %fn $replace($noqt($DLF.GetFileName($1-)),$space,_)
   var %req $hfind(DLF.dccsend.requests,$+($network,|*|!,$nick,|,%fn,|*),1,w).item
   if (%req) return %req
-  var %sbresult $nick $+ _results_for_
-  if (%sbresult $+ *.txt.zip iswmcs %fn) {
-    var %trig $DLF.SearchBot.TriggerFromNick($nick)
-    var %srch $right($removecs($gettok(%fn,1,$asc(.)),%sbresult),-1)
-    return $hfind(DLF.dccsend.requests,$+($network,|*|,%trig,|,%srch,|*),1,w).item
+  if (*_results_for_*.txt.zip iswmcs %fn) {
+    var %nick $gettok(%fn,1,$asc(_)), %trig $DLF.SearchBot.TriggerFromNick($nick)
+    var %sbresult %nick $+ _results_for_
+    if ((%trig) && ($istok($nick $nick $+ Bot Search SearchBot,%nick,$asc($space)))) {
+      var %srch $right($removecs($gettok(%fn,1,$asc(.)),%sbresult),-1)
+      return $hfind(DLF.dccsend.requests,$+($network,|*|,%trig,|,%srch,|*),1,w).item
+    }
   }
   var %req $hfind(DLF.dccsend.requests,$+($network,|*|@,$nick,||),1,w).item
   if (%req) return %req
@@ -1533,12 +1535,16 @@ alias -l DLF.DccSend.IsRequest {
   var %req $DLF.DccSend.GetRequest(%fn)
   if (%req == $null) return $false
   var %trig $gettok(%req,3,$asc(|))
-  if (($left(%trig,1) == !) && ($right(%trig,-1) != $nick) && ($gettok($right(%trig,-1),1,$asc(-)) != $nick)) return $false
-  if ($left(%trig,1) == @) {
-    var %nick $right(%trig,-1)
-    if (($DLF.SearchBot.TriggerFromNick($nick) == $null) && ($DLF.IsRegularUser($nick)) && (%nick != $nick) && ($gettok(%nick,1,$asc(-)) != $nick)) return $false
+  if ($left(%trig,1) == !) {
+    if (($right(%trig,-1) != $nick) && ($gettok($right(%trig,-1),1,$asc(-)) != $nick)) return $false
+  }
+  elseif ($left(%trig,1) == @) {
+    var %nick $right(%trig,-1), %tfn $DLF.SearchBot.TriggerFromNick($nick)
+    if ((%tfn != $null) && (%tfn != %trig)) return $false
+    if ((%tfn == $null) && ($DLF.IsRegularUser($nick)) && (%nick != $nick) && ($gettok(%nick,1,$asc(-)) != $nick)) return $false
     if ($gettok(%fn,-1,$asc(.)) !isin txt zip rar 7z) return $false
   }
+  else return $false
   DLF.Watch.Log File request found: %trig $1-
   return $true
 }
