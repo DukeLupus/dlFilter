@@ -2095,7 +2095,8 @@ alias -l DLF.Win.WinOpen {
   var %switches $2
   if (%DLF.perconnect == 0) %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ iz,1,$asc($space))
   else %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ v,1,$asc($space))
-  if ((%DLF.background == 1) && ($4 == 0)) %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ h,1,$asc($space))
+  if (((($1== Filter) && (%DLF.background == 1)) || ($1 == Ads)) && ($4 == 0)) $&
+    %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ h,1,$asc($space))
   window %switches %win
   if (($3) && ($isfile(%lfn))) loadbuf $windowbuffer -rpi %win %lfn
   if ($5- != $null) titlebar %win -=- $5-
