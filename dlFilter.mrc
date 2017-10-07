@@ -1,7 +1,7 @@
 /*
 DLFILTER -=- Firewall, anti-spam for mIRC
 and message filter for file sharing channels.
-Authors: DukeLupus and Sophist
+Authors: © DukeLupus and Sophist
 
 Annoyed by advertising messages from the various file serving bots? Fed up with endless channel messages from other users searching for and requesting files? Are the responses to your own requests getting lost in the crowd?
 
@@ -1829,7 +1829,7 @@ alias -l DLF.SearchBot.GetTriggers {
   var %ttl $DLF.SearchBot.TTL
   hadd -mzu $+ %ttl DLF.sbrequests $+($network,$chan) %ttl
   hadd -mzu60 DLF.sbcurrentreqs $+($network,$chan) 60
-  msg $chan @SearchBot-Trigger
+  .msg $chan @SearchBot-Trigger
 }
 
 ; ctcp TRIGGER network chan trigger
@@ -3019,8 +3019,7 @@ alias -l DLF.oNotice.Input {
   }
   if ($me isop %chan) {
     if ((@ isin $DLF.iSupport.Supports(STATUSMSG)) || ($DLF.iSupport.Supports(WALLCHOPS))) {
-      ; FUTURE - switch to msg once this version has reasonable penetration
-      if (%event == Text) .notice @ $+ %chan $1-
+      if (%event == Text) .msg @ $+ %chan $1-
       else .describe @ $+ %chan $2-
     }
     elseif (%event == Text) .onotice %chan $1-
@@ -3047,7 +3046,6 @@ alias -l DLF.oNotice.Channel {
     %omsg = $2-
   }
   elseif ($1 == @) var %omsg $2-
-  if (%event == notice) %event = Text
   DLF.Win.Echo %event %win $nick %omsg
   DLF.oNotice.Log %event %win $nick %omsg
   DLF.Halt oNotice sent to %win
@@ -3293,7 +3291,7 @@ dialog -l DLF.Options.GUI {
   ; tab Ops
   text "These options are only enabled if you are an op on a filtered channel.", 705, 4 25 160 12, tab 7 multi
   box " Channel Ops ", 710, 4 38 160 38, tab 7
-  check "Filter oNotices to separate @#window (OpsTalk)", 715, 7 48 155 6, tab 7
+  check "Filter oNotices etc. to separate OpsTalk @#window ", 715, 7 48 155 6, tab 7
   check "On channel spam, oNotify other ops", 725, 7 57 155 6, tab 7
   check "On private spam, oNotify other ops in common channels", 730, 7 66 155 6, tab 7
   box " dlFilter promotion ", 755, 4 77 160 38, tab 7
@@ -3325,7 +3323,7 @@ alias -l DLF.Options.SetLinkedFields {
 ; Initialise dialog
 on *:dialog:DLF.Options.GUI:init:0: DLF.Options.Init
 ; Channel text box typed or clicked - Enable / disable Add channel button
-on *:dialog:DLF.Options.GUI:sclick:15: url -a https://github.com/DukeLupus/dlFilter/blob/master/options-help.md
+on *:dialog:DLF.Options.GUI:sclick:15: url -a https://github.com/DukeLupus/dlFilter/wiki/Options
 ; Channel text box typed or clicked - Enable / disable Add channel button
 on *:dialog:DLF.Options.GUI:edit:120: DLF.Options.SetAddChannelButton
 on *:dialog:DLF.Options.GUI:sclick:120: DLF.Options.SetAddChannelButton
@@ -3338,7 +3336,7 @@ on *:dialog:DLF.Options.GUI:sclick:140: DLF.Options.SetRemoveChannelButton
 ; Channel list double click - Remove channel and put in text box for editing and re-adding.
 on *:dialog:DLF.Options.GUI:dclick:140: DLF.Options.EditChannel
 ; Goto website button
-on *:dialog:DLF.Options.GUI:sclick:170: url -a https://github.com/DukeLupus/dlFilter/
+on *:dialog:DLF.Options.GUI:sclick:170: url -a https://github.com/DukeLupus/dlFilter/wiki
 ; Download update button
 on *:dialog:DLF.Options.GUI:sclick:180: DLF.Options.DownloadUpdate
 ; Per-Server option clicked
@@ -4280,6 +4278,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *Files*free Slots*Queued*Speed*Served*
   DLF.hadd chantext.ads *For my list of * files type*@*
   DLF.hadd chantext.ads *For my list*files*type @*
+  DLF.hadd chantext.ads *Pour ma liste faite*@*
   DLF.hadd chantext.ads *For My Top Download Hit-chart, type @*
   DLF.hadd chantext.ads *Type*@* for my list*
   DLF.hadd chantext.ads *Type*@* to get my list*
@@ -4503,6 +4502,10 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce arrrf!
   DLF.hadd chantext.announce oink oink!
   DLF.hadd chantext.announce Moooo
+  DLF.hadd chantext.announce chirp!
+  DLF.hadd chantext.announce waaaaa
+  DLF.hadd chantext.announce ><((((º> *
+  DLF.hadd chantext.announce Aflaaaaaac! *
   inc %matches $hget(DLF.chantext.announce,0).item
 
   DLF.hmake DLF.chantext.always
@@ -4532,10 +4535,13 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.fileserv * Total Offered: *, Total Transferred (since *): *
   DLF.hadd chantext.fileserv * packs * of * slots open Queue: *, Priority queue: *
   DLF.hadd chantext.fileserv added [*] * /MSG * XDCC SEND *
-  DLF.hadd chantext.fileserv added [*] * /MSG * XDCC SEND *
   DLF.hadd chantext.fileserv ? *.avi
   DLF.hadd chantext.fileserv ?? *.avi
   DLF.hadd chantext.fileserv ??? *.avi
+  DLF.hadd chantext.fileserv Searching for XDCC packs on * with the word(s) *...
+  DLF.hadd chantext.fileserv No matches found!
+  DLF.hadd chantext.fileserv «*» *: (*) * (* gets, size:*) (/ctcp * xdcc send *)
+  DLF.hadd chantext.fileserv Mill§cript users double click search results to get pack (v0.2.0 and up only)
   inc %matches $hget(DLF.chantext.fileserv,0).item
 
   DLF.hmake DLF.chantext.triviahint
@@ -4665,6 +4671,10 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia Type * The Triviabot*
   DLF.hadd chantext.trivia * has * points so far today, * points so far this week, * points so far this month*
   DLF.hadd chantext.trivia ?~?~?*?~?~?
+  DLF.hadd chantext.trivia It's *! Last Week Day is Tomorrow!
+  DLF.hadd chantext.trivia It's *! Weekly Reset Tonight!
+  DLF.hadd chantext.trivia * has found another valid answer for this question that I know: *!
+  DLF.hadd chantext.trivia *...Welcome back!
   inc %matches $hget(DLF.chantext.trivia,0).item
 
   DLF.hmake DLF.chanaction.trivia
