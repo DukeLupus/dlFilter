@@ -106,8 +106,8 @@ on *:load: {
   ; Reload script if needed to be first to execute
   DLF.LoadCheck .load
 
-  set -u1 %DLF.JustLoaded 1
-  set -u1 %DLF.OptionInit $false
+  set -eu5 %DLF.JustLoaded 1
+  set -eu5 %DLF.OptionInit $false
   DLF.Initialise
   if (%DLF.OptionInit != $false) DLF.Options.Show
   DLF.StatusAll Loading complete.
