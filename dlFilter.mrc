@@ -4531,7 +4531,6 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.triviahint 1st Hint: *
   DLF.hadd chantext.triviahint 2nd Hint: *
   DLF.hadd chantext.triviahint 3rd Hint: *
-  DLF.hadd chantext.triviahint Answer: *
   inc %matches $hget(DLF.chantext.triviahint,0).item
 
   DLF.hmake DLF.chantext.trivia
