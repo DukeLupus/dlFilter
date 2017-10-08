@@ -93,8 +93,8 @@ alias -l DLF.mIRCversion {
 ; ========== Initialisation / Termination ==========
 on *:start: {
   ; Reload script if needed to be first to execute
-  DLF.LoadCheck .reload
-  if (%DLF.JustLoaded) return
+  var %pos $DLF.LoadPosition
+  if ($script != $script(%pos)) DLF.Reload %pos
   DLF.Initialise
   return
 
@@ -102,29 +102,15 @@ on *:start: {
   DLF.Error During start: $qt($error)
 }
 
-on *:load: {
-  ; Reload script if needed to be first to execute
-  DLF.LoadCheck .load
-
-  set -eu5 %DLF.JustLoaded 1
-  set -eu5 %DLF.OptionInit $false
-  DLF.Initialise
-  if (%DLF.OptionInit != $false) DLF.Options.Show
-  DLF.StatusAll Loading complete.
-  return
-
-  :error
-  DLF.Error During load: $qt($error)
+alias -l DLF.Reload {
+  .timer 1 0 .signal DLF.Initialise
+  .reload -rs $+ $1 $qt($script)
+  halt
 }
 
-alias -l DLF.LoadCheck {
-  if ((sbClient.* iswm $nopath($script(1))) || (sbClient.* iswm $nopath($script(2)))) var %sbc $true
-  else var %sbc $false
-  if (($script == $script(1)) && (%sbc == $false)) return
-  if (($script == $script(2)) && (%sbc)) return
-  if (%sbc) var %rs -rs2
-  else var %rs -rs1
-  $1 %rs $qt($script)
+alias -l DLF.LoadPosition {
+  if ((sbClient.* iswm $nopath($script(1))) || (sbClient.* iswm $nopath($script(2)))) return 2
+  return 1
 }
 
 alias -l DLF.RenameVar {
@@ -3988,7 +3974,7 @@ alias -l DLF.Update.DownloadAvailable {
   var %ver $1 version $2
   if ($4-) %ver = %ver - $4-
   if ($version >= $3) {
-    DLF.Options.Status You can update dlFilter to %ver
+    DLF.Options.Status You can update to %ver
     did -e DLF.Options.GUI 180
   }
   else DLF.Options.Status Upgrade mIRC before you can update dlFilter to %ver
@@ -4055,7 +4041,7 @@ on *:sockread:DLF.Socket.Download: {
 
 on *:sockclose:DLF.Socket.Download: {
   var %newscript $qt($script $+ .new)
-  var %oldscript $qt($script $+ .v $+ $DLF.SetVersion)
+  var %oldscript $qt($script $+ .v $+ $replace($DLF.SetVersion,.,))
   var %oldsaved $false
   sockread -f &block
   if ($sockerr > 0) DLF.Socket.SockErr sockclose
@@ -4063,15 +4049,14 @@ on *:sockclose:DLF.Socket.Download: {
   if ($isfile(%oldscript)) .remove %oldscript
   if ($exists(%oldscript)) .remove $script
   else {
-    .rename $script %oldscript
+    .rename $qt($script) %oldscript
     %oldsaved = $true
   }
-  .rename %newscript $script
+  .rename %newscript $qt($script)
   %DLF.version = %DLF.version.web
-  DLF.Options.Status New version of dlFilter downloaded and installed
-  if (%oldsaved) DLF.StatusAll Old version of dlFilter.mrc saved as %oldscript in case you need to revert
-  signal DLF.Initialise
-  .reload -rs1 $script
+  if (%oldsaved) DLF.StatusAll Old version of dlFilter.mrc saved as $qt($nopath(%oldscript)) in case you need to revert.
+  DLF.Options.Status New version of dlFilter downloaded and installed.
+  DLF.Reload $DLF.LoadPosition
 }
 
 alias -l DLF.Download.Error {
@@ -4896,8 +4881,8 @@ alias -l DLF.CreateHashTables {
 alias -l DLF.logo return $rev([dlFilter])
 alias -l DLF.StatusAll {
   var %m $c(1,9,$DLF.logo $1-)
-  scon -a echo -tsf %m
-  echo -tafi2 %m
+  scon -a echo -tsfi2 %m
+  if ($window($active).type != status) echo -tafi2 %m
 }
 alias -l DLF.Status { echo -tsf $c(1,9,$DLF.logo $1-) }
 alias -l DLF.Warning { DLF.StatusAll $c(1,9,$DLF.logo Warning: $1-) }
