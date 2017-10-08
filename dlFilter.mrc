@@ -63,14 +63,12 @@ dlFilter uses the following code from other people:
       Add right click menu items to @find windows to re-sort list by trigger and filename.
       Request and store searchbot triggers to determine @search command validity
 
-1.19  Enhancements & fixes
-      Add filtering for trivia bots
-      Request and process @SearchBot-Trigger and use to avoid hacker response to search request.
+2.00  Major version number for release.
 
 */
 
 alias -l DLF.SetVersion {
-  %DLF.version = 1.19
+  %DLF.version = 2.00
   return %DLF.version
 }
 
