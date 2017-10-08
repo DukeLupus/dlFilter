@@ -3766,6 +3766,7 @@ alias -l DLF.Options.AddChannel {
   DLF.Options.InitChannelList
 }
 
+
 alias -l DLF.Options.RemoveChannel {
   var %i $did(DLF.Options.GUI,140,0).sel
   while (%i) {
