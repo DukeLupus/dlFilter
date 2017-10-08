@@ -4489,21 +4489,6 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce No requests found!
   DLF.hadd chantext.announce Please use !REQUEST ADD request to add a request! (!REQUEST COMMANDS for available commands)
   DLF.hadd chantext.announce Command syntax: !REQUEST ADD|FILL|UNFILL|DEL|LIST|CONFIRM|COMMANDS [parameters]
-  DLF.hadd chantext.announce Aflaaaaaac!
-  DLF.hadd chantext.announce meeeow!
-  DLF.hadd chantext.announce Grrrrrrrreaaaaattt!
-  DLF.hadd chantext.announce KFC!
-  DLF.hadd chantext.announce eeek!
-  DLF.hadd chantext.announce chirp chirp!
-  DLF.hadd chantext.announce Yummmm!!!
-  DLF.hadd chantext.announce ribbit!
-  DLF.hadd chantext.announce arrrf!
-  DLF.hadd chantext.announce oink oink!
-  DLF.hadd chantext.announce Moooo
-  DLF.hadd chantext.announce chirp!
-  DLF.hadd chantext.announce waaaaa
-  DLF.hadd chantext.announce ><((((º> *
-  DLF.hadd chantext.announce Aflaaaaaac! *
   inc %matches $hget(DLF.chantext.announce,0).item
 
   DLF.hmake DLF.chantext.always
@@ -4627,52 +4612,6 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia Correct! La réponse est: *. Continue comme çà, * ! *
   DLF.hadd chantext.trivia Le délai est bientot écoulé!
   DLF.hadd chantext.trivia Tapez * pour connaitre les commandes que le Quizz reconnait
-  ; TriviaOasis
-  DLF.hadd chantext.trivia Welcome To * Triviabot, v*
-  DLF.hadd chantext.trivia The bonus pot is * points!*
-  DLF.hadd chantext.trivia Question * of *, worth * points:
-  DLF.hadd chantext.trivia *BONUS QUESTION * of *, worth * points:*
-  DLF.hadd chantext.trivia Clue: *
-  DLF.hadd chantext.trivia Congratulations *! You got the answer *-> * <-   in * seconds and receive * points! Way to go!
-  DLF.hadd chantext.trivia * has won * times in a row! C'mon everyone...Break the winning streak!
-  DLF.hadd chantext.trivia * receives a * point bonus for his or her winning streak! Well done *!
-  DLF.hadd chantext.trivia * needs * more points to take over position * this month!
-  DLF.hadd chantext.trivia Down to * points: *
-  DLF.hadd chantext.trivia Time's up! *: *!
-  DLF.hadd chantext.trivia Since nobody answered correctly another * points are going into the BONUS POT, making it * points!
-  DLF.hadd chantext.trivia * Top * Players:  1st: *
-  DLF.hadd chantext.trivia Nobody seems to be playing anymore...off I go...?Zzzzzzzzzzzzzz?
-  DLF.hadd chantext.trivia The Triviabot has gone to sleep...type !start to wake it again!*
-  DLF.hadd chantext.trivia * is now updated with the latest scores...enjoy!
-  DLF.hadd chantext.trivia * Out of * mIRC'ers play our Trivia!*
-  DLF.hadd chantext.trivia Congratulations to * for winning the last Daily Jackpot of * points!*
-  DLF.hadd chantext.trivia visit *trivia* To See The Web Site
-  DLF.hadd chantext.trivia Trivia: Now for something a little different!*
-  DLF.hadd chantext.trivia There goes your streak of *
-  DLF.hadd chantext.trivia * receives a prize for that answer!
-  DLF.hadd chantext.trivia Typing * correct answer reports an error so we can fix it!
-  DLF.hadd chantext.trivia *(Containing * questions with very few repeats!)
-  DLF.hadd chantext.trivia *...Let's play!
-  DLF.hadd chantext.trivia *...Nice to see you again!
-  DLF.hadd chantext.trivia *...Let's play some trivia!
-  DLF.hadd chantext.trivia * wins the BONUS POT of * points with that answer!*
-  DLF.hadd chantext.trivia Remember to keep the same nick when playing to keep increasing your score!
-  DLF.hadd chantext.trivia * is in 1st place for this month! Good job *!
-  DLF.hadd chantext.trivia * is * points ahead for keeping * place this month!
-  DLF.hadd chantext.trivia * just destroyed *'s winning streak of *!
-  DLF.hadd chantext.trivia Watch for the * point* BONUS QUESTIONS *
-  DLF.hadd chantext.trivia Type !won NICK To See A Specific User's Complete Trivia Score Info *
-  DLF.hadd chantext.trivia *Type !repeat to see the current question*
-  DLF.hadd chantext.trivia Type !lastanswer To View The Previous Question's Answer!
-  DLF.hadd chantext.trivia Type * displays the current daily, weekly, and monthly position of NICK!
-  DLF.hadd chantext.trivia Type * To * Top *
-  DLF.hadd chantext.trivia Type * The Triviabot*
-  DLF.hadd chantext.trivia * has * points so far today, * points so far this week, * points so far this month*
-  DLF.hadd chantext.trivia ?~?~?*?~?~?
-  DLF.hadd chantext.trivia It's *! Last Week Day is Tomorrow!
-  DLF.hadd chantext.trivia It's *! Weekly Reset Tonight!
-  DLF.hadd chantext.trivia * has found another valid answer for this question that I know: *!
-  DLF.hadd chantext.trivia *...Welcome back!
   inc %matches $hget(DLF.chantext.trivia,0).item
 
   DLF.hmake DLF.chanaction.trivia
