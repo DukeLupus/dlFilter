@@ -4058,6 +4058,7 @@ on *:sockclose:DLF.Socket.Download: {
   %DLF.version = %DLF.version.web
   if (%oldsaved) DLF.StatusAll Old version of dlFilter.mrc saved as $qt($nopath(%oldscript)) in case you need to revert.
   DLF.Options.Status New version of dlFilter downloaded and installed.
+  if ($dialog(DLF.Options.GUI)) dialog -x DLF.Options.GUI
   DLF.Reload $DLF.LoadPosition
 }
 
