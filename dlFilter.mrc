@@ -68,7 +68,7 @@ dlFilter uses the following code from other people:
 */
 
 alias -l DLF.SetVersion {
-  %DLF.version = 2.00
+  %DLF.version = 2.01
   return %DLF.version
 }
 
@@ -1610,8 +1610,8 @@ alias -l DLF.DccSend.Send {
 alias -l DLF.DccSend.Block {
   dcc reject
   DLF.Watch.Log Blocked: dcc send from $nick - $1-
-  DLF.Status Blocked: DCC Send from $nick $br($address) because $1- $+ : $filename
-  DLF.Status If this file was requested add this nick to your DCC trusted list with $+ $c(4,$color(Background),$space,/dcc trust $nick,$space) $+ and retry your request.
+  DLF.Win.Echo Blocked Private $nick DCC Send from $nick $br($address) because $1- $+ : $filename
+  DLF.Win.Echo Blocked Private $nick If this file was requested add this nick to your DCC trusted list with $+ $c(4,$color(Background),$space,/dcc trust $nick,$space) $+ and retry your request.
   DLF.Win.Log Filter Blocked Private $nick DCC Send from $nick $br($address) because $1-
   DLF.Win.Filter DCC SEND $filename
 }
@@ -2191,6 +2191,7 @@ alias -l DLF.Win.Echo {
       return
     }
     var %sent
+    if ($1 == Blocked) %pref = $null
     while (%i) {
       var %chan $comchan($3,%i)
       echo -tci2 %col %chan %pref %line
