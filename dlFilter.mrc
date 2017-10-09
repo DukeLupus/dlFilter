@@ -1592,7 +1592,7 @@ alias -l DLF.DccSend.Send {
     return
   }
   if (!%trusted) {
-    if (%DLF.dccsend.requested == 1) DLF.DccSend.Block the file was not requested or @ trigger response has invalid filetype
+    if (%DLF.dccsend.requested == 1) DLF.DccSend.Block the file was not requested
     if (%DLF.dccsend.dangerous == 1) {
       var %ext $nopath($filename)
       var %ext $gettok(%ext,-1,$asc(.))
