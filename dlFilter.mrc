@@ -64,11 +64,14 @@ dlFilter uses the following code from other people:
       Request and store searchbot triggers to determine @search command validity
 
 2.00  Major version number for release.
+2.01  Send file blocking messages to common channel.
+      Close dialog when updating
+2.02  Fix file get requests failing if e.g. ::INFO:: is included in the request
 
 */
 
 alias -l DLF.SetVersion {
-  %DLF.version = 2.01
+  %DLF.version = 2.02
   return %DLF.version
 }
 
@@ -1492,14 +1495,15 @@ alias -l DLF.DccSend.Request {
   DLF.Watch.Called DLF.DccSend.Request : $1-
   DLF.SearchBot.GetTriggers
   var %trig $strip($1)
-  var %fn $replace($strip($2-),$tab $+ $space,$space,$tab,$null)
+  if ($left(%trig,1) == @) var %fn $replace($strip($2-),$tab $+ $space,$space,$tab,$null)
+  else var %fn $DLF.GetFilename($2-)
   hadd -mz DLF.dccsend.requests $+($network,|,$chan,|,%trig,|,$replace(%fn,$space,_),|,$encode(%fn)) 86400
   DLF.Watch.Log Request recorded: %trig %fn
 }
 
 alias -l DLF.DccSend.GetRequest {
   var %fn $replace($noqt($DLF.GetFileName($1-)),$space,_)
-  var %req $hfind(DLF.dccsend.requests,$+($network,|*|!,$nick,|,%fn,|*),1,w).item
+  var %req $hfind(DLF.dccsend.requests,$+($network,|*|!,$nick,|,%fn,*|*),1,w).item
   if (%req) return %req
   if (*_results_for_*.txt.zip iswmcs %fn) {
     var %nick $gettok(%fn,1,$asc(_)), %trig $DLF.SearchBot.TriggerFromNick($nick)
