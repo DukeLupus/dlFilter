@@ -43,8 +43,6 @@ dlFilter uses the following code from other people:
       Test location and filename for oNotice log files
       Test window highlighting (flashing etc.) - define rules.
       Decide what to do (if anything) about highlight users.
-      Don't block private messages from users not in common channel.
-        (Either filter or send to single message / status window.)
 
   Ideas for possible future enhancements
       Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
