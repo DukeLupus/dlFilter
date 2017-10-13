@@ -1603,7 +1603,7 @@ alias -l DLF.DccSend.Send {
     }
     if (%DLF.dccsend.untrusted == 1) DLF.DccSend.Block the user is not in your DCC Get trust list
     if ((%DLF.dccsend.nocomchan == 1) && ($comchan($nick,0) == 0)) DLF.DccSend.Block the user is not in a common channel
-    if ((%DLF.dccsend.regular == 1) && ($DLF.IsRegularUser($nick)) DLF.DccSend.Block the user is a regular user
+    if ((%DLF.dccsend.regular == 1) && ($DLF.IsRegularUser($nick))) DLF.DccSend.Block the user is a regular user
   }
   DLF.Watch.Log DCC Send accepted
   DLF.DccSend.Receiving %fn
