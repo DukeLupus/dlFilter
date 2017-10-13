@@ -1612,7 +1612,7 @@ alias -l DLF.DccSend.Send {
 alias -l DLF.DccSend.Block {
   dcc reject
   DLF.Watch.Log Blocked: dcc send from $nick - $1-
-  DLF.Win.Echo Blocked Private $nick DCC Send from $nick $br($address) because $1- $+ : $filename
+  DLF.Win.Echo Blocked Private $nick DCC Send from $nick $br($address) because $1- $+ : $nopath($filename)
   DLF.Win.Echo Blocked Private $nick If this file was requested add this nick to your DCC trusted list with $+ $c(4,$color(Background),$space,/dcc trust $nick,$space) $+ and retry your request.
   DLF.Win.Log Filter Blocked Private $nick DCC Send from $nick $br($address) because $1-
   DLF.Win.Filter DCC SEND $filename
