@@ -1493,10 +1493,16 @@ alias -l DLF.DccSend.Request {
   DLF.Watch.Called DLF.DccSend.Request : $1-
   DLF.SearchBot.GetTriggers
   var %trig $strip($1)
-  if ($left(%trig,1) == @) var %fn $replace($strip($2-),$tab $+ $space,$space,$tab,$null)
+  if ($left(%trig,1) == @) var %fn $DLF.DccSend.FixString($2-)
   else var %fn $DLF.GetFilename($2-)
+  echo -a %trig %fn
   hadd -mz DLF.dccsend.requests $+($network,|,$chan,|,%trig,|,$replace(%fn,$space,_),|,$encode(%fn)) 86400
   DLF.Watch.Log Request recorded: %trig %fn
+}
+
+alias DLF.DccSend.FixString {
+  var %s = $replace($strip($1-),$tab $+ $space,$space,$tab,$null)
+  return $remove(%s,¬,`,¦,!,",£,$,€,%,^,&,*,$lbr,$rbr,_,-,+,=,$lcurly,$rcurly,[,],:,;,@,',~,$hashtag,|,\,<,$comma,>,.,?,/)
 }
 
 alias -l DLF.DccSend.GetRequest {
