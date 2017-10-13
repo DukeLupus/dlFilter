@@ -1495,7 +1495,6 @@ alias -l DLF.DccSend.Request {
   var %trig $strip($1)
   if ($left(%trig,1) == @) var %fn $DLF.DccSend.FixString($2-)
   else var %fn $DLF.GetFilename($2-)
-  echo -a %trig %fn
   hadd -mz DLF.dccsend.requests $+($network,|,$chan,|,%trig,|,$replace(%fn,$space,_),|,$encode(%fn)) 86400
   DLF.Watch.Log Request recorded: %trig %fn
 }
