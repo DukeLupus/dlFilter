@@ -1828,12 +1828,7 @@ alias -l DLF.SearchBot.SetTriggers {
   DLF.Watch.Called DLF.SearchBot.SetTriggers $1-
   var %ttl $DLF.SearchBot.TTL
   hadd -mzu $+ %ttl DLF.searchbots $+($network,|,$3,|,$nick,|,$4) %ttl
-  var %i $comchan($nick,0)
-  while (%i) {
-    var %chan $comchan($nick,%i)
-    if ($hget(DLF.sbcurrentreqs,$+($network,%chan)) != $null) DLF.Win.Filter $event Private $nick $1-
-    dec %i
-  }
+  if ($hget(DLF.sbcurrentreqs,$+($network,$3)) != $null) DLF.Win.Filter $event Private $nick $1-
 }
 
 alias -l DLF.SearchBot.NickFromTrigger {
