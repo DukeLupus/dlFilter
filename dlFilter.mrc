@@ -2167,6 +2167,18 @@ alias -l DLF.Win.Echo {
     echo %flags %col $2 %line
     DLF.Watch.Log Echoed: To $2
   }
+  elseif (($2 == Private) && (($query($3)) || $notify($3))) {
+    if ($query($3) == $null) {
+      DLF.Watch.Log Echoed: Opening query window for notify user
+      query $3
+    }
+    echo -tci2bf %col $3 %line
+    DLF.Watch.Log Echoed: To query window
+  }
+  elseif (($2 == Private) && ($usesinglemsg == 1) && (%su == $false)) {
+    echo -dtci2bf %col %line
+    DLF.Watch.Log Echoed: To single message window
+  }
   else {
     var %i $comchan($3,0), %su $DLF.IsServiceUser($3)
     if ((%i == 0) || ($3 == $me)) {
@@ -2177,24 +2189,14 @@ alias -l DLF.Win.Echo {
           DLF.Watch.Log Echoed: To active window $active
         }
         else {
-          echo -astci2 %col %pref %line
+          echo -astci2bf %col %pref %line
           DLF.Watch.Log Echoed: To status window and active window $active
         }
       }
-      elseif ($query($3)) {
-        if ($2 == Private) %pref = $null
-        echo -tci2 %col $2 %pref %line
-        DLF.Watch.Log Echoed: To query window
-      }
-      elseif (($usesinglemsg == 0) || (%su)) {
-        if ($2 == Private) %pref = $null
-        echo -stci2 %col %pref %line
-        DLF.Watch.Log Echoed: To status window
-      }
       else {
         if ($2 == Private) %pref = $null
-        echo -dtci2 %col %pref %line
-        DLF.Watch.Log Echoed: To single message window
+        echo -stci2bf %col %pref %line
+        DLF.Watch.Log Echoed: To status window
       }
       return
     }
@@ -2202,7 +2204,7 @@ alias -l DLF.Win.Echo {
     if ($1 == Blocked) %pref = $null
     while (%i) {
       var %chan $comchan($3,%i)
-      echo -tci2 %col %chan %pref %line
+      echo -tci2bf %col %chan %pref %line
       %sent = $addtok(%sent,%chan,$asc($comma))
       dec %i
     }
@@ -2340,8 +2342,8 @@ alias -l DLF.Ads.AddLine {
     var %s $DLF.Ads.SearchText(%l)
     if (%s == %srch) {
       if ($5- != %l) {
-        var %selected
-        if ($line($1,%ln).state) %selected = -a
+        if ($line($1,%ln).state) var %selected -a
+        else var %selected $null
         rline %selected $2 $1 %ln $5-
         DLF.Watch.Log Advert: Replaced
       }
@@ -2566,7 +2568,7 @@ alias -l DLF.Ads.Split {
   while (%i) {
     scon %i
     var %match $+([,$network,*]*)
-    var %nl - $+ $len($network)
+    var %nl $len($network)
     var %j $fline(%oldwin,%match,0)
     if (%j) DLF.Ads.Add
     while (%j) {
@@ -2574,7 +2576,7 @@ alias -l DLF.Ads.Split {
       var %l $line(%oldwin,%ln)
       var %col $line(%oldwin,%ln).color
       var %nc $left($right($gettok(%l,1,$asc($tab)),-1),-2)
-      var %nc $right(%nc,%nl)
+      if ($left(%nc,%nl) == $network) %nc = $right(%nc,- $+ %nl)
       if ($left(%nc,1) isin $chantypes) DLF.Ads.AddLine $DLF.Win.WinName(Ads) %col %nc $DLF.Win.NickFromTag($gettok(%l,2,$asc($tab))) $sbr(%nc) $tab $+ $deltok(%l,1,$asc($tab))
       dec %j
     }
