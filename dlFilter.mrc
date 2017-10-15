@@ -66,11 +66,12 @@ dlFilter uses the following code from other people:
 2.01  Send file blocking messages to common channel.
       Close dialog when updating
 2.02  Fix file get requests failing if e.g. ::INFO:: is included in the request
+2.03  Add option to prevent new query windows opening
 
 */
 
 alias -l DLF.SetVersion {
-  %DLF.version = 2.02
+  %DLF.version = 2.03
   return %DLF.version
 }
 
@@ -1164,6 +1165,7 @@ alias -l DLF.Priv.CommonChan {
 }
 
 alias -l DLF.Priv.QueryOpen {
+  if (%DLF.private.query == 0) return
   var %notify $notify($nick)
   if ((%notify) || (($query($nick)) && ($event != open))) {
     if (%notify) DLF.Watch.Log Private $event from notify user
@@ -2167,7 +2169,7 @@ alias -l DLF.Win.Echo {
     echo %flags %col $2 %line
     DLF.Watch.Log Echoed: To $2
   }
-  elseif (($2 == Private) && (($query($3)) || $notify($3))) {
+  elseif (($2 == Private) && (($query($3)) || $notify($3) || ((%private.query == 0) && ($event isin Text Action)))) {
     if ($query($3) == $null) {
       DLF.Watch.Log Echoed: Opening query window for notify user
       query $3
@@ -3280,10 +3282,11 @@ dialog -l DLF.Options.GUI {
   check "Retry incomplete file requests (up to 3 times)", 570, 7 124 155 6, tab 5
   box " mIRC-wide ", 605, 4 135 160 64, tab 5
   check "Check mIRC settings are secure (future enhancement)", 610, 7 144 155 6, tab 5 disable
-  check "Filter private spam", 615, 7 153 155 6, tab 5
-  check "Filter private messages from users not in a common channel", 620, 7 162 155 6, tab 5
-  check "Block channel CTCP requests unless from an op", 655, 7 171 155 6, tab 5
-  check "Block IRC Finger requests (which share personal information)", 660, 7 180 155 6, tab 5
+  check "Prevent non-Notify private message opening query window", 620, 7 153 155 6, tab 5
+  check "Filter private spam", 630, 7 162 155 6, tab 5
+  check "Filter private messages from users not in a common channel", 640, 7 171 155 6, tab 5
+  check "Block channel CTCP requests unless from an op", 655, 7 180 155 6, tab 5
+  check "Block IRC Finger requests (which share personal information)", 660, 7 189 155 6, tab 5
   ; tab Ops
   text "These options are only enabled if you are an op on a filtered channel.", 705, 4 25 160 12, tab 7 multi
   box " Channel Ops ", 710, 4 38 160 38, tab 7
@@ -3388,7 +3391,6 @@ alias -l DLF.Options.Initialise {
   DLF.Options.InitOption serverads 1
   DLF.Options.InitOption filter.modeschan 1
   DLF.Options.InitOption filter.trivia 0
-  DLF.Options.InitOption filter.spampriv 1
   DLF.Options.InitOption filter.controlcodes 0
   DLF.Options.InitOption filter.privdlfchan 0
   DLF.Options.InitOption filter.privother 0
@@ -3421,6 +3423,8 @@ alias -l DLF.Options.Initialise {
   DLF.Options.InitOption serverretry 1
   ; Other tab mIRC-wide box
   DLF.Options.InitOption checksecurity 1
+  DLF.Options.InitOption private.query 0
+  DLF.Options.InitOption filter.spampriv 1
   DLF.Options.InitOption private.nocomchan 1
   DLF.Options.InitOption chanctcp 1
   DLF.Options.InitOption nofingers 1
@@ -3541,8 +3545,9 @@ alias -l DLF.Options.Init {
   if (%DLF.dccsend.regular == 1) did -c DLF.Options.GUI 565
   if (%DLF.serverretry == 1) did -c DLF.Options.GUI 570
   if (%DLF.checksecurity == 1) did -c DLF.Options.GUI 610
-  if (%DLF.filter.spampriv == 1) did -c DLF.Options.GUI 615
-  if (%DLF.private.nocomchan == 1) did -c DLF.Options.GUI 620
+  if (%DLF.private.query == 1) did -c DLF.Options.GUI 620
+  if (%DLF.filter.spampriv == 1) did -c DLF.Options.GUI 630
+  if (%DLF.private.nocomchan == 1) did -c DLF.Options.GUI 640
   if (%DLF.chanctcp == 1) did -c DLF.Options.GUI 655
   if (%DLF.nofingers == 1) did -c DLF.Options.GUI 660
   if (%DLF.win-onotice.enabled == 1) did -c DLF.Options.GUI 715
@@ -3605,8 +3610,9 @@ alias -l DLF.Options.Save {
   %DLF.dccsend.regular = $did(DLF.Options.GUI,565).state
   %DLF.serverretry = $did(DLF.Options.GUI,570).state
   %DLF.checksecurity = $did(DLF.Options.GUI,610).state
-  %DLF.filter.spampriv = $did(DLF.Options.GUI,615).state
-  %DLF.private.nocomchan = $did(DLF.Options.GUI,620).state
+  %DLF.private.query = $did(DLF.Options.GUI,620).state
+  %DLF.filter.spampriv = $did(DLF.Options.GUI,630).state
+  %DLF.private.nocomchan = $did(DLF.Options.GUI,640).state
   %DLF.chanctcp = $did(DLF.Options.GUI,655).state
   %DLF.nofingers = $did(DLF.Options.GUI,660).state
   %DLF.win-onotice.enabled = $did(DLF.Options.GUI,715).state
