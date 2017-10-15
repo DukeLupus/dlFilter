@@ -1155,7 +1155,9 @@ alias -l DLF.Priv.CommonChan {
   DLF.Watch.Called DLF.Priv.CommonChan
   if ($DLF.IsServiceUser($nick)) return
   if ($comchan($nick,0) == 0) {
-    var %msg Private $event from $nick with no common channel
+    var %event $event
+    if (%event isin open text) %event = message
+    var %msg Private %event from $nick with no common channel
     DLF.Watch.Log Blocked: %msg
     DLF.Status Blocked: %msg
     DLF.Status Blocked: $1-
