@@ -2169,6 +2169,10 @@ alias -l DLF.Win.Echo {
     echo %flags %col $2 %line
     DLF.Watch.Log Echoed: To $2
   }
+  elseif (($2 == Private) && ($usesinglemsg == 1) && (%su == $false) && ($query($3) == $null)) {
+    echo -dtci2bf %col %line
+    DLF.Watch.Log Echoed: To single message window
+  }
   ; Send to query window if:
   ; 1. Not Prevent Query and Text or Action; or
   ; 2. Notify user (all types); or
@@ -2185,10 +2189,6 @@ alias -l DLF.Win.Echo {
     echo -tci2bf %col $3 %line
     DLF.Watch.Log Echoed: To query window
   }
-  elseif (($2 == Private) && ($usesinglemsg == 1) && (%su == $false)) {
-    echo -dtci2bf %col %line
-    DLF.Watch.Log Echoed: To single message window
-  }
   else {
     var %i $comchan($3,0), %su $DLF.IsServiceUser($3)
     if ((%i == 0) || ($3 == $me)) {
@@ -2198,15 +2198,22 @@ alias -l DLF.Win.Echo {
           echo -atci2 %col %pref %line
           DLF.Watch.Log Echoed: To active window $active
         }
-        else {
-          echo -astci2bf %col %pref %line
+        elseif ($cid == $activecid) {
+          echo -atci2bf %col %pref %line
+          if ($2 == Private) %pref = $null
+          echo -stci2bf %col %pref %line
           DLF.Watch.Log Echoed: To status window and active window $active
+        }
+        else {
+          if ($2 == Private) %pref = $null
+          echo -stci2bf %col %pref %line
+          DLF.Watch.Log Echoed: To status window
         }
       }
       else {
         if ($2 == Private) %pref = $null
         echo -stci2bf %col %pref %line
-        DLF.Watch.Log Echoed: To status window
+        DLF.Watch.Log Echoed: To status window because active window is custom / listbox
       }
       return
     }
