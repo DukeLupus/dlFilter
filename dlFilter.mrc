@@ -1165,7 +1165,7 @@ alias -l DLF.Priv.CommonChan {
 }
 
 alias -l DLF.Priv.QueryOpen {
-  if (%DLF.private.query == 0) return
+  if (%DLF.private.query != 1) return
   var %notify $notify($nick)
   if ((%notify) || (($query($nick)) && ($event != open))) {
     if (%notify) DLF.Watch.Log Private $event from notify user
@@ -2169,7 +2169,15 @@ alias -l DLF.Win.Echo {
     echo %flags %col $2 %line
     DLF.Watch.Log Echoed: To $2
   }
-  elseif (($2 == Private) && (($query($3)) || $notify($3) || ((%private.query == 0) && ($event isin Text Action)))) {
+  ; Send to query window if:
+  ; 1. Not Prevent Query and Text or Action; or
+  ; 2. Notify user (all types); or
+  ; 3. Query open and Text or Action; or
+  ; 4. Query open and Prevent Query
+  elseif (($2 == Private) && ( $&
+      (($query($3)) && ((%private.query == 1) || ($event isin Text Action))) || $notify($3) || $&
+      ((%private.query != 1) && ($event isin Text Action)) $&
+    )) {
     if ($query($3) == $null) {
       DLF.Watch.Log Echoed: Opening query window for notify user
       query $3
