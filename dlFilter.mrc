@@ -43,6 +43,7 @@ dlFilter uses the following code from other people:
       Test location and filename for oNotice log files
       Test window highlighting (flashing etc.) - define rules.
       Decide what to do (if anything) about highlight users.
+      Speed-up Merge and Split ads windows using Filter commands
 
   Ideas for possible future enhancements
       Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
@@ -2534,12 +2535,14 @@ alias -l DLF.Ads.ColourLines {
 
 alias -l DLF.Ads.Merge {
   var %active $active
-  var %i $window(@DLF.Ads.*,0)
-  if (%i == 0) return
+  if ($window(@DLF.Ads.*,0) == 0) return
   DLF.Ads.Add
   var %win $DLF.Win.WinName(Ads)
+  var %i $window(@DLF.Ads.*,0)
   while (%i) {
     var %oldwin $window(@DLF.Ads.*,%i)
+    dec %i
+    if (%oldwin == %win) continue
     var %net $gettok(%oldwin,-1,$asc(.))
     var %j $line(%oldwin,0)
     while (%j) {
@@ -2552,7 +2555,6 @@ alias -l DLF.Ads.Merge {
       dec %j
     }
     close -@ %oldwin
-    dec %i
   }
   if ($left(%active,9) == @DLF.Ads.) window -a %win
 }
