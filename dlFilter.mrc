@@ -2553,11 +2553,9 @@ alias -l DLF.Ads.ColourLines {
 }
 
 alias -l DLF.Ads.Merge {
-  ; Take windows in network order, add network to each line and merge using /filter
   var %active $active
   var %i $window(@DLF.Ads.*,0)
   if (%i == 0) return
-  ; Get sorted list of windows
   var %wins
   while (%i) {
     %wins = $addtok(%wins,$window(@DLF.Ads.*,%i),$asc($space))
@@ -2574,9 +2572,7 @@ alias -l DLF.Ads.Merge {
     var %j $fline(%oldwin,[*]*,0)
     while (%j) {
       var %ln $fline(%oldwin,[*]*,%j)
-      if ($line($1,%ln).state) var %selected -a
-      else var %selected $null
-      rline %selected $line(%oldwin,%ln).color %oldwin %ln [ $+ %net $+ $right($line(%oldwin,%ln),-1)
+      rline $line(%oldwin,%ln).color %oldwin %ln [ $+ %net $+ $right($line(%oldwin,%ln),-1)
       dec %j
     }
     filter -wwz %oldwin %win [*]*
@@ -2591,20 +2587,24 @@ alias -l DLF.Ads.Split {
   var %i $scon(0)
   while (%i) {
     scon %i
-    var %match $+([,$network,*]*)
-    var %nl $len($network)
-    var %j $fline(%oldwin,%match,0)
-    if (%j) DLF.Ads.Add
+    dec %i
+    var %j $len($chantypes), %match $null
     while (%j) {
-      var %ln $fline(%oldwin,%match,%j)
-      var %l $line(%oldwin,%ln)
-      var %col $line(%oldwin,%ln).color
-      var %nc $left($right($gettok(%l,1,$asc($tab)),-1),-2)
-      if ($left(%nc,%nl) == $network) %nc = $right(%nc,- $+ %nl)
-      if ($left(%nc,1) isin $chantypes) DLF.Ads.AddLine $DLF.Win.WinName(Ads) %col %nc $DLF.Win.NickFromTag($gettok(%l,2,$asc($tab))) $sbr(%nc) $tab $+ $deltok(%l,1,$asc($tab))
+      %match = $addtok(%match,$+($lbr,^\[,$network,$mid($chantypes,%j,1),.*\],$rbr),$asc(|))
       dec %j
     }
-    dec %i
+    if ($fline(%oldwin,%match,0,2) == 0) continue
+    DLF.Ads.Add
+    var %win $DLF.Win.WinName(Ads)
+    filter -wwzg %oldwin %win %match
+    var %j $fline(%win,[*]*,0)
+    var %r - $+ $len($network)
+    dec %r
+    while (%j) {
+      var %ln $fline(%win,[*]*,%j)
+      rline $line(%win,%ln).color %win %ln [ $+ $right($line(%win,%ln),%r)
+      dec %j
+    }
   }
   scon -r
   close -@ %oldwin
