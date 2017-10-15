@@ -2008,7 +2008,7 @@ alias -l DLF.Win.Log {
     %show = %DLF.showfiltered
   }
   elseif (%type == Server) %tb = Server response
-  var %win $DLF.Win.WinOpen(%type,-k0nw,%log,%show,%tb $DLF.Win.TbMsg)
+  var %win $DLF.Win.WinOpen(%type,-k0nwD,%log,%show,%tb $DLF.Win.TbMsg)
   DLF.Win.CustomTrim %win
   if (%ts == 1) %line = $timestamp %line
   if (%strip == 1) %line = $strip(%line)
@@ -2332,7 +2332,7 @@ alias -l DLF.Ads.Add {
 alias -l DLF.Ads.OpenWin {
   if (%DLF.perconnect == 1) var %tabs -t20,40
   else var %tabs -t30,55
-  return $DLF.Win.WinOpen($1,-k0nwl %tabs,0,%DLF.serverads,0 %tb)
+  return $DLF.Win.WinOpen($1,-k0nwlD %tabs,0,%DLF.serverads,0 %tb)
 }
 
 ; DLF.Ads.AddLine win colour netchan nick line
@@ -5411,7 +5411,7 @@ alias DLF.Watch {
     if (($0 == 0) || ($1 == on)) {
       var %target @dlF.Watch. $+ $network
       if ($window(%target) == $null) {
-        window -k0mx %target
+        window -k0mxD %target
         titlebar %target -=- Watch irc messages on $network and dlF's handling of them.
       }
     }
