@@ -2553,26 +2553,33 @@ alias -l DLF.Ads.ColourLines {
 }
 
 alias -l DLF.Ads.Merge {
+  ; Take windows in network order, add network to each line and merge using /filter
   var %active $active
-  if ($window(@DLF.Ads.*,0) == 0) return
+  var %i $window(@DLF.Ads.*,0)
+  if (%i == 0) return
+  ; Get sorted list of windows
+  var %wins
+  while (%i) {
+    %wins = $addtok(%wins,$window(@DLF.Ads.*,%i),$asc($space))
+    dec %i
+  }
+  %wins = $sorttok(%wins,$asc($space),r)
+  %i = $numtok(%wins,$asc($space))
   DLF.Ads.Add
   var %win $DLF.Win.WinName(Ads)
-  var %i $window(@DLF.Ads.*,0)
   while (%i) {
-    var %oldwin $window(@DLF.Ads.*,%i)
+    var %oldwin $gettok(%wins,%i,$asc($space))
     dec %i
-    if (%oldwin == %win) continue
     var %net $gettok(%oldwin,-1,$asc(.))
-    var %j $line(%oldwin,0)
+    var %j $fline(%oldwin,[*]*,0)
     while (%j) {
-      var %l $line(%oldwin,%j)
-      if (%l == $crlf) break
-      var %chan $left($right($gettok(%l,1,$asc($tab)),-1),-2)
-      var %nc = $+(%net,%chan)
-      var %col = $line(%oldwin,%j).color
-      DLF.Ads.AddLine %win %col %nc $DLF.Win.NickFromTag($gettok(%l,2,$asc($tab))) $sbr(%nc) $tab $+ $deltok(%l,1,$asc($tab))
+      var %ln $fline(%oldwin,[*]*,%j)
+      if ($line($1,%ln).state) var %selected -a
+      else var %selected $null
+      rline %selected $line(%oldwin,%ln).color %oldwin %ln [ $+ %net $+ $right($line(%oldwin,%ln),-1)
       dec %j
     }
+    filter -wwz %oldwin %win [*]*
     close -@ %oldwin
   }
   if ($left(%active,9) == @DLF.Ads.) window -a %win
