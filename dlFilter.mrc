@@ -217,7 +217,7 @@ menu menubar {
   .$iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Options.ToggleShowFilter
   .$iif(%DLF.serverads,Hide,Show) ads window(s): DLF.Options.ToggleShowAds
   .Options: DLF.Options.Show
-  .Visit filter website: .url -a https://github.com/DukeLupus/dlFilter/
+  .Visit dlFilter website: .url -a https://github.com/DukeLupus/dlFilter/
   .-
   .Unload dlFilter: if ($?!="Do you want to unload dlFilter?" == $true) .unload -rs $qt($script)
 }
@@ -1916,10 +1916,10 @@ alias -l DLF.Custom.CreateHash {
 menu @dlF.Filter.* {
   Search: DLF.Search.Show $menu $?="Enter search string"
   -
-  $iif(%DLF.win-filter.timestamp == 1,$style(1)) Timestamp: DLF.Options.ToggleOption filtered.timestamp
-  $iif(%DLF.win-filter.strip == 1,$style(1)) Strip codes: DLF.Options.ToggleOption filtered.strip
-  $iif(%DLF.win-filter.wrap == 1,$style(1)) Wrap lines: DLF.Options.ToggleOption filtered.wrap
-  $iif(%DLF.win-filter.log == 1,$style(1)) Log: DLF.Options.ToggleOption filtered.log
+  $iif(%DLF.win-filter.timestamp == 1,$style(1)) Timestamp: DLF.Options.ToggleOption win-filter.timestamp
+  $iif(%DLF.win-filter.strip == 1,$style(1)) Strip codes: DLF.Options.ToggleOption win-filter.strip
+  $iif(%DLF.win-filter.wrap == 1,$style(1)) Wrap lines: DLF.Options.ToggleOption win-filter.wrap
+  $iif(%DLF.win-filter.log == 1,$style(1)) Log: DLF.Options.ToggleOption win-filter.log
   -
   $iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Options.ToggleShowFilter
   Clear: clear
@@ -1930,10 +1930,10 @@ menu @dlF.Filter.* {
 menu @dlF.Server.* {
   Search: DLF.Search.Show $menu $?="Enter search string"
   -
-  $iif(%DLF.win-server.timestamp == 1,$style(1)) Timestamp: DLF.Options.ToggleOption server.timestamp
-  $iif(%DLF.win-server.strip == 1,$style(1)) Strip codes: DLF.Options.ToggleOption server.strip
-  $iif(%DLF.win-server.wrap == 1,$style(1)) Wrap lines: DLF.Options.ToggleOption server.wrap
-  $iif(%DLF.win-server.log == 1,$style(1)) Log: DLF.Options.ToggleOption server.log
+  $iif(%DLF.win-server.timestamp == 1,$style(1)) Timestamp: DLF.Options.ToggleOption win-server.timestamp
+  $iif(%DLF.win-server.strip == 1,$style(1)) Strip codes: DLF.Options.ToggleOption win-server.strip
+  $iif(%DLF.win-server.wrap == 1,$style(1)) Wrap lines: DLF.Options.ToggleOption win-server.wrap
+  $iif(%DLF.win-server.log == 1,$style(1)) Log: DLF.Options.ToggleOption win-server.log
   -
   Clear: clear
   Options: DLF.Options.Show
@@ -2418,7 +2418,7 @@ alias -l DLF.Ads.ReportFalse {
   }
   var %url $DLF.GitReports(False Positive Ads,$right(%body,-4))
   if (!%url) DLF.Alert Too many lines selected. $+ $crlf $+ You have selected too many lines. Please select fewer lines and try again.
-  url -an %url
+  url -a %url
 }
 
 alias -l DLF.Ads.GetListMulti {
@@ -4959,7 +4959,7 @@ alias -l DLF.GitReportsAlert {
   var %yn $input($replace(%txt,$cr,$crlf),%type,$replace(%title,$cr,$crlf))
   if (%yn) {
     if (%url) {
-      url -an %url
+      url -a %url
       DLF.Watch.Log GitReportsAlert: URL loaded: %url
     }
     else DLF.Alert Unable to launch GitReports in your browser window.
