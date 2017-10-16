@@ -5091,7 +5091,7 @@ alias -l DLF.GetFileName {
     %txt = $deltok(%txt,-1,$asc(.))
     if (%type isalnum) return $+(%txt,.,%type)
   }
-  return $null
+  return %txt
 }
 
 alias -l DLF.strip { return $replace($strip($1-),$tab,$space,$nbsp,$space,$chr(149),$space,$chr(152),$null,$chr(144),$null,$+($space,$space),$space) }
