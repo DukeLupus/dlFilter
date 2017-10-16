@@ -2538,17 +2538,17 @@ alias -l DLF.Ads.ColourLines {
     var %nick $DLF.Win.NickFromTag($gettok(%l,2,$asc($space)))
     if ($1 == join) {
       if ($nick(%chan,%nick) != $null) {
-        DLF.Watch.Log Enabling ad: $gettok(%l,1-7,$asc($space)) …
+        DLF.Watch.Log Enabling ad: $gettok(%l,1-7,$asc($space)) ...
         DLF.Chan.SetNickColour %nick
         cline 3 %win %ln
       }
       else {
-        DLF.Watch.Log Deleting offline ad: $gettok(%l,1-7,$asc($space)) …
+        DLF.Watch.Log Deleting offline ad: $gettok(%l,1-7,$asc($space)) ...
         dline %win %ln
       }
     }
     elseif (($1 == disconnect) || (%nick == $2) || ($me == $2)) {
-      DLF.Watch.Log Disabling ad: $gettok(%l,1-7,$asc($space)) …
+      DLF.Watch.Log Disabling ad: $gettok(%l,1-7,$asc($space)) ...
       cline 14 %win %ln
     }
   }
@@ -3264,7 +3264,7 @@ dialog -l DLF.Options.GUI {
   button "Remove", 135, 86 61 76 11, tab 1 flat disable
   list 140, 4 74 160 83, tab 1 vsbar size sort extsel
   box " Update ", 150, 4 158 160 41, tab 1
-  text "Checking for dlFilter updates…", 160, 7 166 155 8, tab 1
+  text "Checking for dlFilter updates...", 160, 7 166 155 8, tab 1
   button "dlFilter website", 170, 7 175 74 11, tab 1 flat
   button "Update dlFilter", 180, 86 175 74 11, tab 1 flat disable
   check "Check for &beta versions", 190, 7 189 155 6, tab 1
@@ -3283,11 +3283,11 @@ dialog -l DLF.Options.GUI {
   check "Separate dlF windows per connection", 365, 7 124 155 6, tab 3
   check "Keep Filter windows active in background", 370, 7 133 155 6, tab 3
   box " User events ", 375, 4 144 160 55, tab 3
-  check "Joins …", 380, 7 153 53 6, tab 3
-  check "Parts …", 382, 66 153 53 6, tab 3
-  check "Quits …", 384, 120 153 53 6, tab 3
-  check "Nick changes …", 386, 7 162 53 6, tab 3
-  check "Kicks …", 388, 66 162 53 6, tab 3
+  check "Joins ...", 380, 7 153 53 6, tab 3
+  check "Parts ...", 382, 66 153 53 6, tab 3
+  check "Quits ...", 384, 120 153 53 6, tab 3
+  check "Nick changes ...", 386, 7 162 53 6, tab 3
+  check "Kicks ...", 388, 66 162 53 6, tab 3
   check "Away and thank-you messages", 390, 7 171 155 6, tab 3
   check "User mode changes", 395, 7 180 155 6, tab 3
   check "Filter above user events for non-regular users", 397, 7 189 155 6, tab 3
@@ -3321,7 +3321,7 @@ dialog -l DLF.Options.GUI {
   check "Advertise dlFilter in channels every", 760, 7 87 93 6, tab 7
   edit "60", 765, 101 85 12 10, tab 7 right limit 2
   text "mins", 770, 115 86 47 7, tab 7
-  check "… and filter them out", 780, 15 96 147 6, tab 7
+  check "... and filter them out", 780, 15 96 147 6, tab 7
   check "Prompt individual existing dlFilter users to upgrade", 790, 7 105 155 6, tab 7
   ; tab Custom
   check "Enable custom filters", 810, 5 27 65 7, tab 8
@@ -3951,7 +3951,7 @@ alias -l DLF.Update.Check {
 
 alias -l DLF.Update.Run {
   if ($dialog(DLF.Options.GUI)) did -b DLF.Options.GUI 180
-  DLF.Options.Status Checking for dlFilter updates…
+  DLF.Options.Status Checking for dlFilter updates...
   var %branch master
   if (%DLF.update.betas == 1) %branch = beta
   DLF.Socket.Get Update $+(https://raw.githubusercontent.com/DukeLupus/dlFilter/,%branch,/dlFilter.version)
@@ -4059,7 +4059,7 @@ alias -l DLF.Update.ChanAnnounce {
 
 ; ========== Download new version ==========
 alias -l DLF.Download.Run {
-  DLF.Options.Status Downloading new version of dlFilter…
+  DLF.Options.Status Downloading new version of dlFilter...
   var %newscript $qt($script $+ .new)
   if ($isfile(%newscript)) .remove %newscript
   if ($exists(%newscript)) DLF.Socket.Error Unable to delete old temporary download file.
@@ -4255,7 +4255,7 @@ alias -l DLF.CreateGif {
 alias -l hiswm {
   var %h DLF. $+ $1
   if (!$hget(%h)) {
-    DLF.Warning Hash table %h does not exist - attempting to recreate it…
+    DLF.Warning Hash table %h does not exist - attempting to recreate it...
     DLF.CreateHashTables
   }
   var %result $hfind(%h,$2,1,W).data
