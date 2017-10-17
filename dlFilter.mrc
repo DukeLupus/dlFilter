@@ -2139,10 +2139,11 @@ alias -l DLF.Win.Format {
 alias -l DLF.Win.Echo {
   var %line $DLF.Win.Format($1-)
   var %col $DLF.Win.MsgType($1)
+  var %flags -tci2lbf
   var %pref
   if ($1 != ctcpreply) %pref = $2 $+ :
   if ($2 == Status) {
-    echo -stci2 %col %line
+    echo %flags $+ s %col %line
     DLF.Watch.Log Echoed: To Status Window
   }
   elseif ($2 == @find) {
@@ -2150,29 +2151,28 @@ alias -l DLF.Win.Echo {
     var %i $numtok(%chans,$asc($space))
     while (%i) {
       var %chan $gettok(%chans,%i,$asc($space))
-      if ($nick(%chan,$3)) echo -tci2 %col %chan %pref %line
+      if ($nick(%chan,$3)) echo -tci2lbf %col %chan %pref %line
       else $deltok(%chans,%i,$asc($space))
       dec %i
     }
     if (%chans != $null) DLF.Watch.Log Echoed: To @find channels with $3 $+ : %chans
     else {
-      echo -stci2 %col %pref %line
+      echo %flags $+ s %col %pref %line
       DLF.Watch.Log Echoed: To status window
     }
     return
   }
   elseif ($2 !isin Private @find $hashtag) {
     ; mIRC does not support native options for timestamping of custom windows
-    var %flags -tci2
     if (@#* iswm $2) {
-      if (%DLF.win-onotice.timestamp == 0) %flags = -ci2
+      if (%DLF.win-onotice.timestamp == 0) %flags = $remove(%flags,t)
       elseif (!$window($2).stamp) %line = $timestamp %line
     }
     echo %flags %col $2 %line
     DLF.Watch.Log Echoed: To $2
   }
   elseif (($2 == Private) && ($usesinglemsg == 1) && (%su == $false) && ($query($3) == $null)) {
-    echo -dtci2bf %col %line
+    echo %flags $+ d %col %line
     DLF.Watch.Log Echoed: To single message window
   }
   ; Send to query window if:
@@ -2188,7 +2188,7 @@ alias -l DLF.Win.Echo {
       DLF.Watch.Log Echoed: Opening query window for notify user
       query $3
     }
-    echo -tci2bf %col $3 %line
+    echo %flags %col $3 %line
     DLF.Watch.Log Echoed: To query window
   }
   else {
@@ -2197,24 +2197,24 @@ alias -l DLF.Win.Echo {
       if ((($window($active).type !isin custom listbox) || ($left($active,2) == @#)) $&
        && (((%su) && (!$DLF.Event.JustConnected)) || ($3 == $me))) {
         if ($3 == $me) {
-          echo -atci2 %col %pref %line
+          echo %flags $+ a %col %pref %line
           DLF.Watch.Log Echoed: To active window $active
         }
         elseif ($cid == $activecid) {
-          echo -atci2bf %col %pref %line
+          echo %flags $+ a %col %pref %line
           if ($2 == Private) %pref = $null
-          echo -stci2bf %col %pref %line
+          echo %flags $+ s %col %pref %line
           DLF.Watch.Log Echoed: To status window and active window $active
         }
         else {
           if ($2 == Private) %pref = $null
-          echo -stci2bf %col %pref %line
+          echo %flags $+ s %col %pref %line
           DLF.Watch.Log Echoed: To status window
         }
       }
       else {
         if ($2 == Private) %pref = $null
-        echo -stci2bf %col %pref %line
+        echo %flags $+ s %col %pref %line
         DLF.Watch.Log Echoed: To status window because active window is custom / listbox
       }
       return
@@ -2223,7 +2223,7 @@ alias -l DLF.Win.Echo {
     if ($1 == Blocked) %pref = $null
     while (%i) {
       var %chan $comchan($3,%i)
-      echo -tci2bf %col %chan %pref %line
+      echo %flags %col %chan %pref %line
       %sent = $addtok(%sent,%chan,$asc($comma))
       dec %i
     }
@@ -4924,8 +4924,8 @@ alias -l DLF.CreateHashTables {
 alias -l DLF.logo return $rev([dlFilter])
 alias -l DLF.StatusAll {
   var %m $c(1,9,$DLF.logo $1-)
-  scon -a echo -tsfi2 %m
-  if ($window($active).type != status) echo -tafi2 %m
+  scon -a echo -tsi2bf %m
+  if ($window($active).type != status) echo -tai2bf %m
 }
 alias -l DLF.Status { echo -tsf $c(1,9,$DLF.logo $1-) }
 alias -l DLF.Warning { DLF.StatusAll $c(1,9,$DLF.logo Warning: $1-) }
