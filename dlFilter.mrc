@@ -2136,10 +2136,16 @@ alias -l DLF.Win.Format {
   else return * $4-
 }
 
+alias -l DLF.Win.HighlightFlag {
+  if ($istok(input,$1,$asc($space)) return n
+  if ($istok(text action notice ctcp ctcpreply,$1,$asc($space)) return m
+  return $null
+}
+
 alias -l DLF.Win.Echo {
   var %line $DLF.Win.Format($1-)
   var %col $DLF.Win.MsgType($1)
-  var %flags -tci2lbf
+  var %flags -tci2rlbf $+ $DLF.Win.HighlightFlag($1)
   var %pref
   if ($1 != ctcpreply) %pref = $2 $+ :
   if ($2 == Status) {
