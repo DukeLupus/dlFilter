@@ -4030,11 +4030,19 @@ alias -l DLF.Update.CheckVersions {
     if ((%DLF.update.betas) $&
       && (%DLF.version.beta) $&
       && (%DLF.version.beta > %DLF.version.web)) {
-      if (%DLF.version.beta > $DLF.SetVersion) DLF.Update.DownloadAvailable beta %DLF.version.beta %DLF.version.beta.mirc %DLF.version.beta.comment
+      if (%DLF.version.beta > $DLF.SetVersion) {
+        var %comment %DLF.version.beta.comment
+        if ($int(%DLF.version.beta) > $int($DLF.SetVersion)) %comment = Major new version
+        DLF.Update.DownloadAvailable beta %DLF.version.beta %DLF.version.beta.mirc %comment
+      }
       elseif (%DLF.version.beta == $DLF.SetVersion) DLF.Options.Status Running current version of dlFilter beta
       else DLF.Options.Status Running newer version $br($DLF.SetVersion) than beta download $br(%DLF.version.beta)
     }
-    elseif (%DLF.version.web > $DLF.SetVersion) DLF.Update.DownloadAvailable production %DLF.version.web %DLF.version.web.mirc %DLF.version.web.comment
+    elseif (%DLF.version.web > $DLF.SetVersion) {
+      var %comment %DLF.version.web.comment
+      if ($int(%DLF.version.web) > $int($DLF.SetVersion)) %comment = Major new version
+      DLF.Update.DownloadAvailable production %DLF.version.web %DLF.version.web.mirc %comment
+    }
     elseif (%DLF.version.web == $DLF.SetVersion) DLF.Options.Status Running current version of dlFilter
     else DLF.Options.Status Running newer version $br($DLF.SetVersion) than production download $br(%DLF.version.web)
   }
