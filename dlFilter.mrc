@@ -41,7 +41,6 @@ dlFilter uses the following code from other people:
 
   Immediate TODO
       Test location and filename for oNotice log files
-      Decide what to do (if anything) about highlight users.
       Be smarter about matching nicks responding to file requests with triggers when they don't quite match.
         (Add another field to the hash for the nick - check whether trigger exactly matches a nick and if not try to identify a close match (either by looking for matching @trigger in ads window or by looking for very similar nicks e.g. pondering vs. pondering42.)
 
@@ -50,28 +49,26 @@ dlFilter uses the following code from other people:
       Implement toolbar functionality with right click menu
       mIRC security wizard to check that mIRC settings are not too lax
       Manage filetype ignore list like trust list i.e. temp add for requested filetypes.
-      Advertising for sbClient for @search + option (await sbClient remediation).
-      Better icon file
       More menu options equivalent to dialog options
-      Make it work on AdiIRC and update version check handle AdiIRC.
+      Make it work on AdiIRC and update version check to handle AdiIRC versions.
       Merge in sbClient functionality
       Trim lines from Ads window for servers which have been offline for xx hours.
       Configurable F1 etc. aliases to toggle Options, Ads, Filters, Catch-all by F key or other keys.
         (Use On Keydown to capture and check keystrokes, have a key field for each of the options to toggle.)
         (Might be better as a separate script with documented commands you can paste in.
       Add right click menu items to @find windows to re-sort list by trigger and filename.
-      Request and store searchbot triggers to determine @search command validity
 
 2.00  Major version number for release.
 2.01  Send file blocking messages to common channel.
       Close dialog when updating
 2.02  Fix file get requests failing if e.g. ::INFO:: is included in the request
 2.03  Add option to prevent new query windows opening
+2.04  Record ctcp requests and process replies.
 
 */
 
 alias -l DLF.SetVersion {
-  %DLF.version = 2.03
+  %DLF.version = 2.04
   return %DLF.version
 }
 
@@ -79,7 +76,7 @@ alias -l DLF.mIRCversion {
   var %app $nopath($mircexe)
   ; AdiIRC - not sure what version is specifically needed
   ; 2.8 is the version at the time of starting to think about AdiIRC support.
-  if ($left(%app,6) == AdiIRC) {
+  if (AdiIRC* iswm %app) {
     if ($version >= 2.8) return 0
     %DLF.enabled = 0
     DLF.Groups.Events
@@ -346,14 +343,7 @@ on ^*:topic:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.topic)) DLF.W
 raw 332:*: { if (($DLF.Chan.IsDlfChan($2)) && (%DLF.filter.topic == 1)) DLF.Win.Log Filter $event $DLF.chan $DLF.nick Topic is: $sqt($3-) }
 raw 333:*: { if (($DLF.Chan.IsDlfChan($2)) && (%DLF.filter.topic == 1)) DLF.Win.Filter Set by $3 on $asctime($4,ddd mmm dd HH:nn:ss yyyy) }
 
-; Trigger processing
-on *:input:%DLF.channels: {
-  if ($DLF.Chan.IsDlfChan($chan)) {
-    if (($1 == @find) || ($1 == @locator)) DLF.@find.Request $1-
-    elseif (($left($1,1) isin !@) && ($len($1) > 1)) DLF.DccSend.Request $1-
-  }
-}
-
+on *:input:*: { DLF.Event.Input $1- }
 on *:filercvd:*: DLF.DccSend.FileRcvd $1-
 on *:getfail:*: DLF.DccSend.GetFailed $1-
 
@@ -374,7 +364,6 @@ on ^*:notice:*:%DLF.channels: {
 on ^@*:text:*:#: { if ($DLF.oNotice.IsoNotice) DLF.oNotice.Channel $1- }
 on ^@*:action:*:#: { if ($DLF.oNotice.IsoNotice) DLF.oNotice.Channel $1- }
 on ^@*:notice:*:#: { if ($DLF.oNotice.IsoNotice) DLF.oNotice.Channel $1- }
-on *:input:@#* { DLF.oNotice.Input $1- }
 
 ; Private messages
 on ^*:text:*$decode*:?: { DLF.Priv.DollarDecode $1- }
@@ -406,13 +395,6 @@ on *:ctcpreply:VERSION *: {
   DLF.Event.ctcpReply $1-
 }
 on *:ctcpreply:*: { DLF.Event.ctcpReply $1- }
-
-; Determine whether ctcpreply is private or channel
-alias -l DLF.Event.ctcpReply {
-  var %chan $gettok($rawmsg,3,$asc($space))
-  if ($left(%chan,1) !isin $chantypes) DLF.Priv.ctcpReply $1-
-  elseif ($DLF.Chan.IsDlfChan(%chan)) DLF.Chan.ctcpReply $1-
-}
 
 ; We should not need to handle the open event because unwanted dcc chat requests have been halted.
 ;on ^*:open:=: { DLF.DccChat.Open $1- }
@@ -484,6 +466,46 @@ alias -l DLF.CommandDisable {
 }
 
 ; ========== Event splitters ==========
+alias -l DLF.Event.Input {
+  var %win $scriptwin
+  if (@dlF.*Search.* iswm %win) DLF.Search.Show %win $1-
+  elseif ($1 == /ctcp) DLF.ctcpSend.Request %win $1-
+  elseif (@#* iswm %win) DLF.oNotice.Input $1-
+  elseif ($DLF.Chan.IsDlfChan(%win)) {
+    if (($1 == @find) || ($1 == @locator)) DLF.@find.Request $1-
+    elseif (($left($1,1) isin !@) && ($len($1) > 1)) DLF.DccSend.Request $1-
+  }
+}
+
+alias -l DLF.ctcpSend.Request {
+  hadd -mu60z DLF.ctcpSend.Requests $+($network,|,$3,|,$4,|,$1) 60
+}
+
+alias -l DLF.ctcpSend.Reply {
+  var %match $+($network,|*|,$1,|*)
+  var %i $hfind(DLF.ctcpSend.Requests,%match,0,w), %found $false
+  while (%i) {
+    var %item $hfind(DLF.ctcpSend.Requests,%match,%i,w)
+    var %target $gettok(%item,2,$asc(|))
+    var %win $gettok(%item,4,$asc(|))
+    if ((($left(%target,1) !isin $chantypes) && (%target == $nick)) $&
+     || (($left(%target,1) isin $chantypes) && ($nick(%target,$nick)))) {
+      DLF.Win.Echo $event $gettok(%win,1,$asc($space)) $nick $1-
+      %found = $true
+    }
+    dec %i
+  }
+  if (%found) halt
+}
+
+; Determine whether ctcpreply is private or channel
+alias -l DLF.Event.ctcpReply {
+  DLF.ctcpSend.Reply $1-
+  var %chan $gettok($rawmsg,3,$asc($space))
+  if ($left(%chan,1) !isin $chantypes) DLF.Priv.ctcpReply $1-
+  elseif ($DLF.Chan.IsDlfChan(%chan)) DLF.Chan.ctcpReply $1-
+}
+
 alias -l DLF.Event.Join {
   DLF.Watch.Called DLF.Event.Join $1-
   DLF.@find.ColourNick $nick 3
@@ -778,8 +800,8 @@ alias -l DLF.Chan.Text {
   }
   if (($me isop $chan) && (%DLF.ops.advertpriv == 1)) {
     if (@find * iswm %txt) DLF.Ops.Advert@find $1-
-    ;elseif ($left(%txt,7) == @search) DLF.Ops.Advert@search $1-
-    ;elseif (($numtok(%txt,$asc($space)) == 1) && ($left(%txt,1) == @) && ($right($gettok(%txt,1,$asc(-)),-1) ison $chan)) DLF.Ops.Advert@search $1-
+    ;elseif (@search* iswm %txt) DLF.Ops.Advert@search $1-
+    ;elseif (($numtok(%txt,$asc($space)) == 1) && (@* iswm %txt) && ($right($gettok(%txt,1,$asc(-)),-1) ison $chan)) DLF.Ops.Advert@search $1-
   }
 
   DLF.Custom.Filter chantext $1-
@@ -1531,7 +1553,7 @@ alias -l DLF.DccSend.Request {
   DLF.Watch.Called DLF.DccSend.Request : $1-
   DLF.SearchBot.GetTriggers
   var %trig $strip($1)
-  if ($left(%trig,1) == @) var %fn $DLF.DccSend.FixString($2-)
+  if (@* iswm %trig) var %fn $DLF.DccSend.FixString($2-)
   else var %fn $DLF.GetFilename($2-)
   hadd -mz DLF.dccsend.requests $+($network,|,$chan,|,%trig,|,$replace(%fn,$space,_),|,$encode(%fn)) 86400
   DLF.Watch.Log Request recorded: %trig %fn
@@ -1564,10 +1586,10 @@ alias -l DLF.DccSend.IsRequest {
   var %req $DLF.DccSend.GetRequest(%fn)
   if (%req == $null) return $false
   var %trig $gettok(%req,3,$asc(|))
-  if ($left(%trig,1) == !) {
+  if (!* iswm %trig) {
     if (($right(%trig,-1) != $nick) && ($gettok($right(%trig,-1),1,$asc(-)) != $nick)) return $false
   }
-  elseif ($left(%trig,1) == @) {
+  elseif (@* iswm %trig) {
     var %nick $right(%trig,-1), %tfn $DLF.SearchBot.TriggerFromNick($nick)
     if ((%tfn != $null) && (%tfn != %trig)) return $false
     if ((%tfn == $null) && ($DLF.IsRegularUser($nick)) && (%nick != $nick) && ($gettok(%nick,1,$asc(-)) != $nick)) return $false
@@ -2148,7 +2170,7 @@ alias -l DLF.Win.MsgType {
 alias -l DLF.Win.Format {
   tokenize $asc($space) $1-
   var %chan
-  if (($2 != Private) && ($2 != $3)) %chan = : $+ $2
+  if (($2 !isin Private Status Message) && ($2 != $3)) %chan = : $+ $2
   if (($1 isin Normal Text Open) && ($3 == $me) && ($prefixown == 0)) return > $4-
   elseif ($1 isin Normal Text Open) return $tag($DLF.Chan.MsgNick($2,$3)) $4-
   elseif (($1 == TextSend) && ($prefixown == 0)) return > $4-
@@ -2183,6 +2205,10 @@ alias -l DLF.Win.Echo {
   var %su $DLF.IsServiceUser($3)
   if ($2 == Status) {
     echo %flags $+ s %col %line
+    DLF.Watch.Log Echoed: To Status Window
+  }
+  elseif ($2 == Message) {
+    echo %flags $+ d %col %line
     DLF.Watch.Log Echoed: To Status Window
   }
   elseif ($2 == @find) {
@@ -2607,7 +2633,7 @@ alias -l DLF.Ads.Merge {
     filter -wwz %oldwin %win [*]*
     close -@ %oldwin
   }
-  if ($left(%active,9) == @DLF.Ads.) window -a %win
+  if (@DLF.Ads.* iswm %active) window -a %win
 }
 
 alias -l DLF.Ads.Split {
@@ -2668,7 +2694,6 @@ menu @dlF.*Search.* {
   Options: DLF.Options.Show
 }
 
-on *:input:@dlF.*Search.*: DLF.Search.Show $target $1-
 alias -l DLF.Search.Show {
   DLF.Watch.Called DLF.Search.Show $1-
   if ($2 == $null) return
@@ -2794,7 +2819,7 @@ alias -l DLF.@find.Response {
 
 alias -l DLF.@find.OnlyPartial {
   var %txt $strip($1-)
-  if ($left(%txt,1) == !) return
+  if (!* iswm %txt) return
   var %re $hfind(DLF.find.headregex,%txt,1,R).item
   if (%re == $null) return
 
@@ -2839,7 +2864,7 @@ alias -l DLF.@find.Regex {
 alias -l DLF.@find.Results {
   var %trig $strip($1)
   var %rest $2-
-  if ($left(%trig,1) == !) {
+  if (!* iswm %trig) {
     var %rest $strip(%rest)
     var %fn $DLF.GetFilename(%rest)
     var %len 0 - $len(%fn)
@@ -2875,13 +2900,13 @@ alias -l DLF.@find.Results {
   while (%i) {
     var %l $line(%win,%i)
     if (%l == $crlf) break
-    if ($left(%l,1) == !) %l = $left(%l,1) $+ $gettok(%l,2-,$asc($tab))
+    if (!* iswm %l) %l = ! $+ $gettok(%l,2-,$asc($tab))
     if (%l == %smsg) DLF.Halt @find result: Result for %trig added to %win
     if (%l < %smsg) break
     dec %i
   }
   inc %i
-  if ($left(%msg,1) == @) var %col 2
+  if (@* iswm %msg) var %col 2
   else var %col 3
   iline -hn %col %win %i %msg
   window -b %win
@@ -3310,7 +3335,7 @@ dialog -l DLF.Options.GUI {
   box " Advert / Filter Windows ", 360, 4 115 160 28, tab 3
   check "Separate dlF windows per connection", 365, 7 124 155 6, tab 3
   check "Keep Filter windows active in background", 370, 7 133 155 6, tab 3
-  box " User events ", 375, 4 144 160 55, tab 3
+  box " Regular user events ", 375, 4 144 160 55, tab 3
   check "Joins ...", 380, 7 153 53 6, tab 3
   check "Parts ...", 382, 66 153 53 6, tab 3
   check "Quits ...", 384, 120 153 53 6, tab 3
@@ -3777,9 +3802,7 @@ alias -l DLF.Options.InitChannelList {
   var %i $numtok(%DLF.netchans,$asc($comma))
   while (%i) {
     var %netchan $gettok(%DLF.netchans,%i,$asc($comma))
-    if ($left(%netchan,1) == $hashtag) var %net
-    else var %net $gettok(%netchan,1,$asc($hashtag))
-    if (%net) %nets = $addtok(%nets,%net,$asc($space))
+    if ($left(%netchan,1) != $hashtag) %nets = $addtok(%nets,$gettok(%netchan,1,$asc($hashtag)),$asc($space))
     dec %i
   }
   if ($numtok(%nets,$asc($space)) <= 1) var %onenet $true
@@ -4781,7 +4804,6 @@ alias -l DLF.CreateHashTables {
   DLF.hadd privtext.server Lo Siento, no te puedo enviar mi lista ahora, intenta despues*
   DLF.hadd privtext.server Lo siento, pero estoy creando una nueva lista ahora*
   DLF.hadd privtext.server Sorry, I'm making a new list right now, please try later*
-  DLF.hadd privtext.server You should use @search* for searching. @search* uses different method for searching; answers will be sent to you in .txt or .zip file.*
   inc %matches $hget(DLF.privtext.server,0).item
 
   DLF.hmake DLF.privtext.away
@@ -4874,6 +4896,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd privnotice.server *zip va en camino*
   DLF.hadd privnotice.server Thank you for*.*!
   DLF.hadd privnotice.server *'s Stats:  Points (answers)* Total Ever: *
+  DLF.hadd privnotice.server You should use @search* for searching. @search* uses different method for searching; answers will be sent to you in .txt or .zip file.*
   inc %matches $hget(DLF.privnotice.server,0).item
 
   DLF.hmake DLF.privnotice.dnd
@@ -5055,29 +5078,29 @@ alias -l DLF.IsRegularUser {
     return $false
   }
   if ($chan) {
-    if (!$DLF.IsRegularUserChan($1,$chan)) return $false
+    if ($DLF.IsNonRegularUserChan($1,$chan)) return $false
     DLF.Watch.Log Is regular user: $1 in $chan
     return $true
   }
   var %i $comchan($1,0)
   while (%i) {
     var %chan $comchan($1,%i)
-    if (!$DLF.IsRegularUserChan($1,%chan)) return $false
+    if ($DLF.IsNonRegularUserChan($1,%chan)) return $false
     dec %i
   }
   DLF.Watch.Log Is regular user: $1
   return $true
 }
 
-alias -l DLF.IsRegularUserChan {
+alias -l DLF.IsNonRegularUserChan {
   var %log
   if ($1 isop $2) %log = Op in $2
   elseif ($1 ishop $2) %log = HalfOp in $2
   ; Voice only indicates non-regular user in non-moderated channels
   elseif (($1 isvoice $2) && (m !isin $chan($2).mode)) %log = Voiced in non-moderated $2
-  else return $true
+  else return $false
   DLF.Watch.Log Not regular user: %log
-  return $false
+  return $true
 }
 
 alias -l DLF.IsServiceUser {
@@ -5196,7 +5219,7 @@ alias -l urlencode {
 
 ; $startswith(string,start)
 alias -l startswith {
-  if ($left($1,$len($2)) == $2) return $true
+  if ($2 $+ * iswm $1) return $true
   return $false
 }
 
@@ -5275,6 +5298,32 @@ alias -l burko {
     dec %i
   }
   return %txt
+}
+
+alias -l scriptwin {
+  if ($window(Status window).wid == $wid) return Status
+  if ($window(Message window).wid == $wid) return Message
+  var %i $chan(0)
+  while (%i) {
+    if ($chan(%i).wid == $wid) return $chan(%i)
+    dec %i
+  }
+  var %i $query(0)
+  while (%i) {
+    if ($query(%i).wid == $wid) return $query(%i)
+    dec %i
+  }
+  var %i $chat(0)
+  while (%i) {
+    if ($chat(%i).wid == $wid) return $chat(%i)
+    dec %i
+  }
+  var %i $window(0)
+  while (%i) {
+    if ($window(%i).wid == $wid) return $window(%i)
+    dec %i
+  }
+  return Unknown
 }
 
 ; ========== Binary file encode/decode ==========
@@ -5461,7 +5510,7 @@ alias DLF.Watch {
 alias DLF.Watch.Filter {
   var %text $1-
   tokenize $asc($space)) $1-
-  if ($left($2,1) == :) {
+  if (:* iswm $2) {
     var %user $right($2,-1)
     tokenize $asc($space)) $1 $3-
   }
@@ -5486,7 +5535,7 @@ alias -l DLF.Watch.Called {
 alias -l DLF.Watch.Log {
   if ($debug == $null) return
   if ($0 == 0) return
-  if ($left($debug,1) != @) write $debug $1-
+  if (@* !iswm $debug) write $debug $1-
   else {
     DLF.Win.CustomTrim $debug
     var %c 3
