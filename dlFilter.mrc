@@ -41,9 +41,9 @@ dlFilter uses the following code from other people:
 
   Immediate TODO
       Test location and filename for oNotice log files
-      Test window highlighting (flashing etc.) - define rules.
       Decide what to do (if anything) about highlight users.
-      Speed-up Merge and Split ads windows using Filter commands
+      Be smarter about matching nicks responding to file requests with triggers when they don't quite match.
+        (Add another field to the hash for the nick - check whether trigger exactly matches a nick and if not try to identify a close match (either by looking for matching @trigger in ads window or by looking for very similar nicks e.g. pondering vs. pondering42.)
 
   Ideas for possible future enhancements
       Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
@@ -387,7 +387,7 @@ on ^*:notice:DCC CHAT *:?: { DLF.DccChat.ChatNotice $1- }
 on ^*:notice:DCC SEND *:?: { DLF.DccSend.SendNotice $1- }
 on ^*:notice:*:?: { DLF.Priv.Notice $1- }
 on ^*:action:*:?: { DLF.Priv.Action $1- }
-on ^*:open:?:*: { DLF.Priv.Text $1- }
+on ^*:open:?:*: { DLF.Priv.Open $1- }
 
 ; ctcp
 ctcp ^*:FINGER*:#: { DLF.Chan.ctcpBlock $1- }
@@ -403,9 +403,17 @@ ctcp *:*:?: { DLF.Priv.ctcp $1- }
 ctcp *:*:%DLF.channels: { if ($DLF.Chan.IsChanEvent) DLF.Chan.ctcp $1- }
 on *:ctcpreply:VERSION *: {
   if (%DLF.ops.advertpriv) DLF.Ops.VersionReply $1-
-  DLF.Priv.ctcpReply $1-
+  DLF.Event.ctcpReply $1-
 }
-on *:ctcpreply:*: { DLF.Priv.ctcpReply $1- }
+on *:ctcpreply:*: { DLF.Event.ctcpReply $1- }
+
+; Determine whether ctcpreply is private or channel
+alias -l DLF.Event.ctcpReply {
+  var %chan $gettok($rawmsg,3,$asc($space))
+  if ($left(%chan,1) !isin $chantypes) DLF.Priv.ctcpReply $1-
+  elseif ($DLF.Chan.IsDlfChan(%chan)) DLF.Chan.ctcpReply $1-
+}
+
 ; We should not need to handle the open event because unwanted dcc chat requests have been halted.
 ;on ^*:open:=: { DLF.DccChat.Open $1- }
 
@@ -774,7 +782,7 @@ alias -l DLF.Chan.Text {
     ;elseif (($numtok(%txt,$asc($space)) == 1) && ($left(%txt,1) == @) && ($right($gettok(%txt,1,$asc(-)),-1) ison $chan)) DLF.Ops.Advert@search $1-
   }
 
-  DLF.Custom.Filter $1-
+  DLF.Custom.Filter chantext $1-
   if ((%DLF.filter.requests == 1) && ($DLF.Chan.IsCmd($1-))) DLF.Win.Filter $1-
   if ($hiswm(chantext.ads,%txt)) DLF.Win.Ads $1-
   if ($hiswm(chantext.announce,%txt)) DLF.Win.AdsAnnounce $1-
@@ -801,7 +809,7 @@ alias -l DLF.Chan.Text {
 
 alias -l DLF.Chan.Action {
   DLF.Watch.Called DLF.Chan.Action
-  DLF.Custom.Filter $1-
+  DLF.Custom.Filter chanaction $1-
   var %txt $DLF.strip($1-)
   if ((%DLF.filter.ads == 1) && ($hiswm(chanaction.spam,%txt))) DLF.Win.Filter $1-
   if ((%DLF.filter.aways == 1) && ($hiswm(chanaction.away,%txt))) DLF.Win.Filter $1-
@@ -811,7 +819,7 @@ alias -l DLF.Chan.Action {
 
 alias -l DLF.Chan.Notice {
   DLF.Watch.Called DLF.Chan.Notice
-  DLF.Custom.Filter $1-
+  DLF.Custom.Filter channotice $1-
   var %txt $DLF.strip($1-)
   if ($hiswm(channotice.spam,%txt)) DLF.Chan.SpamFilter $1-
   if ((%txt != $1-) && ($hiswm(channotice.trivia,%txt))) DLF.Win.Filter $1-
@@ -824,11 +832,22 @@ alias -l DLF.Chan.Notice {
 alias -l DLF.Chan.ctcp {
   DLF.Watch.Called DLF.Chan.ctcp
   if ($1 == SLOTS) DLF.SearchBot.GetTriggers
-  DLF.Custom.Filter $1-
+  DLF.Custom.Filter chanctcp $1-
   if ($hiswm(chanctcp.spam,$1-)) DLF.Win.Filter $1-
   if ($hiswm(chanctcp.server,$1-)) DLF.Win.Server $1-
   ; Override mIRC default destination and send to channel rather than active/status windows.
   DLF.Win.Echo $event $chan $nick $1-
+  halt
+}
+
+alias -l DLF.Chan.ctcpReply {
+  DLF.Watch.Called DLF.Chan.ctcpReply
+  var %chan $gettok($rawmsg,3,$asc($space))
+  if ($hiswm(ctcp.reply,$1-)) {
+    DLF.Win.Log Filter $event %chan $nick $1-
+    halt
+  }
+  DLF.Win.Echo $event %chan $nick $1-
   halt
 }
 
@@ -1058,39 +1077,51 @@ alias -l DLF.Trivia.Answer {
 }
 
 ; ========== Private messages ==========
+alias -l DLF.Priv.Open {
+  DLF.Watch.Called DLF.Priv.Open $1-
+  if ($gettok($rawmsg,4,$asc($space)) === $+(:,$chr(1),ACTION)) DLF.Priv.Action $1-
+  else DLF.Priv.Text $1-
+}
+
 alias -l DLF.Priv.Text {
-  DLF.Watch.Called DLF.Priv.Text
+  DLF.Watch.Called DLF.Priv.Text $1-
   DLF.@find.Response $1-
   if ($DLF.DccSend.IsTrigger) DLF.Win.Server $1-
-  DLF.Priv.QueryOpen $1-
-  DLF.Custom.Filter $1-
+  DLF.Custom.Filter privtext $1-
   var %txt $DLF.strip($1-)
   if ($hiswm(privtext.server,%txt)) DLF.Win.Server $1-
+  if ($event != open) DLF.Priv.QueryOpen $1-
   if ((%DLF.filter.aways == 1) && ($hiswm(privtext.away,%txt))) DLF.Win.Filter $1-
   if ((%DLF.filter.spampriv == 1) && ($hiswm(privtext.spam,%txt))) DLF.Priv.SpamFilter $1-
+  ; Allow some messages to open query window and trigger normal event
   DLF.Priv.CommonChan $1-
   DLF.Priv.RegularUser Text $1-
-  DLF.Win.Echo $event Private $nick $1-
+  if (%DLF.private.query != 1) return
+  if ($notify($nick)) return
+  DLF.Win.Echo Text Private $nick $1-
   halt
 }
 
 alias -l DLF.Priv.Action {
-  DLF.Watch.Called DLF.Priv.Action
-  DLF.Priv.QueryOpen $1-
-  DLF.Custom.Filter $1-
+  DLF.Watch.Called DLF.Priv.Action $1-
+  if ($event != open) DLF.Priv.QueryOpen $1-
+  DLF.Custom.Filter privaction $1-
   if ((%DLF.filter.spampriv == 1) && ($hiswm(privaction.spam,%txt))) DLF.Priv.SpamFilter $1-
+  ; Allow some messages to open query window and trigger normal event
   DLF.Priv.CommonChan $1-
   DLF.Priv.RegularUser Action $1-
-  DLF.Win.Echo $event Private $nick $1-
+  if (%DLF.private.query != 1) return
+  if ($notify($nick)) return
+  DLF.Win.Echo Action Private $nick $1-
   halt
 }
 
 alias -l DLF.Priv.Notice {
-  DLF.Watch.Called DLF.Priv.Notice
+  DLF.Watch.Called DLF.Priv.Notice $1-
   DLF.@find.Response $1-
   DLF.Priv.NoticeServices $1-
   if ($DLF.DccSend.IsTrigger) DLF.Win.Server $1-
-  DLF.Custom.Filter $1-
+  DLF.Custom.Filter privnotice $1-
   DLF.Priv.QueryOpen $1-
   var %txt $DLF.strip($1-)
   if ($hiswm(privnotice.dnd,%txt)) DLF.Win.Filter $1-
@@ -1112,9 +1143,9 @@ alias -l DLF.Priv.NoticeServices {
 }
 
 alias -l DLF.Priv.ctcp {
-  DLF.Watch.Called DLF.Priv.ctcp
+  DLF.Watch.Called DLF.Priv.ctcp $1-
   if ($1 == TRIGGER) DLF.SearchBot.SetTriggers $1-
-  DLF.Custom.Filter $1-
+  DLF.Custom.Filter privctcp $1-
   DLF.Priv.QueryOpen $1-
   DLF.Priv.CommonChan $1-
   DLF.Priv.RegularUser ctcp $1-
@@ -1123,7 +1154,7 @@ alias -l DLF.Priv.ctcp {
 }
 
 alias -l DLF.Priv.ctcpReply {
-  DLF.Watch.Called DLF.Priv.ctcpReply
+  DLF.Watch.Called DLF.Priv.ctcpReply $1-
   if ($1 == VERSION) {
     DLF.Win.Echo $event Private $nick $1-
     halt
@@ -1203,6 +1234,8 @@ alias -l DLF.Priv.RegularUser {
     if (%DLF.filter.privother == 0) return
   }
   var %type $lower($replace($1,-,$space))
+  ; prevent dlfilter wars
+  if ((dlfilter isin $2-) || (sbfilter isin $2-)) return
   if (%type isin normal text) %type = message
   .DLF.notice $nick Your private %type has been blocked by the $DLF.logo firewall. If you want to contact me privately, please ask in channel.
   var %msg Private %type from regular user $nick $br($address)
@@ -1850,16 +1883,15 @@ alias -l DLF.SearchBot.TTL { return 86400 }
 ; ========== Custom Filters ==========
 alias -l DLF.Custom.Filter {
   DLF.Watch.Called DLF.Custom.Filter
-  if ($left($chan,1) isin $chantypes) var %filt chan $+ $event
-  else var %filt priv $+ $event
+  var %filt $1
   var %hiswm $+(custfilt.,%filt)
   var %hash $+(DLF.,%hiswm)
   if ($hget(%hash) == $null) DLF.Custom.CreateHash %filt
   elseif ($hget(%hash,0).item != $numtok([ [ $+(%,DLF.custom.,%filt) ] ],$asc($comma))) DLF.Custom.CreateHash %filt
-  var %match = $hiswm(%hiswm,$DLF.strip($1-))
+  var %match = $hiswm(%hiswm,$DLF.strip($2-))
   if (%match) {
     DLF.Watch.Log Matched in custom. $+ %filt $+ : %match
-    DLF.Win.Filter $1-
+    DLF.Win.Filter $2-
   }
 }
 
@@ -2123,13 +2155,13 @@ alias -l DLF.Win.Format {
   elseif ($1 == TextSend) return $tag($DLF.Chan.MsgNick($2,$me)) $4-
   elseif ($1 == Action) return * $3-
   elseif ($1 == ActionSend) return * $me $4-
-  elseif ($1 == Notice) return $+(-,$3,-) $4-
-  elseif ($1 == NoticeSend) return $+(-,$me,-) $4-
+  elseif ($1 == Notice) return $+(-,$3,%chan,-) $4-
+  elseif ($1 == NoticeSend) return -> $+(-,$me,-) $4-
   elseif (($1 == ctcp) && ($4 == DCC)) return $4-
   elseif ($1 == ctcp) return $sbr($3 $+ %chan $4) $5-
-  elseif ($1 == ctcpsend) return -> $sbr($3 $+ %chan) $upper($4) $5-
+  elseif ($1 == ctcpsend) return -> $sbr($3) $upper($4) $5-
   elseif ($1 == ctcpreply) return $sbr($3 $+ %chan $4 reply) $5-
-  elseif ($1 == ctcpreplysend) return -> $sbr($3 $+ %chan) $4-
+  elseif ($1 == ctcpreplysend) return -> $sbr($3) $4-
   elseif ($1 == warning) return $c(1,9,$DLF.logo Warning: $4-)
   elseif ($1 == blocked) return $c(1,9,$DLF.logo Blocked: $4-)
   elseif ($1 == session) return $4-
@@ -2137,17 +2169,18 @@ alias -l DLF.Win.Format {
 }
 
 alias -l DLF.Win.HighlightFlag {
-  if ($istok(input,$1,$asc($space)) return n
-  if ($istok(text action notice ctcp ctcpreply,$1,$asc($space)) return m
+  if ($istok(input,$1,$asc($space))) return n
+  if ($istok(text action notice ctcp ctcpreply,$1,$asc($space))) return m
   return $null
 }
 
 alias -l DLF.Win.Echo {
+  DLF.Watch.Log DLF.Win.Echo $1-
   var %line $DLF.Win.Format($1-)
   var %col $DLF.Win.MsgType($1)
   var %flags -tci2rlbf $+ $DLF.Win.HighlightFlag($1)
-  var %pref
-  if ($1 != ctcpreply) %pref = $2 $+ :
+  var %pref $2 $+ :
+  var %su $DLF.IsServiceUser($3)
   if ($2 == Status) {
     echo %flags $+ s %col %line
     DLF.Watch.Log Echoed: To Status Window
@@ -2181,24 +2214,12 @@ alias -l DLF.Win.Echo {
     echo %flags $+ d %col %line
     DLF.Watch.Log Echoed: To single message window
   }
-  ; Send to query window if:
-  ; 1. Not Prevent Query and Text or Action; or
-  ; 2. Notify user (all types); or
-  ; 3. Query open and Text or Action; or
-  ; 4. Query open and Prevent Query
-  elseif (($2 == Private) && ( $&
-      (($query($3)) && ((%private.query == 1) || ($event isin Text Action))) || $notify($3) || $&
-      ((%private.query != 1) && ($event isin Text Action)) $&
-    )) {
-    if ($query($3) == $null) {
-      DLF.Watch.Log Echoed: Opening query window for notify user
-      query $3
-    }
+  elseif (($2 == Private) && ($query($3))) {
     echo %flags %col $3 %line
     DLF.Watch.Log Echoed: To query window
   }
   else {
-    var %i $comchan($3,0), %su $DLF.IsServiceUser($3)
+    var %i $comchan($3,0)
     if ((%i == 0) || ($3 == $me)) {
       if ((($window($active).type !isin custom listbox) || ($left($active,2) == @#)) $&
        && (((%su) && (!$DLF.Event.JustConnected)) || ($3 == $me))) {
@@ -4930,10 +4951,10 @@ alias -l DLF.CreateHashTables {
 alias -l DLF.logo return $rev([dlFilter])
 alias -l DLF.StatusAll {
   var %m $c(1,9,$DLF.logo $1-)
-  scon -a echo -tsi2bf %m
-  if ($window($active).type != status) echo -tai2bf %m
+  scon -a echo -ti2nbfs %m
+  if (($window($active).type !isin status custom listbox) || ($left($active,2) == @#)) echo -ti2a %m
 }
-alias -l DLF.Status { echo -tsf $c(1,9,$DLF.logo $1-) }
+alias -l DLF.Status { echo -ti2sf $c(1,9,$DLF.logo $1-) }
 alias -l DLF.Warning { DLF.StatusAll $c(1,9,$DLF.logo Warning: $1-) }
 alias -l DLF.Error {
   echo -tabf $c(1,9,$DLF.logo $c(4,$b(Error:)) $1-)
@@ -5349,7 +5370,7 @@ alias -l DLF.iSupport.Supports {
 
 alias -l DLF.msg {
   var %c $DLF.ComChanOp($1)
-  if (($DLF.iSupport.Supports(CPRIVMSG)) && (%c) && ($left($1,1) !isin $chantypes)) .raw CPRIVMSG $1 %c $2-
+  if (($DLF.iSupport.Supports(CPRIVMSG)) && (%c) && ($left($1,1) !isin $chantypes)) .raw CPRIVMSG $1 %c : $+ $2-
   else .msg $1-
   if ($show) DLF.Win.Echo TextSend Private $1-
 }
@@ -5360,7 +5381,7 @@ alias -l DLF.describe {
 
 alias -l DLF.notice {
   var %c $DLF.ComChanOp($1)
-  if (($DLF.iSupport.Supports(CNOTICE)) && (%c) && ($left($1,1) !isin $chantypes)) .raw CNOTICE $1 %c $2-
+  if (($DLF.iSupport.Supports(CNOTICE)) && (%c) && ($left($1,1) !isin $chantypes)) .raw CNOTICE $1 %c : $+ $2-
   else .notice $1-
   if ($show) DLF.Win.Echo NoticeSend Private $1-
 }
@@ -5368,14 +5389,14 @@ alias -l DLF.notice {
 alias -l DLF.ctcp {
   var %c $DLF.ComChanOp($1)
   var %msg $upper($2) $3-
-  if (($DLF.iSupport.Supports(CPRIVMSG)) && (%c) && ($left($1,1) !isin $chantypes)) .raw CPRIVMSG $1 %c $DLF.ctcpEncode(%msg)
+  if (($DLF.iSupport.Supports(CPRIVMSG)) && (%c) && ($left($1,1) !isin $chantypes)) .raw CPRIVMSG $1 %c : $+ $DLF.ctcpEncode(%msg)
   else .ctcp $1-
   if ($show) DLF.Win.Echo ctcpSend Private $1-
 }
 
 alias -l DLF.ctcpreply {
   var %c $DLF.ComChanOp($1)
-  if (($DLF.iSupport.Supports(CNOTICE)) && (%c) && ($left($1,1) !isin $chantypes)) .raw CNOTICE $1 %c $DLF.ctcpEncode($2-)
+  if (($DLF.iSupport.Supports(CNOTICE)) && (%c) && ($left($1,1) !isin $chantypes)) .raw CNOTICE $1 %c : $+ $DLF.ctcpEncode($2-)
   else .ctcpreply $1-
   if ($show) DLF.Win.Echo ctcpreplySend Private $1-
 }
