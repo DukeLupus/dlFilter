@@ -3037,11 +3037,12 @@ alias -l DLF.@find.SendTovPowerGet {
 }
 
 alias -l DLF.@find.SaveResults {
-  var %fn $sfile($sysdir(downloads),Save @find results as a text file,Save)
+  if (%DLF.savedir == $null) set -e %DLF.savedir $getdir(*.txt)
+  var %fn $sfile(%DLF.savedir,Save @find results as a text file,Save)
   if (!%fn) return
-  var %tok =
-  %fn = $qt($deltok(%fn,-1,$asc(.)) $+ .txt)
-  savebuf $active %fn
+  set -e %DLF.savedir $nofile(%fn)
+  if ($numtok(%fn,$asc(.)) == 1) %fn = %fn $+ .txt
+  savebuf $active $qt(%fn)
 }
 
 ; ========== oNotice ==========
@@ -4772,6 +4773,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd privtext.server Lo Siento, no te puedo enviar mi lista ahora, intenta despues*
   DLF.hadd privtext.server Lo siento, pero estoy creando una nueva lista ahora*
   DLF.hadd privtext.server Sorry, I'm making a new list right now, please try later*
+  DLF.hadd privtext.server You should use @search* for searching. @search* uses different method for searching; answers will be sent to you in .txt or .zip file.*
   inc %matches $hget(DLF.privtext.server,0).item
 
   DLF.hmake DLF.privtext.away
@@ -4952,12 +4954,11 @@ alias -l DLF.logo return $rev([dlFilter])
 alias -l DLF.StatusAll {
   var %m $c(1,9,$DLF.logo $1-)
   scon -a echo -ti2nbfs %m
-  if (($window($active).type !isin status custom listbox) || ($left($active,2) == @#)) echo -ti2a %m
+  if (($window($active).type !isin status custom listbox) || ($left($active,2) == @#)) echo -ti2na %m
 }
 alias -l DLF.Status { echo -ti2sf $c(1,9,$DLF.logo $1-) }
 alias -l DLF.Warning { DLF.StatusAll $c(1,9,$DLF.logo Warning: $1-) }
 alias -l DLF.Error {
-  echo -tabf $c(1,9,$DLF.logo $c(4,$b(Error:)) $1-)
   DLF.StatusAll $c(4,$b(Error:)) $1-
   halt
 }
