@@ -2723,7 +2723,7 @@ menu @dlF.@find.* {
       dec %i
     }
   }
-  Copy line(s): DLF.@find.CopyLines
+  $iif($DLF.Win.IsInvalidSelection,$style(2)) Copy line(s): DLF.@find.CopyLines
   $iif(!$script(AutoGet.mrc),$style(2)) Send to AutoGet: DLF.@find.SendToAutoGet
   $iif(!$script(vPowerGet.net.mrc),$style(2)) Send to vPowerGet.NET: DLF.@find.SendTovPowerGet
   Save results as a text file: DLF.@find.SaveResults
