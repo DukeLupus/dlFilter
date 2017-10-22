@@ -2884,7 +2884,7 @@ alias -l DLF.@find.Results {
     %msg = %msg $c(4,0,:: Received from $nick)
   }
   var %win $+(@dlF.@find.,$network)
-  if (!$window(%win)) window -lk0wn -t15 %win
+  if (!$window(%win)) window -lk0w -t15 %win
   if ($line(%win,0) == 0) {
     aline -n 6 %win This window shows @find results as received individually from various servers.
     aline -n 2 %win In the future you might want to use @search instead of @find as it is quicker and more efficient.
