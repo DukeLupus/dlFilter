@@ -2762,17 +2762,17 @@ menu @dlF.@find.* {
 }
 
 alias -l DLF.@find.Request {
-  hadd -mz DLF.@find.requests $+($network,$chan) 900
+  hadd -mz DLF.@find.requests $+($network,|,$chan) 900
 }
 
 alias -l DLF.@find.IsResponse {
-  var %net = $network $+ *, %ln - $+ $len($network)
+  var %net = $+($network,|*), %ln - $+ $len($network)
   var %n $hfind(DLF.@find.requests,%net,0,w).item
   var %chans
   while (%n) {
     var %netchan $hfind(DLF.@find.requests,%net,%n,w).item
-    var %chan $right(%netchan,%ln)
-    if (($left(%chan,1) isin $chantypes) && ($nick ison %chan)) {
+    var %chan $gettok(%netchan,2,$asc(|))
+    if (($nick ison %chan) $$ (!$istok(%chans,%chan,$asc($space)))) {
       DLF.Watch.Log @find.IsResponse: %chan
       %chans = %chan %chans
     }
@@ -4577,6 +4577,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce No requests found!
   DLF.hadd chantext.announce Please use !REQUEST ADD request to add a request! (!REQUEST COMMANDS for available commands)
   DLF.hadd chantext.announce Command syntax: !REQUEST ADD|FILL|UNFILL|DEL|LIST|CONFIRM|COMMANDS [parameters]
+  DLF.hadd chantext.announce ?? * packs ??  * of * slots open
   inc %matches $hget(DLF.chantext.announce,0).item
 
   DLF.hmake DLF.chantext.always
