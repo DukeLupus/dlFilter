@@ -467,11 +467,13 @@ alias -l DLF.CommandDisable {
 
 ; ========== Event splitters ==========
 alias -l DLF.Event.Input {
-  var %win $scriptwin
+  var %win $winscript
+  echo -a Win: %win
   if (@dlF.*Search.* iswm %win) DLF.Search.Show %win $1-
   elseif ($1 == /ctcp) DLF.ctcpSend.Request %win $1-
   elseif (@#* iswm %win) DLF.oNotice.Input $1-
   elseif ($DLF.Chan.IsDlfChan(%win)) {
+    echo -a Trigger: $1
     if (($1 == @find) || ($1 == @locator)) DLF.@find.Request $1-
     elseif (($left($1,1) isin !@) && ($len($1) > 1)) DLF.DccSend.Request $1-
   }
@@ -5300,7 +5302,7 @@ alias -l burko {
   return %txt
 }
 
-alias -l scriptwin {
+alias -l winscript {
   if ($window(Status window).wid == $wid) return Status
   if ($window(Message window).wid == $wid) return Message
   var %i $chan(0)
