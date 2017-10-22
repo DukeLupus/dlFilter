@@ -718,13 +718,14 @@ alias -l DLF.Chan.Set {
   %DLF.channels = $uniquetok(%DLF.channels,$asc($comma))
 }
 
-; Check if channel is set whether it is network#channel or just #channel
+; Check if channel message should be filtered
 alias -l DLF.Chan.IsChanEvent {
   DLF.Watch.Called DLF.Chan.IsChanEvent
-  var %log
+  var %log, %targetnick $DLF.Chan.TargetNick($true)
   if ($DLF.Chan.IsDlfChan($chan) == $false) %log = Not a filtered channel
   elseif ($nick == $me) %log = Me
-  elseif ($DLF.Chan.TargetNick($true) == $me) %log = About me
+  elseif (%targetnick == $me) %log = About me
+  elseif ($notify(%targetnick)) %log = Notify nick
   else DLF.Stats.Count $chan Total
   if ($DLF.Chan.IsOnlyRegUserChanEvent) %log = Filtering only regular users
   elseif ($1 == 0) %log = Filtering off for $event
