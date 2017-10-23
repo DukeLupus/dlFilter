@@ -2772,7 +2772,7 @@ alias -l DLF.@find.IsResponse {
   while (%n) {
     var %netchan $hfind(DLF.@find.requests,%net,%n,w).item
     var %chan $gettok(%netchan,2,$asc(|))
-    if (($nick ison %chan) $$ (!$istok(%chans,%chan,$asc($space)))) {
+    if (($nick ison %chan) && (!$istok(%chans,%chan,$asc($space)))) {
       DLF.Watch.Log @find.IsResponse: %chan
       %chans = %chan %chans
     }
