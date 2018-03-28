@@ -2171,7 +2171,7 @@ alias -l DLF.Win.MsgType {
 alias -l DLF.Win.Format {
   tokenize $asc($space) $1-
   var %chan
-  if (($2 !isin Private Status Message) && ($2 != $3)) %chan = : $+ $2
+  if (($2 !isin Private Status Message) && ($2 != $3) && ($chan != $null)) %chan = : $+ $chan
   if (($1 isin Normal Text Open) && ($3 == $me) && ($prefixown == 0)) return > $4-
   elseif ($1 isin Normal Text Open) return $tag($DLF.Chan.MsgNick($2,$3)) $4-
   elseif (($1 == TextSend) && ($prefixown == 0)) return > $4-
@@ -2844,6 +2844,8 @@ alias -l DLF.@find.OnlyPartial {
     }
     if (%r == $null) %r = First %displayed results displayed
     else %r = %r displaying only %displayed
+    if (%DLF.searchresults == 1) DLF.Win.Log Filter $event @find $nick $1-
+    else DLF.Win.Log Server $event @find $nick $1-
     DLF.@find.Results %list %r $c(14,:: Double click here to get the server's full list)
   }
 }
@@ -4395,6 +4397,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads En attente de joueurs, tapez !* pour lancer le Quizz!
   DLF.hadd chantext.ads @* = * songs ? * movies *
   DLF.hadd chantext.ads For a listing type..::*::.. *«UPP»*
+  DLF.hadd chantext.ads *HOST: * USER: * PASS: * PORT: *
   inc %matches $hget(DLF.chantext.ads,0).item
 
   DLF.hmake DLF.chantext.announce
@@ -4578,6 +4581,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce Please use !REQUEST ADD request to add a request! (!REQUEST COMMANDS for available commands)
   DLF.hadd chantext.announce Command syntax: !REQUEST ADD|FILL|UNFILL|DEL|LIST|CONFIRM|COMMANDS [parameters]
   DLF.hadd chantext.announce ?? * packs ??  * of * slots open
+  DLF.hadd chantext.announce the README.txt file to know how to request audiobooks*
   inc %matches $hget(DLF.chantext.announce,0).item
 
   DLF.hmake DLF.chantext.always
@@ -4806,6 +4810,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd privtext.server Lo Siento, no te puedo enviar mi lista ahora, intenta despues*
   DLF.hadd privtext.server Lo siento, pero estoy creando una nueva lista ahora*
   DLF.hadd privtext.server Sorry, I'm making a new list right now, please try later*
+  DLF.hadd privtext.server Search Result * Match* For * Copy * Paste !* To * To Request. *
   inc %matches $hget(DLF.privtext.server,0).item
 
   DLF.hmake DLF.privtext.away
@@ -4929,7 +4934,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd find.header *Note*Hey look at what i found!*
   DLF.hadd find.header *Note*MP3-MP3*
   DLF.hadd find.header *OmeN*Search Result*ServE*
-  DLF.hadd find.header *Résultat De Recherche*OmeNServE*
+  DLF.hadd find.header *Résultat De Recherche*
   DLF.hadd find.header *Resultado Da Busca*Arquivos*Pegue A Minha Lista De*@*
   DLF.hadd find.header *Resultados De Busqueda*OmenServe*
   DLF.hadd find.header *Resultados de la búsqueda*DragonServe*
@@ -5500,7 +5505,7 @@ alias DLF.Watch {
     if (($0 == 0) || ($1 == on)) {
       var %target @dlF.Watch. $+ $network
       if ($window(%target) == $null) {
-        window -k0mxD %target
+        window -k0mxDn %target
         titlebar %target -=- Watch irc messages on $network and dlF's handling of them.
       }
     }
