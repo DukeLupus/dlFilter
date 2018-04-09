@@ -1,6 +1,7 @@
 Home page: https://github.com/DukeLupus/dlFilter
 Help: https://github.com/DukeLupus/dlFilter/wiki
 Report a problem: https://gitreports.com/issue/DukeLupus/dlFilter/
+License: Mozilla Public License (MPL) 2.0, https://github.com/DukeLupus/dlFilter/blob/master/LICENSE
 
 Installation:
 
