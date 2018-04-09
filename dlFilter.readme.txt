@@ -1,11 +1,15 @@
+Home page: https://github.com/DukeLupus/dlFilter
+Help: https://github.com/DukeLupus/dlFilter/wiki
+Report a problem: https://gitreports.com/issue/DukeLupus/dlFilter/
 
 Installation:
 
 The first time you download the script, you need to install it. Once you have installed it, automated or manual updates should not need you to install it again.
-Extract the contents of DLFilter.zip to your mIRC scripts folder.
+
+Extract the contents of dlFilter.zip to your mIRC scripts folder.
 Load into mIRC by typing the following into any mIRC window and pressing enter:
 /load -rs1 dlFilter.mrc
 The dlFilter options dialog window will open for you to configure dlFilter to your needs.
+
 Note 1: dlFilter loads itself automatically as the first script to run (or the second if you are also running sbClient). This avoids problems where other scripts halt events.
 Note 2: Some other scripts may interfere with filtering, causing various problems. In particular usage of mIRC theme system (MTS) should be avoided.
-https://github.com/DukeLupus/dlFilter/wiki
