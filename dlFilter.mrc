@@ -735,7 +735,7 @@ alias -l DLF.Chan.IsChanEvent {
 }
 
 alias -l DLF.Chan.IsOnlyRegUserChanEvent {
-  if ($event !isin join part quit nick kick) return $false
+  if ($event !isin join part quit nick kick voice op deop voice devoice help dehelp serverop) return $false
   if (%DLF.filter.regular == 1) return $false
   if ($DLF.IsRegularUser($DLF.Chan.TargetNick)) return $false
   return $true
@@ -5101,10 +5101,10 @@ alias -l DLF.IsRegularUser {
 
 alias -l DLF.IsNonRegularUserChan {
   var %log
-  if ($1 isop $2) %log = Op in $2
-  elseif ($1 ishop $2) %log = HalfOp in $2
+  if (($1 isop $2) || ($event == op)) %log = Op in $2
+  elseif (($1 ishop $2) || ($event == help)) %log = HalfOp in $2
   ; Voice only indicates non-regular user in non-moderated channels
-  elseif (($1 isvoice $2) && (m !isin $chan($2).mode)) %log = Voiced in non-moderated $2
+  elseif ((($1 isvoice $2) || ($event == voice)) && (m !isin $chan($2).mode)) %log = Voiced in non-moderated $2
   else return $false
   DLF.Watch.Log Not regular user: %log
   return $true
