@@ -609,7 +609,8 @@ alias -l DLF.User.Channel {
   elseif ($me isin $1-) %log = About me
   elseif ($notify($nick)) %log = Notify user
   elseif (($event == kick) && ($notify($knick))) %log = About notify user
-  elseif ((%DLF.filter.regular == 0) && (!$DLF.IsRegularUser($nick))) %log = Filtering only regular users
+  elseif (($event == kick) && (%DLF.filter.regular == 0) && (!$DLF.IsRegularUser($knick))) %log = Filtering only regular users
+  elseif (($event != kick) && (%DLF.filter.regular == 0) && (!$DLF.IsRegularUser($nick))) %log = Filtering only regular users
   else DLF.Win.Filter $1-
   DLF.Watch.Log Not filtered: %log
 }
