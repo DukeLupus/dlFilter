@@ -389,6 +389,7 @@ ctcp ^*:PING*:?: { DLF.Priv.ctcpBlock $1- }
 ctcp *:DCC CHAT *:?: { DLF.DccChat.Chat $1- }
 ctcp *:DCC SEND *:?: { DLF.DccSend.Send $1- }
 ctcp *:*:?: { DLF.Priv.ctcp $1- }
+ctcp *:SLOTS *:%DLF.channels: { DLF.Chan.ctcp $1- }
 ctcp *:*:%DLF.channels: { if ($DLF.Chan.IsChanEvent) DLF.Chan.ctcp $1- }
 on *:ctcpreply:VERSION *: {
   if (%DLF.ops.advertpriv) DLF.Ops.VersionReply $1-
