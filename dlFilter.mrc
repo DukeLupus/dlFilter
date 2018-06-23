@@ -4060,7 +4060,7 @@ alias -l DLF.Update.CheckVersions {
       && (%DLF.version.beta > %DLF.version.web)) {
       if (%DLF.version.beta > $DLF.SetVersion) {
         var %comment %DLF.version.beta.comment
-        if ($int(%DLF.version.beta) > $int($DLF.SetVersion)) %comment = Major new version
+        if ($floor(%DLF.version.beta) > $floor($DLF.SetVersion)) %comment = Major new version
         DLF.Update.DownloadAvailable beta %DLF.version.beta %DLF.version.beta.mirc %comment
       }
       elseif (%DLF.version.beta == $DLF.SetVersion) DLF.Options.Status Running current version of dlFilter beta
@@ -4068,7 +4068,7 @@ alias -l DLF.Update.CheckVersions {
     }
     elseif (%DLF.version.web > $DLF.SetVersion) {
       var %comment %DLF.version.web.comment
-      if ($int(%DLF.version.web) > $int($DLF.SetVersion)) %comment = Major new version
+      if ($floor(%DLF.version.web) > $floor($DLF.SetVersion)) %comment = Major new version
       DLF.Update.DownloadAvailable production %DLF.version.web %DLF.version.web.mirc %comment
     }
     elseif (%DLF.version.web == $DLF.SetVersion) DLF.Options.Status Running current version of dlFilter
