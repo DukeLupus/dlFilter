@@ -64,6 +64,9 @@ dlFilter uses the following code from other people:
 2.02  Fix file get requests failing if e.g. ::INFO:: is included in the request
 2.03  Add option to prevent new query windows opening
 2.04  Record ctcp requests and process replies.
+2.05  Handle filtering of op events better (i.e. show voice / part of voiced users if settings allow)
+      Do not display ctcp SLOTS for notify users
+      Fix version checking
 
 */
 
