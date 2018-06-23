@@ -1,3 +1,3 @@
 ;id|dlf-ver|min-mirc-ver|version improvements
-dlFilter|2.04|7.44|Improved ctcpreply handling
-dlFilter.beta|2.05|7.44|Major re-release
+dlFilter|2.04|7.44|Major re-release + fixes 
+dlFilter.beta|2.05|7.44|Major re-release + fixes
