@@ -4758,6 +4758,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chanaction.spam *Now*Playing*Kbps*KHz*
   DLF.hadd chanaction.spam *[Backing Up]*
   DLF.hadd chanaction.spam *FTP*port*user*pass*
+  DLF.hadd chanaction.spam *FTP*port*/*
   DLF.hadd chanaction.spam *get AMIP*plug-in at http*amip.tools-for.net*
   DLF.hadd chanaction.spam is dAnCiNg ArOuNd *ThE *RoOm (_\_)(_/_)(_\_) MovInG' iT (_\_)(_/_)(_\_) *ShAkeN' *iT (_\_)(_/_)(_\_) *WiggLiNg' *iT (_\_)(_/_)(_\_) *JuSt *LeTTinG *iT aLL *fLoW (_\_)(_/_)(_\_)
   inc %matches $hget(DLF.chanaction.spam,0).item
