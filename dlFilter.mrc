@@ -5310,7 +5310,7 @@ alias -l func {
 ;   character could be parsed e.g. ( ) { } < > =
 alias -l tab returnex $chr(9)
 alias -l space returnex $chr(32)
-alias -l nbsp return $chr(190)
+alias -l nbsp return $chr(160)
 alias -l hashtag returnex $chr(35)
 alias -l lbr return $chr(40)
 alias -l rbr return $chr(41)
