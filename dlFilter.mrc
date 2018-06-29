@@ -3811,7 +3811,6 @@ alias -l DLF.Options.CheckForUpdates {
   DLF.Options.SetLinkedFields
   if ($1) DLF.Update.Check
   else did -r DLF.Options.GUI 190
-
 }
 
 alias -l DLF.Options.CheckForBetas {
