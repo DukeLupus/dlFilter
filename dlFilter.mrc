@@ -3325,10 +3325,11 @@ dialog -l DLF.Options.GUI {
   button "Remove", 135, 86 61 76 11, tab 1 flat disable
   list 140, 4 74 160 83, tab 1 vsbar size sort extsel
   box " Update ", 150, 4 158 160 41, tab 1
-  text "Checking for dlFilter updates...", 160, 7 166 155 8, tab 1
-  button "dlFilter website", 170, 7 175 74 11, tab 1 flat
-  button "Update dlFilter", 180, 86 175 74 11, tab 1 flat disable
-  check "Check for &beta versions", 190, 7 189 155 6, tab 1
+  check "Check for updates", 160, 7 167 74 6, tab 1
+  check "Check for &beta versions", 165, 86 167 74 6, tab 1
+  button "dlFilter website", 170, 7 176 74 11, tab 1 flat
+  button "Update dlFilter", 180, 86 176 74 11, tab 1 flat disable
+  text "Checking for dlFilter updates...", 190, 7 189 155 8, tab 1
   ; tab Filters
   box " Channel messages ", 305, 4 23 160 91, tab 3
   check "Filter other users @search / @file / @locator / !get requests", 310, 7 32 155 6, tab 3
@@ -3402,6 +3403,7 @@ dialog -l DLF.Options.GUI {
 
 alias -l DLF.Options.SetLinkedFields {
   DLF.Options.LinkedFields -545 550,555,560,565
+  DLF.Options.LinkedFields 160 -165,190
 }
 
 ; Initialise dialog
@@ -3417,6 +3419,10 @@ on *:dialog:DLF.Options.GUI:sclick:130: DLF.Options.AddChannel
 on *:dialog:DLF.Options.GUI:sclick:135: DLF.Options.RemoveChannel
 ; Channel list clicked - Enable / disable Remove channel button
 on *:dialog:DLF.Options.GUI:sclick:140: DLF.Options.SetRemoveChannelButton
+; Enable / disable check for updates
+on *:dialog:DLF.Options.GUI:sclick:160: DLF.Options.CheckForUpdates $did(DLF.Options.GUI,160).state
+; Enable / disable check for beta
+on *:dialog:DLF.Options.GUI:sclick:165: DLF.Options.CheckForBetas $did(DLF.Options.GUI,165).state
 ; Channel list double click - Remove channel and put in text box for editing and re-adding.
 on *:dialog:DLF.Options.GUI:dclick:140: DLF.Options.EditChannel
 ; Goto website button
@@ -3467,6 +3473,7 @@ alias -l DLF.Options.Initialise {
   else DLF.Chan.Set %DLF.netchans
 
   ; Channels tab - Check for updates
+  DLF.Options.InitOption update.check 1
   DLF.Options.InitOption update.betas 0
 
   ; Filter tab
@@ -3593,7 +3600,8 @@ alias -l DLF.Options.Init {
   DLF.Options.SetButtonTextFilter
   if (%DLF.serverads == 1) did -c DLF.Options.GUI 40
   DLF.Options.SetButtonTextAds
-  if (%DLF.update.betas == 1) did -c DLF.Options.GUI 190
+  if (%DLF.update.check == 1) did -c DLF.Options.GUI 160
+  if (%DLF.update.betas == 1) did -c DLF.Options.GUI 165
   if (%DLF.filter.requests == 1) did -c DLF.Options.GUI 310
   if (%DLF.filter.ads == 1) did -c DLF.Options.GUI 315
   if (%DLF.filter.topic == 1) did -c DLF.Options.GUI 320
@@ -3646,16 +3654,28 @@ alias -l DLF.Options.Init {
   DLF.Options.InitChannelList
   DLF.Options.InitCustomList
   DLF.Options.SetLinkedFields
-  DLF.Update.Run
+  DLF.Update.Check
   DLF.Options.About
 }
 
+; Enable / disable fields based on checkbox state
 alias -l DLF.Options.LinkedFields {
   var %state $did(DLF.Options.GUI,$abs($1)).state
+  ; negative checkbox id means enable when unchecked
   if ($1 < 0) %state = 1 - %state
-  if (%state) var %flags -e
-  else var %flags -cb
-  did %flags DLF.Options.GUI $2
+  var %i $numtok($2,$asc($comma))
+  while (%i) {
+    var %id $gettok($2,%i,$asc($comma))
+    if (%state) var %flags -e
+    else {
+      var %flags -b
+      ; negative linked field means clear when checkbox is disabled
+      if (%id > 0) %flags = $+(%flags,c)
+      else %flags = $+(%flags,u)
+    }
+    did %flags DLF.Options.GUI $abs(%id)
+    dec %i
+  }
 }
 
 alias -l DLF.Options.Save {
@@ -3664,7 +3684,8 @@ alias -l DLF.Options.Save {
   DLF.Groups.Events
   %DLF.showfiltered = $did(DLF.Options.GUI,30).state
   %DLF.serverads = $did(DLF.Options.GUI,40).state
-  %DLF.update.betas = $did(DLF.Options.GUI,190).state
+  %DLF.update.check = $did(DLF.Options.GUI,160).state
+  %DLF.update.betas = $did(DLF.Options.GUI,165).state
   %DLF.filter.requests = $did(DLF.Options.GUI,310).state
   %DLF.filter.ads = $did(DLF.Options.GUI,315).state
   %DLF.filter.topic = $did(DLF.Options.GUI,320).state
@@ -3782,7 +3803,20 @@ alias -l DLF.Options.ClickOption {
   DLF.Options.SetButtonTextAds
   DLF.Win.ShowHide Filter %DLF.showfiltered
   DLF.Win.ShowHide Ads. %DLF.serverads
-  if (($did == 190) && (!$sock(DLF.Socket.Update))) {
+}
+
+alias -l DLF.Options.CheckForUpdates {
+  DLF.Watch.Called DLF.Options.CheckForUpdates $1-
+  DLF.Options.Save
+  DLF.Options.SetLinkedFields
+  if ($1) DLF.Update.Check
+  else did -r DLF.Options.GUI 190
+}
+
+alias -l DLF.Options.CheckForBetas {
+  DLF.Watch.Called DLF.Options.CheckForBetas $1-
+  DLF.Options.Save
+  if (!$sock(DLF.Socket.Update)) {
     if (%DLF.update.betas == 0) DLF.Update.CheckVersions
     else DLF.Update.Run
   }
@@ -3992,7 +4026,7 @@ alias -l DLF.Options.DownloadUpdate {
 }
 
 alias -l DLF.Options.Status {
-  if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 160 1 $1-
+  if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 190 1 $1-
   DLF.StatusAll $1-
 }
 
@@ -4002,18 +4036,30 @@ alias -l DLF.Options.Error {
 ; ========== Check version for updates ==========
 ; Check once per week for normal releases and once per day if user is wanting betas
 alias -l DLF.Update.Check {
+  DLF.Watch.Called DLF.Update.Check $1-
+  if (!%DLF.update.check) {
+    DLF.Watch.Log DLF.Update.Check: Updates disabled
+    return
+  }
   var %days $ctime - %DLF.update.lastcheck
   var %days %days / 86400
   var %days $int(%days)
+  DLF.Watch.Log DLF.Update.Check: %days since last run
   if ((%days >= 7) || ((%DLF.update.betas) && (%days >= 1))) DLF.Update.Run
+  else DLF.Update.CheckVersions
 }
 
 alias -l DLF.Update.Run {
+  DLF.Watch.Called DLF.Update.Run $1-
+  if (!%DLF.update.check) {
+    DLF.Watch.Log DLF.Update.Run: Updates disabled
+    return
+  }
   if ($dialog(DLF.Options.GUI)) did -b DLF.Options.GUI 180
   DLF.Options.Status Checking for dlFilter updates...
   var %branch master
   if (%DLF.update.betas == 1) %branch = beta
-  DLF.Socket.Get Update $+(https://raw.githubusercontent.com/DukeLupus/dlFilter/,%branch,/dlFilter.version)
+  DLF.Socket.Get Update $+(https://raw.githubusercontent.com/DukeLupus/dlFilter/,master,/dlFilter.version)
 }
 
 on *:sockread:DLF.Socket.Update: {
@@ -4031,6 +4077,8 @@ on *:sockread:DLF.Socket.Update: {
     if ($sockbr == 0) break
     DLF.Update.ProcessLine %line
   }
+  DLF.Watch.Log DLF.Update.Check: Prod: Ver: %DLF.version.web requires mIRC v $+ %DLF.version.web.mirc
+  DLF.Watch.Log DLF.Update.Check: Beta: Ver: %DLF.version.beta requires mIRC v $+ %DLF.version.beta.mirc
 }
 
 on *:sockclose:DLF.Socket.Update: {
@@ -4304,7 +4352,7 @@ alias -l DLF.Socket.Error {
     var %mark $sock($sockname).mark
     var %msg $+($sockname,: http,$iif($sock($sockname).ssl,s),://,$gettok(%mark,2,$asc($space)),$gettok(%mark,3,$asc($space)),:) $1-
     sockclose $sockname
-    if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 160 1 Communications error whilst $1-
+    if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 190 1 Communications error whilst $1-
     DLF.Error %msg
   }
   else DLF.Error $1-
