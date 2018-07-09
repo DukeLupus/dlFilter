@@ -67,11 +67,12 @@ dlFilter uses the following code from other people:
 2.05  Handle filtering of op events better (i.e. show voice / part of voiced users if settings allow)
       Do not display ctcp SLOTS for notify users
       Fix version checking
+2.06  Option to disable version checking
 
 */
 
 alias -l DLF.SetVersion {
-  %DLF.version = 2.05
+  %DLF.version = 2.06
   return %DLF.version
 }
 
