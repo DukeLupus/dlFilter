@@ -1151,7 +1151,6 @@ alias -l DLF.Priv.Notice {
   DLF.Priv.NoticeServices $1-
   if ($DLF.DccSend.IsTrigger) DLF.Win.Server $1-
   DLF.Custom.Filter privnotice $1-
-  DLF.Priv.QueryOpen $1-
   var %txt $DLF.strip($1-)
   if ($hiswm(privnotice.dnd,%txt)) DLF.Win.Filter $1-
   if ($hiswm(privnotice.server,%txt)) DLF.Win.Server $1-
@@ -2247,7 +2246,7 @@ alias -l DLF.Win.Echo {
     echo %flags $+ d %col %line
     DLF.Watch.Log Echoed: To single message window
   }
-  elseif (($2 == Private) && ($query($3))) {
+  elseif (($2 == Private) && ($query($3)) && ($1 != notice)) {
     echo %flags %col $3 %line
     DLF.Watch.Log Echoed: To query window
   }
