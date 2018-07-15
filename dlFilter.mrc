@@ -4840,6 +4840,8 @@ alias -l DLF.CreateHashTables {
   DLF.hadd privtext.spam *www*xxx*
   DLF.hadd privtext.spam *xxx*http*
   DLF.hadd privtext.spam *xxx*www*
+  DLF.hadd privtext.spam *masturbate*http*
+  DLF.hadd privtext.spam *http*masturbate*
   inc %matches $hget(DLF.privtext.spam,0).item
 
   DLF.hmake DLF.privaction.spam
