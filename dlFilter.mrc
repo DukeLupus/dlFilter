@@ -589,7 +589,7 @@ alias -l DLF.Event.MeConnect {
   DLF.Watch.Called DLF.Event.MeConnect $1-
   set -ez [ [ $+(%,DLF.CONNECT.CID,$cid) ] ] 40
   DLF.Win.ChangeNetwork
-  DLF.Update.Check
+  if ($DLF.Connections == 1) DLF.Update.Check
 }
 
 alias -l DLF.Event.JustConnected {
@@ -602,6 +602,16 @@ alias -l DLF.Event.MeDisconnect {
   DLF.@find.ColourMe $event
   DLF.Ads.ColourLines $event $nick
   DLF.iSupport.Disconnect
+}
+
+alias -l DLF.Connections {
+  var %i $scon(0)
+  var %n 0
+  while (%i) {
+    if ($scon(%i).status  == connected) %n = %n + 1
+    dec %i
+  }
+  return %n
 }
 
 ; ========== Channel events ==========
