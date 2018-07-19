@@ -68,6 +68,10 @@ dlFilter uses the following code from other people:
       Do not display ctcp SLOTS for notify users
       Fix version checking
 2.06  Option to disable version checking
+2.07  Additional porn filter
+      Fix server notices shown in query window
+      Process messages (like ads) from notify users
+      Only check for updates on first connection
 
 */
 
