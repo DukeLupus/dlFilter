@@ -731,7 +731,6 @@ alias -l DLF.Chan.IsChanEvent {
   if ($DLF.Chan.IsDlfChan($chan) == $false) %log = Not a filtered channel
   elseif ($nick == $me) %log = Me
   elseif (%targetnick == $me) %log = About me
-  elseif ($notify(%targetnick)) %log = Notify nick
   else DLF.Stats.Count $chan Total
   if ($DLF.Chan.IsOnlyRegUserChanEvent) %log = Filtering only regular users
   elseif ($1 == 0) %log = Filtering off for $event
