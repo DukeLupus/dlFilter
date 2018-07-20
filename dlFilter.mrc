@@ -5709,9 +5709,9 @@ alias -l DLF.Watch.Log {
     if ($1 isin <->) DLF.Watch.Offset
     var %eventid
     if ($eventid) %eventid = $eventid
-    var %l $timestamp $+ $DLF.Watch.Offset %eventid $1-
+    var %l $timestamp $+ $DLF.Watch.Offset $burko(%eventid $1-)
     DLF.Search.Add $debug 1 %c %l
-    aline -pi %c $debug $burko(%l)
+    aline -pi %c $debug %l
   }
 }
 
