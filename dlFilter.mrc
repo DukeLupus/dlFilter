@@ -559,7 +559,11 @@ alias -l DLF.CommandDisable {
 
 ; Log to filter window if halted by a previous script
 alias -l DLF.AlreadyHalted {
-  if ($halted) DLF.Win.Log Filter $event $DLF.chan $DLF.nick Already halted: $1-
+  if ($halted) {
+    DLF.Watch.Log Filtered: Already halted by previous script: $1-
+    DLF.Win.Log Filter $event $DLF.chan $DLF.nick Already halted: $1-
+    halt
+  }
 }
 
 ; ========== Event splitters ==========
@@ -2305,6 +2309,11 @@ alias -l DLF.Win.HighlightFlag {
 
 alias -l DLF.Win.Echo {
   DLF.Watch.Log DLF.Win.Echo $1-
+  if ($halted) {
+    DLF.Watch.Log Filtered: Already halted by previous script: $1-
+    DLF.Win.Log Filter $1-3 Already halted: $4-
+    return
+  }
   var %line $DLF.Win.Format($1-)
   var %col $DLF.Win.MsgType($1)
   var %flags -tci2rlbf $+ $DLF.Win.HighlightFlag($1)
