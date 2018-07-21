@@ -293,7 +293,6 @@ on ^*:join:#: {
   if ($shortjoinsparts) %joins = Joins:
   else %joined = has joined $chan $+ %txt
   DLF.Event.Join %joins $nick $br($address) %joined %txt
-  DLF.AlreadyHalted $1-
 }
 on me:*:join:#: {
   DLF.Event.MeJoin $1-
@@ -315,12 +314,10 @@ on ^*:kick:#: {
   if ($shortjoinsparts) %addr = $br($address($knick,5))
   else %fromchan = from $chan
   DLF.Event.Kick $knick %addr was kicked %fromchan by $nick %txt
-  DLF.AlreadyHalted $1-
 }
 on ^*:nick: {
   if ($nick == $newnick) DLF.Halt Nick failed.
   DLF.Event.Nick $nick is now known as $newnick
-  DLF.AlreadyHalted $1-
 }
 on ^*:quit: {
   var %txt, %quits, %quit
@@ -328,90 +325,84 @@ on ^*:quit: {
   if ($shortjoinsparts) %quits = Quits:
   else %quit = quit
   DLF.Event.Quit $nick %quits $nick $br($address) %quit %txt
-  DLF.AlreadyHalted $1-
 }
 on me:*:quit: {
   DLF.Event.MeQuit $1-
-  DLF.AlreadyHalted $1-
 }
 on *:connect: {
   DLF.Event.MeConnect $1-
-  DLF.AlreadyHalted $1-
 }
 on *:disconnect: {
   DLF.Event.MeDisconnect $1-
-  DLF.AlreadyHalted $1-
 }
 
 ; User mode changes
 ; ban, unban, op, deop, voice, devoice etc.
 on ^*:ban:%DLF.channels: {
   if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$bnick)) DLF.Chan.Mode $1-
-  DLF.AlreadyHalted $1-
 }
 on ^*:unban:%DLF.channels: {
   if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$bnick)) DLF.Chan.Mode $1-
-  DLF.AlreadyHalted $1-
 }
 
 on ^*:op:%DLF.channels: {
   if ($opnick != $me) DLF.oNotice.AddNick
   else DLF.oNotice.AddChanNicks
   if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1-
-  DLF.AlreadyHalted $1-
 }
 
 on ^*:deop:%DLF.channels: {
   DLF.oNotice.DelNick
   if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1-
-  DLF.AlreadyHalted $1-
 }
 
 on ^*:owner:%DLF.channels: {
   if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1-
-  DLF.AlreadyHalted $1-
 }
 on ^*:deowner:%DLF.channels: {
   if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1-
-  DLF.AlreadyHalted $1-
 }
 on ^*:voice:%DLF.channels: {
   if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$vnick)) DLF.Chan.Mode $1-
-  DLF.AlreadyHalted $1-
 }
 on ^*:devoice:%DLF.channels: {
   if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$vnick)) DLF.Chan.Mode $1-
-  DLF.AlreadyHalted $1-
 }
 on ^*:serverop:%DLF.channels: {
   if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1-
-  DLF.AlreadyHalted $1-
 }
 on ^*:serverdeop:%DLF.channels: {
   if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$opnick)) DLF.Chan.Mode $1-
-  DLF.AlreadyHalted $1-
 }
 on ^*:servervoice:%DLF.channels: {
   if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$vnick)) DLF.Chan.Mode $1-
-  DLF.AlreadyHalted $1-
 }
 on ^*:serverdevoice:%DLF.channels: {
   if ($DLF.Chan.IsChanEvent(%DLF.filter.modesuser,$vnick)) DLF.Chan.Mode $1-
-  DLF.AlreadyHalted $1-
 }
 on ^*:mode:%DLF.channels: {
   if ($DLF.Chan.IsChanEvent(%DLF.filter.modeschan)) DLF.Chan.Mode $1-
-  DLF.AlreadyHalted $1-
 }
 on ^*:servermode:%DLF.channels: {
   if ($DLF.Chan.IsChanEvent(%DLF.filter.modeschan)) DLF.Chan.Mode $1-
-  DLF.AlreadyHalted $1-
 }
 
 ; filter topic changes and when joining channel
-on ^*:topic:%DLF.channels: { if ($DLF.Chan.IsChanEvent(%DLF.filter.topic)) DLF.Win.Filter $nick changes topic to: $sqt($1-) }
-raw 332:*: { if (($DLF.Chan.IsDlfChan($2)) && (%DLF.filter.topic == 1)) DLF.Win.Log Filter $event $DLF.chan $DLF.nick Topic is: $sqt($3-) }
-raw 333:*: { if (($DLF.Chan.IsDlfChan($2)) && (%DLF.filter.topic == 1)) DLF.Win.Filter Set by $3 on $asctime($4,ddd mmm dd HH:nn:ss yyyy) }
+on ^*:topic:%DLF.channels: {
+  DLF.Watch.Called $null : $1-
+  DLF.AlreadyHalted $1-
+  if ($DLF.Chan.IsChanEvent(%DLF.filter.topic)) DLF.Win.Filter $nick changes topic to: $sqt($1-)
+}
+raw 332:*: {
+  DLF.Watch.Called $null : $1-
+  DLF.AlreadyHalted $1-
+  if (($DLF.Chan.IsDlfChan($2)) && (%DLF.filter.topic == 1)) DLF.Win.Filter Topic is: $sqt($3-)
+}
+raw 333:*: {
+  DLF.Watch.Called $null : $1-
+  DLF.AlreadyHalted $1-
+  if (($DLF.Chan.IsDlfChan($2)) && (%DLF.filter.topic == 1)) DLF.Win.Filter Set by $3 on $asctime($4,ddd mmm dd HH:nn:ss yyyy)
+}
 
 on *:input:*: { DLF.Event.Input $1- }
 on *:filercvd:*: DLF.DccSend.FileRcvd $1-
@@ -421,17 +412,14 @@ on *:getfail:*: DLF.DccSend.GetFailed $1-
 on ^*:text:*:%DLF.channels: {
   if ($DLF.oNotice.IsoNotice) DLF.oNotice.Channel $1-
   if ($DLF.Chan.IsChanEvent) DLF.Chan.Text $1-
-  DLF.AlreadyHalted $1-
 }
 on ^*:action:*:%DLF.channels: {
   if ($DLF.oNotice.IsoNotice) DLF.oNotice.Channel $1-
   if ($DLF.Chan.IsChanEvent) DLF.Chan.Action $1-
-  DLF.AlreadyHalted $1-
 }
 on ^*:notice:*:%DLF.channels: {
   if ($DLF.oNotice.IsoNotice) DLF.oNotice.Channel $1-
   if ($DLF.Chan.IsChanEvent) DLF.Chan.Notice $1-
-  DLF.AlreadyHalted $1-
 }
 ; oNotice events
 on ^@*:text:*:#: { if ($DLF.oNotice.IsoNotice) DLF.oNotice.Channel $1- }
@@ -446,27 +434,21 @@ on ^*:open:?:*$decode*: { DLF.Priv.DollarDecode $1- }
 
 on ^*:text:*:?: {
   DLF.Priv.Text $1-
-  DLF.AlreadyHalted $1-
 }
 on ^*:notice:DCC CHAT *:?: {
   DLF.DccChat.ChatNotice $1-
-  DLF.AlreadyHalted $1-
 }
 on ^*:notice:DCC SEND *:?: {
   DLF.DccSend.SendNotice $1-
-  DLF.AlreadyHalted $1-
-}
-on ^*:notice:*:?: {
-  DLF.Priv.Notice $1-
-  DLF.AlreadyHalted $1-
 }
 on ^*:action:*:?: {
   DLF.Priv.Action $1-
-  DLF.AlreadyHalted $1-
+}
+on ^*:notice:*:?: {
+  DLF.Priv.Notice $1-
 }
 on ^*:open:?:*: {
   DLF.Priv.Open $1-
-  DLF.AlreadyHalted $1-
 }
 
 ; ctcp
@@ -558,12 +540,7 @@ alias -l DLF.CommandDisable {
 }
 
 ; Log to filter window if halted by a previous script
-alias -l DLF.AlreadyHalted {
-  if ($halted) {
-    DLF.Watch.Log Filtered: Already halted by previous script: $1-
-    halt
-  }
-}
+alias -l DLF.AlreadyHalted { if ($halted) DLF.Watch.Log Filtered: Already halted by previous script: $1- }
 
 ; ========== Event splitters ==========
 alias -l DLF.Event.Input {
@@ -608,6 +585,7 @@ alias -l DLF.Event.ctcpReply {
 
 alias -l DLF.Event.Join {
   DLF.Watch.Called DLF.Event.Join : $1-
+  DLF.AlreadyHalted $1-
   DLF.@find.ColourNick $nick 3
   if ($DLF.Chan.IsChanEvent) {
     DLF.Ads.ColourLines $event $nick $chan
@@ -647,6 +625,7 @@ alias -l DLF.Event.MePart {
 
 alias -l DLF.Event.Kick {
   DLF.Watch.Called DLF.Event.Kick : $1-
+  DLF.AlreadyHalted $1-
   DLF.oNotice.DelNick
   DLF.@find.ColourNick $knick 14
   if ($DLF.Chan.IsChanEvent) {
@@ -657,6 +636,7 @@ alias -l DLF.Event.Kick {
 
 alias -l DLF.Event.Nick {
   DLF.Watch.Called DLF.Event.Nick : $1-
+  DLF.AlreadyHalted $1-
   DLF.oNotice.NickChg $1-
   DLF.Ops.NickChg
   DLF.Ads.NickChg
@@ -666,6 +646,7 @@ alias -l DLF.Event.Nick {
 
 alias -l DLF.Event.Quit {
   DLF.Watch.Called DLF.Event.Quit : $1-
+  DLF.AlreadyHalted $1-
   DLF.oNotice.DelNickAllChans
   DLF.@find.ColourNick $nick 14
   if ($DLF.Chan.IsUserEvent) {
@@ -676,12 +657,14 @@ alias -l DLF.Event.Quit {
 
 alias -l DLF.Event.MeQuit {
   DLF.Watch.Called DLF.Event.MeQuit : $1-
+  DLF.AlreadyHalted $1-
   DLF.@find.ColourMe $event
   DLF.Ads.ColourLines $event $nick
 }
 
 alias -l DLF.Event.MeConnect {
   DLF.Watch.Called DLF.Event.MeConnect : $1-
+  DLF.AlreadyHalted $1-
   set -ez [ [ $+(%,DLF.CONNECT.CID,$cid) ] ] 40
   DLF.Win.ChangeNetwork
   if ($DLF.Connections == 1) DLF.Update.Check
@@ -694,6 +677,7 @@ alias -l DLF.Event.JustConnected {
 
 alias -l DLF.Event.MeDisconnect {
   DLF.Watch.Called DLF.Event.MeDisconnect : $1-
+  DLF.AlreadyHalted $1-
   DLF.@find.ColourMe $event
   DLF.Ads.ColourLines $event $nick
   DLF.iSupport.Disconnect
@@ -761,6 +745,7 @@ alias -l DLF.User.NoChannel {
 ; ban unban voice devoice etc.
 alias -l DLF.Chan.Mode {
   DLF.Watch.Called DLF.Chan.Mode $nick $+ : $1-
+  DLF.AlreadyHalted $1-
   if ($nick == $me) {
     DLF.Watch.Log Not filtered: Me
     return
@@ -843,7 +828,7 @@ alias -l DLF.Chan.IsChanEvent {
     DLF.Watch.Log Is DLF channel event: %nick in $chan
     return $true
   }
-  DLF.Watch.Log Not filtered: %log $+ %nick in $chan
+  DLF.Watch.Log Not filtered: %log $+ : %nick in $chan
   return $false
 }
 
@@ -900,6 +885,7 @@ alias -l DLF.Chan.IsUserEvent {
 
 alias -l DLF.Chan.Text {
   DLF.Watch.Called DLF.Chan.Text : $1-
+  DLF.AlreadyHalted $1-
   ; Remove leading and double spaces
   var %txt $DLF.strip($1-)
   if (%txt == $null) {
@@ -945,6 +931,7 @@ alias -l DLF.Chan.Text {
 
 alias -l DLF.Chan.Action {
   DLF.Watch.Called DLF.Chan.Action : $1-
+  DLF.AlreadyHalted $1-
   DLF.Custom.Filter chanaction $1-
   var %txt $DLF.strip($1-)
   if ((%DLF.filter.ads == 1) && ($hiswm(chanaction.spam,%txt))) DLF.Win.Filter $1-
@@ -955,6 +942,7 @@ alias -l DLF.Chan.Action {
 
 alias -l DLF.Chan.Notice {
   DLF.Watch.Called DLF.Chan.Notice : $1-
+  DLF.AlreadyHalted $1-
   DLF.Custom.Filter channotice $1-
   var %txt $DLF.strip($1-)
   if ($hiswm(channotice.spam,%txt)) DLF.Chan.SpamFilter $1-
@@ -1048,7 +1036,7 @@ alias -l DLF.Chan.SetNickColour {
     var %c $color(Highlight)
     if ($1) var %nick $1
     else var %nick $nick
-    if ($event != signal) DLF.Watch.Called DLF.Chan.SetNickColour %nick $+ : $2-
+    if ($event == signal) DLF.Watch.Called DLF.Chan.SetNickColour %nick $+ : $2-
     var %i $comchan(%nick,0)
     while (%i) {
       var %chan $comchan(%nick,%i)
@@ -1215,12 +1203,15 @@ alias -l DLF.Trivia.Answer {
 ; ========== Private messages ==========
 alias -l DLF.Priv.Open {
   DLF.Watch.Called DLF.Priv.Open : $1-
+  DLF.AlreadyHalted $1-
+  if ($halted) return
   if ($gettok($rawmsg,4,$asc($space)) === $+(:,$chr(1),ACTION)) DLF.Priv.Action $1-
   else DLF.Priv.Text $1-
 }
 
 alias -l DLF.Priv.Text {
   DLF.Watch.Called DLF.Priv.Text : $1-
+  DLF.AlreadyHalted $1-
   DLF.@find.Response $1-
   if ($DLF.DccSend.IsTrigger) DLF.Win.Server $1-
   DLF.Custom.Filter privtext $1-
@@ -1240,6 +1231,7 @@ alias -l DLF.Priv.Text {
 
 alias -l DLF.Priv.Action {
   DLF.Watch.Called DLF.Priv.Action : $1-
+  DLF.AlreadyHalted $1-
   if ($event != open) DLF.Priv.QueryOpen $1-
   DLF.Custom.Filter privaction $1-
   if ((%DLF.filter.spampriv == 1) && ($hiswm(privaction.spam,%txt))) DLF.Priv.SpamFilter $1-
@@ -1254,6 +1246,7 @@ alias -l DLF.Priv.Action {
 
 alias -l DLF.Priv.Notice {
   DLF.Watch.Called DLF.Priv.Notice : $1-
+  DLF.AlreadyHalted $1-
   DLF.@find.Response $1-
   DLF.Priv.NoticeServices $1-
   if ($DLF.DccSend.IsTrigger) DLF.Win.Server $1-
@@ -1752,6 +1745,7 @@ alias -l DLF.DccSend.Rejoin {
 
 alias -l DLF.DccSend.SendNotice {
   DLF.Watch.Called DLF.DccSend.SendNotice : $1-
+  DLF.AlreadyHalted $1-
   var %req $DLF.DccSend.GetRequest($3-)
   if (%req == $null) return
   var %chan $gettok(%req,2,$asc(|))
@@ -1958,6 +1952,7 @@ alias DLF.Requests {
 
 alias -l DLF.DccChat.ChatNotice {
   DLF.Watch.Called DLF.DccChat.ChatNotice : $1-
+  DLF.AlreadyHalted $1-
   if ((%DLF.private.nocomchan == 1) && ($comchan($nick,0) == 0)) {
     DLF.Watch.Log DCC CHAT will be blocked: No common channel
     DLF.Win.Log Filter Warning Private $nick DCC Chat will be blocked because user is not in a common channel:
