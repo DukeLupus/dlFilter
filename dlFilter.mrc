@@ -561,7 +561,6 @@ alias -l DLF.CommandDisable {
 alias -l DLF.AlreadyHalted {
   if ($halted) {
     DLF.Watch.Log Filtered: Already halted by previous script: $1-
-    DLF.Win.Log Filter $event $DLF.chan $DLF.nick Already halted: $1-
     halt
   }
 }
@@ -2317,7 +2316,6 @@ alias -l DLF.Win.Echo {
   DLF.Watch.Log DLF.Win.Echo $1-
   if ($halted) {
     DLF.Watch.Log Filtered: Already halted by previous script: $1-
-    DLF.Win.Log Filter $1-3 Already halted: $4-
     return
   }
   var %line $DLF.Win.Format($1-)
