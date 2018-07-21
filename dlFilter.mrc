@@ -3769,7 +3769,7 @@ alias -l DLF.Options.IsOp {
     scon %i
     var %j $chan(0)
     while (%j) {
-      if ($me isop $chan(%j)) {
+      if (($DLF.Chan.IsDlfChan($chan(%j))) && ($me isop $chan(%j))) {
         scon -r
         return $true
       }
