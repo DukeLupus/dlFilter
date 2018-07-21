@@ -72,6 +72,9 @@ dlFilter uses the following code from other people:
       Fix server notices shown in query window
       Process messages (like ads) from notify users
       Only check for updates on first connection
+      DLF.Watch timestamps coloured correctly as per mIRC timestamp setting.
+      Improvements to DLF.Watch messages
+      Only enable Ops tab if Ops in DLF channel not if only ops in non-DLF channel.
 
 */
 
