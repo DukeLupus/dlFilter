@@ -1776,6 +1776,11 @@ alias -l DLF.DccSend.IsNotGetCommand {
 }
 
 alias -l DLF.DccSend.GetFailed {
+
+; To try to identify when user cancels, report the $get and $window properties to status window
+; echo -s DCC get: Nick: $get(-1) $+ , Size: $get(-1).size $+ , Secs: $get(-1).secs $+ , Rcvd: $get(-1).rcvd $+ , Idle: $get(-1).idle $+ , Wid: $get(-1).wid $+ , Active: $activewid
+; return
+
   var %fn $nopath($filename)
   DLF.Watch.Called DLF.DccSend.GetFailed %fn : $1-
   var %req $DLF.DccSend.GetRequest(%fn)
