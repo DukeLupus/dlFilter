@@ -895,7 +895,7 @@ alias -l DLF.Chan.IsUserEvent {
     DLF.Watch.Log Not filtered: %log $+ : %nick
     return $false
   }
-  DLF.Watch.Log Filtering: $nick in $chan
+  DLF.Watch.Log Filtering: $nick
   return $true
 }
 
