@@ -75,6 +75,7 @@ dlFilter uses the following code from other people:
       DLF.Watch timestamps coloured correctly as per mIRC timestamp setting.
       Improvements to DLF.Watch messages
       Only enable Ops tab if Ops in DLF channel not if only ops in non-DLF channel.
+      Respect Enable Custom Filters global setting.
 
       Run DLF last rather than first in order to avoid cvausing issues with other scripts. See Github #44.
       DLF is intended to filter stuff from the screen not from other scripts.
@@ -2034,6 +2035,7 @@ alias -l DLF.SearchBot.TTL { return 86400 }
 
 ; ========== Custom Filters ==========
 alias -l DLF.Custom.Filter {
+  if (!%DLF.custom.enabled) return
   DLF.Watch.Called DLF.Custom.Filter : $1-
   var %filt $1
   var %hiswm $+(custfilt.,%filt)
