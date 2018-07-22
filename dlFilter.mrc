@@ -72,6 +72,9 @@ dlFilter uses the following code from other people:
       Fix server notices shown in query window
       Process messages (like ads) from notify users
       Only check for updates on first connection
+      DLF.Watch timestamps coloured correctly as per mIRC timestamp setting.
+      Improvements to DLF.Watch messages
+      Only enable Ops tab if Ops in DLF channel not if only ops in non-DLF channel.
 
       Run DLF last rather than first in order to avoid cvausing issues with other scripts. See Github #44.
       DLF is intended to filter stuff from the screen not from other scripts.
@@ -1214,7 +1217,7 @@ alias -l DLF.Trivia.Answer {
 alias -l DLF.Priv.Open {
   DLF.Watch.Called DLF.Priv.Open : $1-
   DLF.AlreadyHalted $1-
-  if ($halted) return
+  if ($halted) halt
   if ($gettok($rawmsg,4,$asc($space)) === $+(:,$chr(1),ACTION)) DLF.Priv.Action $1-
   else DLF.Priv.Text $1-
 }
@@ -1869,6 +1872,11 @@ alias -l DLF.DccSend.IsNotGetCommand {
 }
 
 alias -l DLF.DccSend.GetFailed {
+
+; To try to identify when user cancels, report the $get and $window properties to status window
+; echo -s DCC get: Nick: $get(-1) $+ , Size: $get(-1).size $+ , Secs: $get(-1).secs $+ , Rcvd: $get(-1).rcvd $+ , Idle: $get(-1).idle $+ , Wid: $get(-1).wid $+ , Active: $activewid
+; return
+
   var %fn $nopath($filename)
   DLF.Watch.Called DLF.DccSend.GetFailed %fn : $1-
   var %req $DLF.DccSend.GetRequest(%fn)
@@ -3870,7 +3878,7 @@ alias -l DLF.Options.IsOp {
     scon %i
     var %j $chan(0)
     while (%j) {
-      if ($me isop $chan(%j)) {
+      if (($DLF.Chan.IsDlfChan($chan(%j))) && ($me isop $chan(%j))) {
         scon -r
         return $true
       }
