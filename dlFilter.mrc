@@ -481,19 +481,27 @@ raw 301:*: { DLF.Away.Filter $1- }
 ; Show messages in status AND active windows (rather than just status)
 ; Unknown command / No such nick/channel / Nickname is already in use / Nick change too fast
 raw 401:*: {
-  echo -astc Info * $2-
+  DLF.Watch.Called $null : $1-
+  DLF.AlreadyHalted $1-
+  if (!$halted) echo -astc Info * $2-
   halt
 }
 raw 421:*: {
-  echo -astc Info * $2-
+  DLF.Watch.Called $null : $1-
+  DLF.AlreadyHalted $1-
+  if (!$halted) echo -astc Info * $2-
   halt
 }
 raw 433:*: {
-  echo -astc Info * $2-
+  DLF.Watch.Called $null : $1-
+  DLF.AlreadyHalted $1-
+  if (!$halted) echo -astc Info * $2-
   halt
 }
 raw 438:*: {
-  echo -astc Info * $2-
+  DLF.Watch.Called $null : $1-
+  DLF.AlreadyHalted $1-
+  if (!$halted) echo -astc Info * $2-
   halt
 }
 
@@ -602,6 +610,7 @@ alias -l DLF.Event.MeJoin {
 
 alias -l DLF.Event.MeJoinComplete {
   DLF.Watch.Called DLF.Event.MeJoinComplete : $1-
+  DLF.AlreadyHalted $1-
   DLF.@find.ColourMe Join $2
   if ($DLF.Chan.IsDlfChan($2)) DLF.Ads.ColourLines Join $1-2
 }
@@ -726,7 +735,9 @@ alias -l DLF.User.NoChannel {
     var %i $comchan(%nick,0)
     while (%i) {
       var %chan $comchan(%nick,%i)
-      if (($nick == $me) || ($DLF.Chan.IsDlfChan(%chan) == $false)) echo -tc $event %chan * $1-
+      if (($nick == $me) || ($DLF.Chan.IsDlfChan(%chan) == $false)) {
+        if (!$halted) echo -tc $event %chan * $1-
+      }
       else {
         DLF.Stats.Count %chan Total
         %dlfchan = $true
@@ -1398,6 +1409,7 @@ alias -l DLF.Priv.ctcpReply.Version {
 ; ========== away responses ==========
 alias -l DLF.Away.Filter {
   DLF.Watch.Called DLF.Away.Filter : $1-
+  DLF.AlreadyHalted $1-
   if (%DLF.filter.aways == 1) DLF.Win.Filter $3-
 }
 
