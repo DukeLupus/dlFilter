@@ -2112,7 +2112,7 @@ alias -l DLF.Win.Log {
 
 alias -l DLF.Win.Ads {
   DLF.Watch.Called DLF.Win.Ads : $1-
-  DLF.Ads.Add $1-
+  DLF.Ads.Add $DLF.strip($1-)
   DLF.Win.AdsAnnounce $1-
 }
 
@@ -2401,7 +2401,7 @@ alias -l DLF.Ads.Add {
     aline -n 1 %win $crlf
   }
   if ($0 == 0) return
-  var %line $DLF.Win.LineFormat($event $chan $nick $replace($DLF.strip($1-),$tab,$null))
+  var %line $DLF.Win.LineFormat($event $chan $nick $replace($1-,$tab,$null))
   var %ad $gettok(%line,3-,$asc($space))
   while ($left(%ad,1) == $space) %ad = $right(%ad,-1)
   while ((%ad != $null) && (($left(%ad,1) !isletter) || ($asc($left(%ad,1)) >= 192))) %ad = $deltok(%ad,1,$asc($space))
