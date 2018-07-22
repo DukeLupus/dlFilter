@@ -2117,7 +2117,7 @@ alias -l DLF.Win.Ads {
 }
 
 alias -l DLF.Win.AdsAnnounce {
-  DLF.Watch.Called DLF.Win.AdsAnnounce
+  DLF.Watch.Called DLF.Win.AdsAnnounce : $1-
   DLF.Chan.SetNickColour
   if (%DLF.filter.ads == 1) DLF.Win.Filter $1-
 }
