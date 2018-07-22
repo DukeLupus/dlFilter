@@ -117,7 +117,6 @@ on *:start: {
 
 alias DLF.Reload {
   .timer 1 0 .signal DLF.Initialise
-  echo -a .reload -rs $+ $1 $qt($script)
   .reload -rs $+ $1 $qt($script)
   halt
 }
