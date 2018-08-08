@@ -465,7 +465,6 @@ ctcp ^*:PING*:?: { DLF.Priv.ctcpBlock $1- }
 ctcp *:DCC CHAT *:?: { DLF.DccChat.Chat $1- }
 ctcp *:DCC SEND *:?: { DLF.DccSend.Send $1- }
 ctcp *:*:?: { DLF.Priv.ctcp $1- }
-ctcp *:SLOTS *:%DLF.channels: { DLF.Chan.ctcp $1- }
 ctcp *:*:%DLF.channels: { if ($DLF.Chan.IsChanEvent) DLF.Chan.ctcp $1- }
 on *:ctcpreply:VERSION *: {
   if (%DLF.ops.advertpriv) DLF.Ops.VersionReply $1-
@@ -714,11 +713,11 @@ alias -l DLF.User.Channel {
   if ($nick == $me) %log = Me
   elseif ($me isin $1-) %log = About me
   elseif ($notify($nick)) %log = Notify user
-  elseif (($event == kick) && ($notify($knick))) %log = About notify user
+  elseif (($event == kick) && ($notify($knick))) %log = About a notify user
   elseif (($event == kick) && (%DLF.filter.regular == 0) && (!$DLF.IsRegularUser($knick))) %log = Filtering only regular users
   elseif (($event != kick) && (%DLF.filter.regular == 0) && (!$DLF.IsRegularUser($nick))) %log = Filtering only regular users
   else DLF.Win.Filter $1-
-  DLF.Watch.Log Not filtered: %log
+  DLF.Watch.Log Not filtered: User event in channel: %log
 }
 
 ; Non-channel user activity
@@ -842,7 +841,7 @@ alias -l DLF.Chan.IsChanEvent {
     DLF.Watch.Log Is DLF channel event: %nick in $chan
     return $true
   }
-  DLF.Watch.Log Not filtered: %log $+ : %nick in $chan
+  DLF.Watch.Log Not filtered: Channel event not in DLF channel: %log $+ : %nick in $chan
   return $false
 }
 
@@ -890,10 +889,10 @@ alias -l DLF.Chan.IsUserEvent {
   elseif ((%DLF.filter.regular == 0) && (!$DLF.IsRegularUser(%nick))) %log = Filtering only regular users
   elseif (($notify($nick)) || ($notify($DLF.Chan.TargetNick($true)))) %log = Notify user
   if (%log) {
-    DLF.Watch.Log Not filtered: %log $+ : %nick
+    DLF.Watch.Log Not filtered: User event: %log $+ : %nick
     return $false
   }
-  DLF.Watch.Log Filtering: $nick
+  DLF.Watch.Log Filtered: User event: %nick
   return $true
 }
 
@@ -1038,9 +1037,8 @@ alias -l DLF.Chan.IsCmd {
 }
 
 alias -l DLF.Chan.ControlCodes {
-  DLF.Watch.Called DLF.Chan.ControlCodes : $1-
   if ((%DLF.filter.controlcodes == 1) && ($strip($1-) != $1-)) {
-    DLF.Watch.Log Filtered: Contains control codes
+    DLF.Watch.Log Filtered: Contains control codes: $1-
     DLF.Win.Filter $1-
   }
 }
@@ -1343,9 +1341,9 @@ alias -l DLF.Priv.QueryOpen {
   if (%DLF.private.query != 1) return
   var %notify $notify($nick)
   if ((%notify) || (($query($nick)) && ($event != open))) {
-    if (%notify) DLF.Watch.Log Private $event from notify user
-    else DLF.Watch.Log Query window exists for private $event from $nick
-    ; Echo this ourselves so that notices / ctcp / ctcpreply go to the query / single message window
+    if (%notify) DLF.Watch.Log Not filtered: Private $event from notify user
+    else DLF.Watch.Log Not filtered: Query window exists for private $event from $nick
+    ; Echo this ourselves so that ctcp / ctcpreply go to the query / single message window
     DLF.Win.Echo $event Private $nick $1-
     halt
   }
@@ -1420,7 +1418,7 @@ alias -l DLF.Away.Filter {
 ; ==========  Filtering Stats in titlebar ==========
 alias -l DLF.Stats.Count {
   hinc -m DLF.stats $+($network,$1,|,$2)
-  DLF.Watch.Log Stats: Total $hget(DLF.stats, $+($network,$1,|Total)) $+ , Filtered $hget(DLF.stats, $+($network,$1,|Filter)) $+ : $1-
+  DLF.Watch.Log Stats for $1- $+ : Total $hget(DLF.stats, $+($network,$1,|Total)) $+ , Filtered $hget(DLF.stats, $+($network,$1,|Filter))
 }
 alias -l DLF.Stats.Get { return $hget(DLF.stats,$+($network,$1,|,$2)) }
 alias -l DLF.Stats.TitleText { return $+(dlFilter efficiency:,$space,$1,%) }
@@ -2209,12 +2207,12 @@ alias -l DLF.Win.Log {
 
 alias -l DLF.Win.Ads {
   DLF.Watch.Called DLF.Win.Ads : $1-
-  DLF.Ads.Add $1-
+  DLF.Ads.Add $DLF.strip($1-)
   DLF.Win.AdsAnnounce $1-
 }
 
 alias -l DLF.Win.AdsAnnounce {
-  DLF.Watch.Called DLF.Win.AdsAnnounce
+  DLF.Watch.Called DLF.Win.AdsAnnounce : $1-
   DLF.Chan.SetNickColour
   if (%DLF.filter.ads == 1) DLF.Win.Filter $1-
 }
@@ -2502,7 +2500,7 @@ alias -l DLF.Ads.Add {
     aline -n 1 %win $crlf
   }
   if ($0 == 0) return
-  var %line $DLF.Win.LineFormat($event $chan $nick $replace($DLF.strip($1-),$tab,$null))
+  var %line $DLF.Win.LineFormat($event $chan $nick $replace($1-,$tab,$null))
   var %ad $gettok(%line,3-,$asc($space))
   while ($left(%ad,1) == $space) %ad = $right(%ad,-1)
   while ((%ad != $null) && (($left(%ad,1) !isletter) || ($asc($left(%ad,1)) >= 192))) %ad = $deltok(%ad,1,$asc($space))
