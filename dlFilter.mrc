@@ -76,7 +76,7 @@ dlFilter uses the following code from other people:
       Improvements to DLF.Watch messages
       Only enable Ops tab if Ops in DLF channel not if only ops in non-DLF channel.
       Respect Enable Custom Filters global setting.
-      Fix filter stats showing > 100% due to miscounting of CTCP SLOTS messages from fileservers.
+      Fix filter stats showing > 100% due to miscounting of CTCP SLOTS from fileservers and notify user messages.
       Respect global option to enable / disable Custom Filters.
 
       Run DLF last rather than first in order to avoid causing issues with other scripts. See Github #44.
@@ -754,6 +754,7 @@ alias -l DLF.User.NoChannel {
       dec %i
     }
   }
+  if ($DLF.Chan.IsNotify) return
   if (%dlfchan) DLF.Win.Log Filter $event $hashtag $nick $1-
   else DLF.Watch.Log Echoed to all common $network channels
   halt
@@ -769,6 +770,7 @@ alias -l DLF.Chan.Mode {
     DLF.Watch.Log Not filtered: Me
     return
   }
+  if ($DLF.Chan.IsNotify) return
   DLF.Win.Log Filter Mode $chan $nick $nick sets mode: $1-
   halt
 }
@@ -885,6 +887,13 @@ alias -l DLF.Chan.TargetNick {
   else return $nick
 }
 
+alias -l DLF.Chan.IsNotify {
+  var %nick $DLF.Chan.TargetNick
+  if (!$notify(%nick)) return $false
+  DLF.Watch.Log Notify user: %nick
+  return $true
+}
+
 ; Check whether non-channel event (quit or nickname) is from a network where we are in a defined channel
 alias -l DLF.Chan.IsUserEvent {
   var %nick $DLF.Chan.TargetNick
@@ -952,6 +961,7 @@ alias -l DLF.Chan.Action {
   DLF.Watch.Called DLF.Chan.Action : $1-
   DLF.AlreadyHalted $1-
   DLF.Custom.Filter chanaction $1-
+  if ($DLF.Chan.IsNotify) return
   var %txt $DLF.strip($1-)
   if ((%DLF.filter.ads == 1) && ($hiswm(chanaction.spam,%txt))) DLF.Win.Filter $1-
   if ((%DLF.filter.aways == 1) && ($hiswm(chanaction.away,%txt))) DLF.Win.Filter $1-
@@ -963,6 +973,7 @@ alias -l DLF.Chan.Notice {
   DLF.Watch.Called DLF.Chan.Notice : $1-
   DLF.AlreadyHalted $1-
   DLF.Custom.Filter channotice $1-
+  if ($DLF.Chan.IsNotify) return
   var %txt $DLF.strip($1-)
   if ($hiswm(channotice.spam,%txt)) DLF.Chan.SpamFilter $1-
   if ((%txt != $1-) && ($hiswm(channotice.trivia,%txt))) DLF.Win.Filter $1-
@@ -976,6 +987,7 @@ alias -l DLF.Chan.ctcp {
   DLF.Watch.Called DLF.Chan.ctcp : $1-
   if ($1 == SLOTS) DLF.SearchBot.GetTriggers
   DLF.Custom.Filter chanctcp $1-
+  if (($1 !== SLOTS) && ($DLF.Chan.IsNotify)) return
   if ($hiswm(chanctcp.spam,$1-)) DLF.Win.Filter $1-
   if ($hiswm(chanctcp.server,$1-)) DLF.Win.Server $1-
   ; Override mIRC default destination and send to channel rather than active/status windows.
@@ -2148,17 +2160,14 @@ alias -l DLF.Win.Log {
   DLF.Watch.Called DLF.Win.Log $1-4 $+ : $5-
   if (($window($4)) && ($event == open)) .window -c $4
   elseif ($dqwindow & 4) close -d
-  var %type $1, %nick $DLF.Chan.TargetNick
   if (($1 == Filter) $&
    && (!$istok(ctcpsend blocked warning,$2,$asc($space))) $&
    && ($3 != Private) $&
-   && (!$notify($4)) $&
-   && (!$notify($nick)) $&
-   && (!$notify(%nick)) $&
    && ($4 != $me) $&
    ) {
     if ($3 != $hashtag) DLF.Stats.Count $3 Filter
     else {
+      var %nick $DLF.Chan.TargetNick
       var %i $comchan(%nick,0)
       while (%i) {
         var %chan $comchan(%nick,%i)
@@ -2174,7 +2183,7 @@ alias -l DLF.Win.Log {
       return
     }
   }
-  if (%type == server) {
+  if ($1 == server) {
     var %log   %DLF.win-server.log
     var %ts    %DLF.win-server.timestamp
     var %strip %DLF.win-server.strip
@@ -2188,8 +2197,8 @@ alias -l DLF.Win.Log {
   }
 
   var %line $DLF.Win.LineFormat($2-)
-  if (%log == 1) write $DLF.Win.LogName($DLF.Win.WinName(%type)) $logstamp $strip(%line)
-  if ((%type = Filter) && (%DLF.showfiltered == 0) && (%DLF.background == 0)) {
+  if (%log == 1) write $DLF.Win.LogName($DLF.Win.WinName($1)) $logstamp $strip(%line)
+  if (($1 = Filter) && (%DLF.showfiltered == 0) && (%DLF.background == 0)) {
     DLF.Watch.Log Dropped: Filtering off
     return
   }
@@ -2199,8 +2208,8 @@ alias -l DLF.Win.Log {
     %tb = Filtered
     %show = %DLF.showfiltered
   }
-  elseif (%type == Server) %tb = Server response
-  var %win $DLF.Win.WinOpen(%type,-k0nwD,%log,%show,%tb $DLF.Win.TbMsg)
+  elseif ($1 == Server) %tb = Server response
+  var %win $DLF.Win.WinOpen($1,-k0nwD,%log,%show,%tb $DLF.Win.TbMsg)
   DLF.Win.CustomTrim %win
   if (%ts == 1) %line = $timestamp %line
   if (%strip == 1) %line = $strip(%line)
