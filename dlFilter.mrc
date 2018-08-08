@@ -119,14 +119,14 @@ on *:start: {
   DLF.Error During start: $qt($error)
 }
 
-alias DLF.Reload {
+alias -l DLF.Reload {
   .timer 1 0 .signal DLF.Initialise
   .reload -rs $+ $1 $qt($script)
   halt
 }
 
 alias DLF.LoadPosition {
-  return $script(0)
+  if (%DLF.loadlast) return $script(0)
   if ((sbClient.* iswm $nopath($script(1))) || (sbClient.* iswm $nopath($script(2)))) return 2
   return 1
 }
@@ -3431,33 +3431,35 @@ alias DLF.Options.Toggle dialog $iif($dialog(DLF.Options.GUI),-c,-md) DLF.Option
 
 dialog -l DLF.Options.GUI {
   title dlFilter v $+ $DLF.SetVersion
-  size -1 -1 168 218
+  size -1 -1 168 227
   option dbu notheme
   link "Help", 15, 153 2 12 7, right
   text "", 20, 67 2 98 7, right hide
   check "&Enable/disable dlFilter", 10, 2 2 62 8
-  tab "Channels", 1, 1 9 166 193
+  tab "Channels", 1, 1 9 166 202
   tab "Filters", 3
   tab "Other", 5
   tab "Ops", 7
   tab "Custom", 8
   tab "About", 9
-  check "Show/hide Filter wins", 30, 1 205 60 11, push
-  check "Show/hide Ads wins", 40, 65 205 60 11, push
-  button "Close", 50, 129 205 37 11, ok default flat
+  check "Show/hide Filter wins", 30, 1 214 60 11, push
+  check "Show/hide Ads wins", 40, 65 214 60 11, push
+  button "Close", 50, 129 214 37 11, ok default flat
+
   ; tab Channels
   text "List the channels you want dlFilter to filter messages in. Use # by itself to make it filter all channels on all networks.", 105, 5 25 160 12, tab 1 multi
   text "Channel to add (select dropdown / type #chan or net#chan):", 110, 5 40 160 7, tab 1
   combo 120, 4 48 160 6, tab 1 drop edit
   button "Add", 130, 5 61 76 11, tab 1 flat disable
   button "Remove", 135, 86 61 76 11, tab 1 flat disable
-  list 140, 4 74 160 83, tab 1 vsbar size sort extsel
-  box " Update ", 150, 4 158 160 41, tab 1
-  check "Check for updates", 160, 7 167 74 6, tab 1
-  check "Check for &beta versions", 165, 86 167 74 6, tab 1
-  button "dlFilter website", 170, 7 176 74 11, tab 1 flat
-  button "Update dlFilter", 180, 86 176 74 11, tab 1 flat disable
-  text "Checking for dlFilter updates...", 190, 7 189 155 8, tab 1
+  list 140, 4 74 160 92, tab 1 vsbar size sort extsel
+  box " Update ", 150, 4 167 160 41, tab 1
+  check "Check for updates", 160, 7 176 74 6, tab 1
+  check "Check for &beta versions", 165, 86 176 74 6, tab 1
+  button "dlFilter website", 170, 7 185 74 11, tab 1 flat
+  button "Update dlFilter", 180, 86 185 74 11, tab 1 flat disable
+  text "Checking for dlFilter updates...", 190, 7 198 155 8, tab 1
+
   ; tab Filters
   box " Channel messages ", 305, 4 23 160 91, tab 3
   check "Filter other users @search / @file / @locator / !get requests", 310, 7 32 155 6, tab 3
@@ -3481,6 +3483,7 @@ dialog -l DLF.Options.GUI {
   check "Away and thank-you messages", 390, 7 171 155 6, tab 3
   check "User mode changes", 395, 7 180 155 6, tab 3
   check "Filter above user events for non-regular users", 397, 7 189 155 6, tab 3
+
   ; Tab Other
   box " Extra functions ", 505, 4 23 160 37, tab 5
   check "Collect @find/@locator results into a single window", 510, 7 32 155 6, tab 5
@@ -3494,13 +3497,15 @@ dialog -l DLF.Options.GUI {
   check "Block files from users not in your mIRC DCC trust list", 560, 15 106 147 6, tab 5
   check "Block files from regular users", 565, 15 115 147 6, tab 5
   check "Retry incomplete file requests (up to 3 times)", 570, 7 124 155 6, tab 5
-  box " mIRC-wide ", 605, 4 135 160 64, tab 5
+  box " mIRC-wide ", 605, 4 135 160 73, tab 5
   check "Check mIRC settings are secure (future enhancement)", 610, 7 144 155 6, tab 5 disable
   check "Prevent non-Notify private message opening query window", 620, 7 153 155 6, tab 5
   check "Filter private spam", 630, 7 162 155 6, tab 5
   check "Filter private messages from users not in a common channel", 640, 7 171 155 6, tab 5
   check "Block channel CTCP requests unless from an op", 655, 7 180 155 6, tab 5
   check "Block IRC Finger requests (which share personal information)", 660, 7 189 155 6, tab 5
+  check "Load dlFilter last (rather than first)", 665, 7 198 155 6, tab 5
+
   ; tab Ops
   text "These options are only enabled if you are an op on a filtered channel.", 705, 4 25 160 12, tab 7 multi
   box " Channel Ops ", 710, 4 38 160 38, tab 7
@@ -3513,6 +3518,7 @@ dialog -l DLF.Options.GUI {
   text "mins", 770, 115 86 47 7, tab 7
   check "... and filter them out", 780, 15 96 147 6, tab 7
   check "Prompt individual existing dlFilter users to upgrade", 790, 7 105 155 6, tab 7
+
   ; tab Custom
   check "Enable custom filters", 810, 5 27 65 7, tab 8
   text "Message type:", 820, 74 27 50 7, tab 8
@@ -3520,13 +3526,14 @@ dialog -l DLF.Options.GUI {
   edit "", 840, 4 37 160 10, tab 8 autohs
   button "Add", 850, 5 51 76 11, tab 8 flat disable
   button "Remove", 860, 86 51 76 11, tab 8 flat disable
-  list 870, 4 64 160 135, tab 8 hsbar vsbar size sort extsel
+  list 870, 4 64 160 144, tab 8 hsbar vsbar size sort extsel
+
   ; tab About
-  edit "", 920, 3 25 162 158, multi read vsbar tab 9
-  text "Download:", 980, 5 185 35 7, tab 9
-  link "https://github.com/DukeLupus/dlFilter/", 985, 45 185 120 7, tab 9
-  text "Report issues:", 990, 5 192 35 7, tab 9
-  link "https://gitreports.com/issue/DukeLupus/dlFilter/", 995, 45 192 120 7, tab 9
+  edit "", 920, 3 25 162 167, multi read vsbar tab 9
+  text "Download:", 980, 5 194 35 7, tab 9
+  link "https://github.com/DukeLupus/dlFilter/", 985, 45 194 120 7, tab 9
+  text "Report issues:", 990, 5 201 35 7, tab 9
+  link "https://gitreports.com/issue/DukeLupus/dlFilter/", 995, 45 201 120 7, tab 9
 }
 
 alias -l DLF.Options.SetLinkedFields {
@@ -3563,6 +3570,8 @@ on *:dialog:DLF.Options.GUI:sclick:365: DLF.Options.PerConnection
 on *:dialog:DLF.Options.GUI:sclick:365: DLF.Options.Background
 ; Titlebar option clicked
 on *:dialog:DLF.Options.GUI:sclick:515: DLF.Options.Titlebar
+; Load last option clicked
+on *:dialog:DLF.Options.GUI:sclick:665: DLF.Options.LoadLast
 ; oNotice option clicked
 on *:dialog:DLF.Options.GUI:sclick:715: DLF.Options.oNotice
 ; Advertising period changed
@@ -3648,6 +3657,7 @@ alias -l DLF.Options.Initialise {
   DLF.Options.InitOption private.nocomchan 1
   DLF.Options.InitOption chanctcp 1
   DLF.Options.InitOption nofingers 1
+  DLF.Options.InitOption loadlast 0
 
   ; Ops tab
   DLF.Options.InitOption win-onotice.enabled 1
@@ -3771,6 +3781,7 @@ alias -l DLF.Options.Init {
   if (%DLF.private.nocomchan == 1) did -c DLF.Options.GUI 640
   if (%DLF.chanctcp == 1) did -c DLF.Options.GUI 655
   if (%DLF.nofingers == 1) did -c DLF.Options.GUI 660
+  if (%DLF.loadlast == 1) did -c DLF.Options.GUI 665
   if (%DLF.win-onotice.enabled == 1) did -c DLF.Options.GUI 715
   if (%DLF.opwarning.spamchan == 1) did -c DLF.Options.GUI 725
   if (%DLF.opwarning.spampriv == 1) did -c DLF.Options.GUI 730
@@ -3849,6 +3860,7 @@ alias -l DLF.Options.Save {
   %DLF.private.nocomchan = $did(DLF.Options.GUI,640).state
   %DLF.chanctcp = $did(DLF.Options.GUI,655).state
   %DLF.nofingers = $did(DLF.Options.GUI,660).state
+  %DLF.loadlast = $did(DLF.Options.GUI,665).state
   %DLF.win-onotice.enabled = $did(DLF.Options.GUI,715).state
   %DLF.opwarning.spamchan = $did(DLF.Options.GUI,725).state
   %DLF.opwarning.spampriv = $did(DLF.Options.GUI,730).state
@@ -3908,6 +3920,11 @@ alias -l DLF.Options.Background {
 alias -l DLF.Options.Titlebar {
   DLF.Options.Save
   DLF.Stats.Active
+}
+
+alias -l DLF.Options.LoadLast {
+  DLF.Options.Save
+  DLF.Reload $DLF.LoadPosition
 }
 
 alias -l DLF.Options.OpsAdPeriod {
