@@ -19,7 +19,7 @@ Feedback on this new version is appreciated. dlFilter is now also an Open Source
 
 To load: use /load -rs dlFilter.mrc
 
-Note that dlFilter loads itself automatically as the last script.
+Note that dlFilter loads itself automatically as either the first (or second if you are also running sbClient) or last script (depending on options). If you are having problems with other scripts processing the same messages, try changing this option.
 
 Roadmap
 =======
@@ -76,11 +76,17 @@ dlFilter uses the following code from other people:
       Improvements to DLF.Watch messages
       Only enable Ops tab if Ops in DLF channel not if only ops in non-DLF channel.
       Respect Enable Custom Filters global setting.
+      Fix filter stats showing > 100% due to miscounting of CTCP SLOTS messages from fileservers.
+      Respect global option to enable / disable Custom Filters.
 
-      Run DLF last rather than first in order to avoid cvausing issues with other scripts. See Github #44.
-      DLF is intended to filter stuff from the screen not from other scripts.
-      Note: Previously we said running first "avoids problems where other scripts halt events preventing this scripts events from running.",
-      however mIRC runs events in all scripts unless the ON statement is prefixed with an "&".
+      Run DLF last rather than first in order to avoid causing issues with other scripts. See Github #44.
+        DLF is intended to filter stuff from the screen not from other scripts.
+        DLF halts messages that are filtered (not displayed as standard) or which DLF wants to display in a different window than mIRC's default.
+        This can cause conflicts with other scripts that also halt messages in order to display them themselves.
+        Other scripts should check $halted==$false before displaying messages.
+
+        Note: Previously we said running first "avoids problems where other scripts halt events preventing this scripts events from running",
+        however mIRC runs events in all scripts unless the ON statement is prefixed with an "&".
 
 */
 
