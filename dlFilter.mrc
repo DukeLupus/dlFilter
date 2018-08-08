@@ -78,6 +78,7 @@ dlFilter uses the following code from other people:
       Respect Enable Custom Filters global setting.
       Fix filter stats showing > 100% due to miscounting of CTCP SLOTS from fileservers and notify user messages.
       Respect global option to enable / disable Custom Filters.
+      Reactivate dialog on show of Filter / Ads windows.
 
       Run DLF last rather than first in order to avoid causing issues with other scripts. See Github #44.
         DLF is intended to filter stuff from the screen not from other scripts.
