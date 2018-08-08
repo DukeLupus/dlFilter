@@ -2464,6 +2464,7 @@ alias -l DLF.Win.ShowHide {
       if (($2 == 1) && ($network == $gettok(%w,-1,$asc(.))) && (%s == hidden)) window -a %w
       dec %i
     }
+    DLF.Options.Show
   }
   elseif ($2 == 0) close -@ %win
 }
