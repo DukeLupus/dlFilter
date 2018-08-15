@@ -40,6 +40,7 @@ dlFilter uses the following code from other people:
 /* CHANGE LOG
 
   Immediate TODO
+      Filter windows open on start even when settings say no
       Test location and filename for oNotice log files
       Be smarter about matching nicks responding to file requests with triggers when they don't quite match.
         (Add another field to the hash for the nick - check whether trigger exactly matches a nick and if not try to identify a close match (either by looking for matching @trigger in ads window or by looking for very similar nicks e.g. pondering vs. pondering42.)
@@ -69,11 +70,11 @@ dlFilter uses the following code from other people:
       Fix version checking
 2.06  Option to disable version checking
 
-2.07  Run DLF last rather than first in order to avoid causing issues with other scripts. See Github #44.
+2.07  Option to run DLF last rather than first in order to avoid causing issues with other scripts. See Github #44.
         DLF is intended to filter stuff from the screen not from other scripts.
         DLF halts messages that are filtered (not displayed as standard) or which DLF wants to display in a different window than mIRC's default.
         This can cause conflicts with other scripts that also halt messages in order to display them themselves.
-        Other scripts should check $halted==$false before displaying messages.
+        Other scripts should check $halted==$false before acting on or echoing messages related to the event.
 
         Note: Previously we said running first "avoids problems where other scripts halt events preventing this scripts events from running",
         however mIRC runs events in all scripts unless the ON statement is prefixed with an "&".
@@ -2349,12 +2350,12 @@ alias -l DLF.Win.Log {
   }
 
   var %show 1, %tb
-  if (%type == Filter) {
+  if ($1 == Filter) {
     %tb = Filtered
     %show = %DLF.showfiltered
   }
   elseif ($1 == Server) %tb = Server response
-  var %win $DLF.Win.WinOpen($1,-k0nwD,%log,%show,%tb $DLF.Win.TbMsg)
+  var %win $DLF.Win.WinOpen($1,-k0nD,%log,%show,%tb $DLF.Win.TbMsg)
   DLF.Win.CustomTrim %win
   if (%ts == 1) %line = $timestamp %line
   if (%strip == 1) %line = $strip(%line)
@@ -2436,7 +2437,7 @@ alias -l DLF.Win.WinOpen {
   if (%DLF.perconnect == 0) %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ iz,1,$asc($space))
   else %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ v,1,$asc($space))
   if (((($1 == Filter) && (%DLF.background == 1)) || ($1 == Ads)) && ($4 == 0)) $&
-    %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ h,1,$asc($space))
+    %switches = $puttok(%switches,$gettok(%switches,1,$asc($space)) $+ hw0,1,$asc($space))
   window %switches %win
   if (($3) && ($isfile(%lfn))) loadbuf $windowbuffer -rpi %win %lfn
   if ($5- != $null) titlebar %win -=- $5-
@@ -2681,7 +2682,7 @@ alias -l DLF.Ads.Add {
 alias -l DLF.Ads.OpenWin {
   if (%DLF.perconnect == 1) var %tabs -t20,40
   else var %tabs -t30,55
-  return $DLF.Win.WinOpen($1,-k0nwlD %tabs,0,%DLF.serverads,0 %tb)
+  return $DLF.Win.WinOpen($1,-k0nlD %tabs,0,%DLF.serverads,0 %tb)
 }
 
 ; DLF.Ads.AddLine win colour netchan nick line
