@@ -95,6 +95,13 @@ dlFilter uses the following code from other people:
       Restrict autotrust to a specific network.
       Reset watch tick counter on events not triggered by server message.
       Handle manual trusts which include a specific network.
+      Improved handling of topics if channel window is not open.
+      Improved handling of messages from a Notify user.
+      Undernet X added as a service.
+      Prevent DLF.Watch.Log errors if watch window was closed.
+      Improved handling of DLF.Watch on servers that use tags.
+      Clean up unnecessary handling of raw messages and reduce replicated code.
+      Avoid duplicate echoing of messages to status window.
 
 */
 
@@ -461,19 +468,43 @@ on ^*:servermode:%DLF.channels: {
 on ^*:topic:%DLF.channels: {
   DLF.Watch.Called $null : $1-
   DLF.AlreadyHalted $1-
-  if ($DLF.Chan.IsChanEvent(%DLF.filter.topic)) DLF.Win.Filter $nick changes topic to: $sqt($1-)
+  var %msg $DLF.TopicForChannel($nick changes topic,for $2,to: $sqt($1-))
+  if ($DLF.Chan.IsChanEvent(%DLF.filter.topic)) DLF.Win.Filter %msg
+  DLF.TopicRedirect $2 %msg
 }
 
 raw 332:*: {
   DLF.Watch.Called $null : $1-
   DLF.AlreadyHalted $1-
-  if (($DLF.Chan.IsDlfChan($2)) && (%DLF.filter.topic == 1)) DLF.Win.Filter Topic is: $sqt($3-)
+  var %msg $DLF.TopicForChannel(Topic,for $2,is: $sqt($3-))
+  if (($DLF.Chan.IsDlfChan($2)) && (%DLF.filter.topic == 1)) DLF.Win.Filter %msg
+  DLF.TopicRedirect $2 %msg
+}
+
+raw 331:*: {
+  DLF.Watch.Called $null : $1-
+  DLF.AlreadyHalted $1-
+  DLF.TopicRedirect $2 No topic is set for $2 $+ .
 }
 
 raw 333:*: {
   DLF.Watch.Called $null : $1-
   DLF.AlreadyHalted $1-
+  Var %msg $DLF.TopicForChannel(Topic,for $2,set by $3 on $asctime($4,ddd mmm dd HH:nn:ss yyyy))
   if (($DLF.Chan.IsDlfChan($2)) && (%DLF.filter.topic == 1)) DLF.Win.Filter Set by $3 on $asctime($4,ddd mmm dd HH:nn:ss yyyy)
+  DLF.TopicRedirect $2 %msg
+}
+
+alias -l DLF.TopicForChannel {
+  if ($window($1)) return $1 $3
+  return $1 $2 $3
+}
+
+alias -l DLF.TopicRedirect {
+  if ($halted) halt
+  if ($window($1)) echo -tc Topic $1 * $2-
+  else echo -atc Topic * $2-
+  halt
 }
 
 on *:input:*: { DLF.Event.Input $1- }
@@ -561,32 +592,21 @@ raw 005:*: { DLF.iSupport.Raw005 $1- }
 raw 301:*: { DLF.Away.Filter $1- }
 
 ; Show messages in status AND active windows (rather than just status)
-; Unknown command / No such nick/channel / Nickname is already in use / Nick change too fast
-raw 401:*: {
-  DLF.Watch.Called $null : $1-
-  DLF.AlreadyHalted $1-
-  if (!$halted) echo -astc Info * $2-
-  halt
-}
+; Too many channels
+raw 405:*: { DLF.Redirect $1-2 unable to join channel (too many channels open) }
+; Unknown command
+raw 421:*: { DLF.Redirect $1- }
+; Nickname is already in use
+raw 433:*: { DLF.Redirect $1- }
+; Nick change too fast
+raw 438:*: { DLF.Redirect $1- }
+; Channel requires authentication
+raw 477:*: { DLF.Redirect $1- }
 
-raw 421:*: {
-  DLF.Watch.Called $null : $1-
+alias -l DLF.Redirect {
+  DLF.Watch.Called DLF.Redirect $1-
   DLF.AlreadyHalted $1-
-  if (!$halted) echo -astc Info * $2-
-  halt
-}
-
-raw 433:*: {
-  DLF.Watch.Called $null : $1-
-  DLF.AlreadyHalted $1-
-  if (!$halted) echo -astc Info * $2-
-  halt
-}
-
-raw 438:*: {
-  DLF.Watch.Called $null : $1-
-  DLF.AlreadyHalted $1-
-  if (!$halted) echo -astc Info * $2-
+  if (!$halted) echo -astc Normal $2-
   halt
 }
 
@@ -1463,6 +1483,7 @@ alias -l DLF.Priv.CommonChan {
   if (%DLF.private.nocomchan != 1) return
   DLF.Watch.Called DLF.Priv.CommonChan : $1-
   if ($DLF.IsServiceUser($nick)) return
+  if ($notify($nick)) return
   if ($comchan($nick,0) == 0) {
     var %event $event
     if (%event isin open text) %event = message
@@ -2539,20 +2560,24 @@ alias -l DLF.Win.Echo {
     echo %flags %col $3 %line
     DLF.Watch.Log Echoed: To query window
   }
+  elseif (($2 == Private) && ($notify($3))) {
+    echo %flags $+ a %col %line
+    DLF.Watch.Log Echoed: To active window $br($active)
+  }
   else {
     var %i $comchan($3,0)
     if ((%i == 0) || ($3 == $me)) {
       if ((($window($active).type !isin custom listbox) || ($left($active,2) == @#)) $&
-       && (((%su) && (!$DLF.Event.JustConnected)) || ($3 == $me))) {
+       && (((%su) && (!$DLF.Event.JustConnected)) || ($3 == $me) || $notify($3))) {
         if ($3 == $me) {
           echo %flags $+ a %col %pref %line
-          DLF.Watch.Log Echoed: To active window $active
+          DLF.Watch.Log Echoed: To active window $br($active)
         }
         elseif ($cid == $activecid) {
-          echo %flags $+ a %col %pref %line
+          if ($active != Status Window) echo %flags $+ a %col %pref %line
           if ($2 == Private) %pref = $null
           echo %flags $+ s %col %pref %line
-          DLF.Watch.Log Echoed: To status window and active window $active
+          DLF.Watch.Log Echoed: To status window and active window $br($active)
         }
         else {
           if ($2 == Private) %pref = $null
@@ -5497,6 +5522,7 @@ alias -l DLF.IsServiceUser {
   if ($1 == UserServ) return $true
   if ($1 == WebServ) return $true
   if ($1 == Global) return $true
+  if (($1 == X) && ($network == Undernet)) return $true
   return $false
 }
 
@@ -5889,18 +5915,25 @@ alias DLF.Watch {
 }
 
 alias DLF.Watch.Filter {
-  var %text $1-
-  tokenize $asc($space)) $1-
-  if (:* iswm $2) {
-    var %user $right($2,-1)
-    tokenize $asc($space)) $1 $3-
+  var %text $2-
+;  tokenize $asc($space)) $1-
+  var %tags
+  if (@* iswm %text) {
+    %tags = $gettok(%text,1,$asc(:))
+    %text = : $+ $gettok(%text,2-,$asc(:))
   }
-  if ($1 == ->) {
-    var %server $2
-    tokenize $asc($space)) $1 $3-
+  var %user
+  if (:* iswm %text) {
+    %user = $right($gettok(%text,1,$asc($space)),-1)
+    %text = $gettok(%text,2-,$asc($space))
   }
-  if (($2 == PING) || ($2 == PONG)) return $null
-  DLF.Watch.Log %text
+  else {
+    DLF.Watch.Log Cannot parse server message: $1-
+    return
+  }
+  var %raw $gettok(%text,1,$asc($space))
+  if ($istok(PING PONG,%raw,$asc($space))) return $null
+  DLF.Watch.Log $1-
   return $null
 }
 
@@ -5916,17 +5949,17 @@ alias -l DLF.Watch.Called {
 alias -l DLF.Watch.Log {
   if ($debug == $null) return
   if ($0 == 0) return
-  if (@* !iswm $debug) write $debug $1-
-  else {
+  if ($1 isin <->) DLF.Watch.Offset
+  var %eventid
+  if ($eventid) %eventid = $eventid
+  var %l $timestamp $+ $DLF.Watch.Offset $burko(%eventid $1-)
+  if (@* !iswm $debug) write $debug %l
+  elseif ($window($debug)) {
     DLF.Win.CustomTrim $debug
     var %c 3
     if ($1 == <-) %c = 1
     elseif ($1 == ->) %c = 12
     elseif ($1 == Halted:) %c = 4
-    if ($1 isin <->) DLF.Watch.Offset
-    var %eventid
-    if ($eventid) %eventid = $eventid
-    var %l $timestamp $+ $DLF.Watch.Offset $burko(%eventid $1-)
     DLF.Search.Add $debug 1 %c %l
     aline -pi %c $debug %l
   }
