@@ -10,7 +10,7 @@ This script filters out the crud, leaving only the useful messages displayed in 
 • For file sharing channels, filter other peoples messages, server adverts and spam
 • Collect @find results from file sharing channels into a custom window
 • Protect your computer from DCC Sends from other users, except those you have explicitly requested - files you have explicitly requested are accepted automatically
-• Limit private messages of all types from other users
+• Limit spam messages of all types from other users
 • If you are a channel op, provide a separate chat window for operators
 
 This version is a significant upgrade from the previous major release 1.16 with significant new functionality, which we hope will encourage strong take-up.
@@ -25,6 +25,8 @@ Roadmap
 =======
 • Improve the ability of users to report issues (e.g. channel messages handled incorrectly) directly from dlFilter popup menus via GitReports.
 • Integrate sbClient functionality and rename to sbFilter.
+• Support mIRC options for Socks4/5/Proxy for script update.
+• Support channel / user specific custom filters.
 
 Acknowledgements
 ================
@@ -40,7 +42,7 @@ dlFilter uses the following code from other people:
 /* CHANGE LOG
 
   Immediate TODO
-      Filter windows open on start even when settings say no
+      If keeping filters in background, convert close to hide.
       Test location and filename for oNotice log files
       Be smarter about matching nicks responding to file requests with triggers when they don't quite match.
         (Add another field to the hash for the nick - check whether trigger exactly matches a nick and if not try to identify a close match (either by looking for matching @trigger in ads window or by looking for very similar nicks e.g. pondering vs. pondering42.)
