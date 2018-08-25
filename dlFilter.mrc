@@ -42,7 +42,6 @@ dlFilter uses the following code from other people:
 /* CHANGE LOG
 
   Immediate TODO
-      Write code to identify mIRC options.
       On start / load ensure that Options / Sounds / Requests is not set (since it misdirects triggers). (Need an option to disable this.)
       Test location and filename for oNotice log files
       Be smarter about matching nicks responding to file requests with triggers when they don't quite match.
@@ -108,6 +107,7 @@ dlFilter uses the following code from other people:
       Add support for /MSG nick XDCC SEND as a file request.
       Close filter window now closes / hides (depending on keep in background) all Filter / FilterSearch windows.
       Options dialog is now associated with active window's connection so show of Filter / Ads makes correct window active.
+      On start / load warn user if "Options/Sounds/Requests/Send '!nick file' as Private Message" is checked (since it misdirects triggers).
 
 */
 
@@ -249,6 +249,7 @@ alias -l DLF.Initialise {
   DLF.Ops.AdvertsEnable
   var %ver $DLF.mIRCversion
   if (%ver != 0) DLF.Error dlFilter requires %ver $+ +. dlFilter disabled until mIRC is updated.
+  if ($sendPlingNickAsPrivate) DLF.Warning You have $qt(Options/Sounds/Requests/Send '!nick file' as Private Message) checked - if you are using dlFilter in a channel which uses ! as a trigger character, you should uncheck this mIRC option.
 }
 
 ; If user manually unloads, do clean-up
@@ -5438,12 +5439,12 @@ alias -l DLF.CreateHashTables {
 ; ========== Status and error messages ==========
 alias -l DLF.logo return $rev([dlFilter])
 alias -l DLF.StatusAll {
-  var %m $c(1,9,$DLF.logo $1-)
+  var %m $DLF.logo $c(1,9,$1-)
   scon -a echo -ti2nbfs %m
   if (($window($active).type !isin status custom listbox) || ($left($active,2) == @#)) echo -ti2na %m
 }
 alias -l DLF.Status { echo -ti2sf $c(1,9,$DLF.logo $1-) }
-alias -l DLF.Warning { DLF.StatusAll $c(1,9,$DLF.logo Warning: $1-) }
+alias -l DLF.Warning { DLF.StatusAll $c(1,7,Warning: $1-) }
 alias -l DLF.Error {
   DLF.StatusAll $c(4,$b(Error:)) $1-
   halt
@@ -5765,6 +5766,9 @@ alias -l winscript {
 }
 
 ; ========== Binary file encode/decode ==========
+; These routines are used to allow multiple files to be delivered as a single mIRC script.
+; You can encode binary files (e.g. dlls, gifs) as mIRC script lines and include them in DLF,
+; and then use the script lines to recreate the binary file from the mIRC script.
 alias -l DLF.CreateBinaryFile {
   if (($0 < 2) || (!$regex($1,/^&[^ ]+$/))) DLF.Error DLF.CreateBinaryFile: Invalid parameters: $1-
   var %len $decode($1,mb)
@@ -5922,6 +5926,7 @@ alias -l enablenickcolors return $DLF.mIRCini(options,0,32)
 alias -l shortjoinsparts return $DLF.mIRCini(options,2,19)
 alias -l windowbuffer return $DLF.mIRCini(options,3,1)
 alias -l usesinglemsg return $DLF.mIRCini(options,0,22)
+alias -l sendPlingNickAsPrivate return $DLF.mIRCini(options,1,23)
 
 alias -l DLF.mIRCini {
   var %item $2
@@ -5929,6 +5934,47 @@ alias -l DLF.mIRCini {
   var %ini $readini($mircini,n,$1,%item)
   if ($3 == $null) return %ini
   return $gettok(%ini,$3,$asc($comma))
+}
+
+alias DLF.mIRCiniDelta {
+  if (%DLF.mIRCiniTemp != $null)  {
+    ; Write old ini to a temp file then iterate through sections and entries in each section to find differences.
+    var %topics $ini($mircini,0)
+    while (%topics) {
+      var %topic $ini($mircini,%topics)
+      var %items $ini($mircini,%topic,0)
+      while (%items) {
+        var %item $ini($mircini,%topic,%items)
+        var %new $readini($mircini,n,%topic,%item)
+        var %old $readini(%DLF.mIRCiniTemp,n,%topic,%item)
+        if (%new !== %old) {
+          var %news $numtok(%new,$asc($comma))
+          var %olds $numtok(%old,$asc($comma))
+          if ((%news != %olds) || ((%n == 1) && ($numtok(%old,$asc($comma)) == 1))) {
+            echo -ac Normal OLD %topic %item = %old
+            echo -ac Normal NEW %topic %item = %new
+          }
+          else {
+            while (%news) {
+              if ($gettok(%new,%news,$asc($comma)) != $gettok(%old,%news,$asc($comma))) {
+                echo -ac Normal OLD %topic %item %news = $gettok(%old,%news,$asc($comma))
+                echo -ac Normal NEW %topic %item %news = $gettok(%new,%news,$asc($comma))
+              }
+              dec %news
+            }
+          }
+        }
+        dec %items
+      }
+      dec %topics
+    }
+  }
+
+; Save current mIRCini
+  set -e %DLF.mIRCiniTemp $qt($tempfn)
+  bread $qt($mircini) 0 $file($mircini).size &DLFmIRCini
+  bwrite -c %DLF.mIRCiniTemp 0 -1 &DLFmIRCini
+  echo -ac ctcp Change options and run it again to see mIRCini differences.
 }
 
 ; ========== DLF.Watch.* ==========
