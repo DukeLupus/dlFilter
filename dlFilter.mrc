@@ -42,7 +42,7 @@ dlFilter uses the following code from other people:
 /* CHANGE LOG
 
   Immediate TODO
-      If keeping filters in background, convert close to hide.
+      If keeping filters in background, convert close by user into hide.
       Test location and filename for oNotice log files
       Be smarter about matching nicks responding to file requests with triggers when they don't quite match.
         (Add another field to the hash for the nick - check whether trigger exactly matches a nick and if not try to identify a close match (either by looking for matching @trigger in ads window or by looking for very similar nicks e.g. pondering vs. pondering42.)
@@ -1952,8 +1952,8 @@ alias -l DLF.DccSend.Send {
   if (%trusted) DLF.Watch.Log User is in your DCC trust list
   if ($DLF.DccSend.IsRequest(%fn)) {
     if ((%DLF.dccsend.autoaccept == 1) && (!%trusted)) DLF.DccSend.TrustAdd
-    DLF.DccSend.Receiving %fn
     DLF.Watch.Log Accepted: DCC Send - you requested this file from this server
+    DLF.DccSend.Receiving %fn
     return
   }
   if (!%trusted) {
@@ -1967,8 +1967,9 @@ alias -l DLF.DccSend.Send {
     if (%DLF.dccsend.untrusted == 1) DLF.DccSend.Block the user is not in your DCC Get trust list
     if ((%DLF.dccsend.nocomchan == 1) && ($comchan($nick,0) == 0)) DLF.DccSend.Block the user is not in a common channel
     if ((%DLF.dccsend.regular == 1) && ($DLF.IsRegularUser($nick))) DLF.DccSend.Block the user is a regular user
+    DLF.Watch.Log DCC Send accepted from untrusted user due to file receiving options
   }
-  DLF.Watch.Log DCC Send accepted
+  else DLF.Watch.Log DCC Send accepted from trusted user
   DLF.DccSend.Receiving %fn
 }
 
@@ -5158,6 +5159,8 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chanaction.spam *[Backing Up]*
   DLF.hadd chanaction.spam *FTP*port*user*pass*
   DLF.hadd chanaction.spam *FTP*port*/*
+  /* Cancel edit formatting as comment
+  */
   DLF.hadd chanaction.spam *get AMIP*plug-in at http*amip.tools-for.net*
   DLF.hadd chanaction.spam is dAnCiNg ArOuNd *ThE *RoOm (_\_)(_/_)(_\_) MovInG' iT (_\_)(_/_)(_\_) *ShAkeN' *iT (_\_)(_/_)(_\_) *WiggLiNg' *iT (_\_)(_/_)(_\_) *JuSt *LeTTinG *iT aLL *fLoW (_\_)(_/_)(_\_)
   inc %matches $hget(DLF.chanaction.spam,0).item
@@ -5917,6 +5920,7 @@ alias DLF.Watch {
 }
 
 alias DLF.Watch.Filter {
+  tokenize $asc($space) $1-
   var %text $2-
 ;  tokenize $asc($space)) $1-
   var %tags
@@ -5925,8 +5929,12 @@ alias DLF.Watch.Filter {
     %text = : $+ $gettok(%text,2-,$asc(:))
   }
   var %user
-  if (:* iswm %text) {
+  if (($1 == <-) && (:* iswm %text)) {
     %user = $right($gettok(%text,1,$asc($space)),-1)
+    %text = $gettok(%text,2-,$asc($space))
+  }
+  elseif ($1 == ->) {
+    %user = $gettok(%text,1,$asc($space))
     %text = $gettok(%text,2-,$asc($space))
   }
   else {
