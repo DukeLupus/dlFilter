@@ -42,7 +42,8 @@ dlFilter uses the following code from other people:
 /* CHANGE LOG
 
   Immediate TODO
-      If keeping filters in background, convert close by user into hide.
+      Write code to identify mIRC options.
+      On start / load ensure that Options / Sounds / Requests is not set (since it misdirects triggers). (Need an option to disable this.)
       Test location and filename for oNotice log files
       Be smarter about matching nicks responding to file requests with triggers when they don't quite match.
         (Add another field to the hash for the nick - check whether trigger exactly matches a nick and if not try to identify a close match (either by looking for matching @trigger in ads window or by looking for very similar nicks e.g. pondering vs. pondering42.)
@@ -105,6 +106,8 @@ dlFilter uses the following code from other people:
       Clean up unnecessary handling of raw messages and reduce replicated code.
       Avoid duplicate echoing of messages to status window.
       Add support for /MSG nick XDCC SEND as a file request.
+      Close filter window now closes / hides (depending on keep in background) all Filter / FilterSearch windows.
+      Options dialog is now associated with active window's connection so show of Filter / Ads makes correct window active.
 
 */
 
@@ -614,6 +617,7 @@ alias -l DLF.Redirect {
 }
 
 on *:close:@DLF.Ads.*: { DLF.Ads.Close }
+on *:close:@DLF.Filter.*: { DLF.Filter.Close }
 
 ; Adjust titlebar on window change
 on *:active:*: { DLF.Stats.Active }
@@ -2648,8 +2652,9 @@ alias -l DLF.Win.ShowHide {
     while (%i) {
       var %w $window(%win,%i)
       var %s $window(%w).state
+      var %cid $window(%w).cid
       window %flags %w
-      if (($2 == 1) && ($network == $gettok(%w,-1,$asc(.))) && (%s == hidden)) window -a %w
+      if (($1 isin Ads. Filter.) && ($2 == 1) && ($cid == %cid) && (%s == hidden)) window -aR %w
       dec %i
     }
   }
@@ -3002,21 +3007,34 @@ alias -l DLF.Ads.Split {
   close -@ %oldwin
 }
 
-alias DLF.Ads.Close {
+; Ads windows are always maintained - either visibly or hidden.
+; If user closes an Ads window, we need instead to hide Ads windows.
+; Ditto for closing a filter window when keep filter windows open in background is set.
+; Since mIRC will not stop us closing it using halt, we need to copy contents to a new window
+; and rename the new window to the old name once the old window has closed.
+alias -l DLF.Ads.Close {
   DLF.Watch.Called DLF.Ads.Close $target : $1-
   var %win $DLF.Ads.OpenWin(Ads.New)
-  DLF.Options.ToggleOption serverads 40
-  DLF.Options.SetButtonTextAds
-  DLF.Win.ShowHide Ads. %DLF.serverads
+  DLF.Options.ToggleShowAds
   filter -wwz $target %win *
-  .timer 1 0 .signal DLF.Ads.CloseRen %win $target
+  .timer 1 0 .signal DLF.Win.CloseRen %win $target
 }
 
-on *:signal:DLF.Ads.CloseRen: { DLF.Ads.CloseRen $1- }
-alias -l DLF.Ads.CloseRen {
+alias -l DLF.Filter.Close {
+  DLF.Watch.Called DLF.Filter.Close $target : $1-
+  var %win $DLF.Win.WinOpen(Filter.New,-k0nD,%log,%DLF.showfiltered,Filtered $DLF.Win.TbMsg)
+  DLF.Options.ToggleShowFilter
+  ; Preserve this filter window if background is on.
+  if (%DLF.background == 0) return
+  filter -wwz $target %win *
+  .timer 1 0 .signal DLF.Win.CloseRen %win $target
+}
+
+on *:signal:DLF.Win.CloseRen: { DLF.Win.CloseRen $1- }
+alias -l DLF.Win.CloseRen {
   ; No incoming debug event - so need a manual reset of tick offset
   DLF.Watch.Offset
-  DLF.Watch.Called DLF.Ads.CloseRen : $1-
+  DLF.Watch.Called DLF.Win.CloseRen : $1-
   if ($window($2)) close -@ $2
   if ($window($1)) renwin $1 $2
 }
@@ -3644,8 +3662,8 @@ alias -l DLF.oNotice.NickChg {
 
 
 ; ========== Options Dialog ==========
-alias DLF.Options.Show { dialog $iif($dialog(DLF.Options.GUI),-v,-md) DLF.Options.GUI DLF.Options.GUI }
-alias DLF.Options.Toggle { dialog $iif($dialog(DLF.Options.GUI),-c,-md) DLF.Options.GUI DLF.Options.GUI }
+alias DLF.Options.Show { dialog $iif($dialog(DLF.Options.GUI),-v,-mdh) DLF.Options.GUI DLF.Options.GUI }
+alias DLF.Options.Toggle { dialog $iif($dialog(DLF.Options.GUI),-c,-mdh) DLF.Options.GUI DLF.Options.GUI }
 
 dialog -l DLF.Options.GUI {
   title dlFilter v $+ $DLF.SetVersion
@@ -3913,7 +3931,13 @@ alias -l DLF.Options.InitOption {
 alias -l DLF.Options.ToggleShowFilter {
   DLF.Options.ToggleOption showfiltered 30
   DLF.Options.SetButtonTextFilter
+  DLF.Win.ShowHide FilterSearch %DLF.showfiltered
   DLF.Win.ShowHide Filter %DLF.showfiltered
+  ; If background is off, close the filter and filtersearch windows
+  if ((%DLF.background == 0) && (%DLF.showfiltered == 0)) {
+    close -a@ @dlf.FilterSearch.*
+    close -a@ @dlf.Filter.*
+  }
 }
 
 alias -l DLF.Options.ToggleShowAds {
