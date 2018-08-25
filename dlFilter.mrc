@@ -104,6 +104,7 @@ dlFilter uses the following code from other people:
       Improved handling of DLF.Watch on servers that use tags.
       Clean up unnecessary handling of raw messages and reduce replicated code.
       Avoid duplicate echoing of messages to status window.
+      Add support for /MSG nick XDCC SEND as a file request.
 
 */
 
@@ -651,6 +652,7 @@ alias -l DLF.AlreadyHalted { if ($halted) DLF.Watch.Log Filtered: Already halted
 ; ========== Event splitters ==========
 ; Command typed by user
 alias -l DLF.Event.Input {
+  DLF.Watch.Called DLF.Event.Input : $1-
   var %win $winscript
   ; if a search window, refilter on new search string
   if (@dlF.*Search.* iswm %win) DLF.Search.Show %win $1-
@@ -662,6 +664,7 @@ alias -l DLF.Event.Input {
   elseif ($DLF.Chan.IsDlfChan(%win)) {
     if (($1 == @find) || ($1 == @locator)) DLF.@find.Request $1-
     elseif (($left($1,1) isin !@) && ($len($1) > 1)) DLF.DccSend.Request $1-
+    elseif ($1 $3 $4 == /MSG XDCC SEND) DLF.DccSend.Request $+(XDCC-,$2) $1-
   }
 }
 
@@ -1849,11 +1852,12 @@ alias -l DLF.Ops.AdvertPrivDLF {
 alias -l DLF.DccSend.Request {
   DLF.Watch.Called DLF.DccSend.Request : $1-
   DLF.SearchBot.GetTriggers
-  var %trig $strip($1)
-  if (@* iswm %trig) var %fn $DLF.DccSend.FixString($2-)
-  else var %fn $DLF.GetFilename($2-)
+  var %trig $strip($1), %fn
+  if (@* iswm %trig) %fn = $DLF.DccSend.FixString($2-)
+  elseif (XDCC-* iswm %trig) %fn = $2-
+  else %fn = $DLF.GetFileName($2-)
   hadd -mz DLF.dccsend.requests $+($network,|,$chan,|,%trig,|,$replace(%fn,$space,_),|,$encode(%fn)) 86400
-  DLF.Watch.Log Request recorded: %trig %fn
+  DLF.Watch.Log DccSend request recorded: %trig %fn
 }
 
 alias DLF.DccSend.FixString {
@@ -1873,6 +1877,9 @@ alias -l DLF.DccSend.GetRequest {
       return $hfind(DLF.dccsend.requests,$+($network,|*|,%trig,|,%srch,|*),1,w).item
     }
   }
+  DLF.Watch.Log hfind(DLF.dccsend.requests, $+($network,|*|XDCC-,$nick,|*|*) ,1,w).item
+  var %req $hfind(DLF.dccsend.requests,$+($network,|*|XDCC-,$nick,|*|*),1,w).item
+  if (%req) return %req
   var %req $hfind(DLF.dccsend.requests,$+($network,|*|@,$nick,||),1,w).item
   if (%req) return %req
   return $hfind(DLF.dccsend.requests,$+($network,|*|@,$nick,-*||),1,w).item
@@ -1882,9 +1889,14 @@ alias -l DLF.DccSend.IsRequest {
   var %fn $noqt($DLF.GetFileName($1-))
   var %req $DLF.DccSend.GetRequest(%fn)
   if (%req == $null) return $false
+  DLF.Watch.Log DccSend Request found: %req
   var %trig $gettok(%req,3,$asc(|))
   if (!* iswm %trig) {
     if (($right(%trig,-1) != $nick) && ($gettok($right(%trig,-1),1,$asc(-)) != $nick)) return $false
+  }
+  elseif (XDCC-* iswm %trig) {
+    var %nick $right(%trig,-5)
+    if (%nick != $nick) return $false
   }
   elseif (@* iswm %trig) {
     var %nick $right(%trig,-1), %tfn $DLF.SearchBot.TriggerFromNick($nick)
@@ -1911,6 +1923,7 @@ alias -l DLF.DccSend.IsTrigger {
     }
     dec %i
   }
+  DLF.Watch.Log User request NOT found!
   return $false
 }
 
@@ -1943,7 +1956,7 @@ alias -l DLF.DccSend.SendNotice {
 
 alias -l DLF.DccSend.Send {
   DLF.Watch.Called DLF.DccSend.Send : $1-
-  var %fn $DLF.GetFilename($3-)
+  var %fn $DLF.GetFileName($3-)
   if ($chr(8238) isin %fn) {
     DLF.Win.Echo Blocked Private $nick DCC Send - filename contains malicious unicode U+8238
     DLF.Halt Blocked: DCC Send - filename contains malicious unicode U+8238
@@ -2083,6 +2096,7 @@ alias -l DLF.DccSend.GetFailed {
   var %retrying
   if (%retry) %retrying = - $c(3,retrying)
   DLF.Win.Log Server ctcp %chan $nick DCC Get of %origfn from $nick incomplete $br($duration(%dur,3) $bytes(%bytes).suf $+ /Sec) %retrying
+  if (xdcc-* iswm %trig) %trig = $null
   if (%retry) DLF.Chan.EditSend %chan %trig $decode($gettok(%req,5,$asc(|)))
 }
 
@@ -3193,7 +3207,7 @@ alias -l DLF.@find.Results {
   var %rest $2-
   if (!* iswm %trig) {
     var %rest $strip(%rest)
-    var %fn $DLF.GetFilename(%rest)
+    var %fn $DLF.GetFileName(%rest)
     var %len 0 - $len(%fn)
     dec %len
     %rest = $right(%rest,%len)
