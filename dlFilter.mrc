@@ -173,7 +173,6 @@ alias -l DLF.RenameVar {
 on *:signal:DLF.Initialise: { DLF.Initialise $1- }
 alias -l DLF.Initialise {
   ; No incoming debug event - so need a manual reset of tick offset
-  DLF.Watch.Offset
   DLF.Watch.Called DLF.Initialise : $1-
 
   ; Handle obsolete variables
@@ -1685,12 +1684,7 @@ alias -l DLF.Ops.AdvertsEnable {
 }
 
 on *:signal:DLF.Ops.AdvertChan: { DLF.Ops.AdvertChan $1- }
-alias -l DLF.Ops.AdvertChan {
-  ; No incoming debug event - so need a manual reset of tick offset
-  DLF.Watch.Offset
-  scon -a DLF.Ops.AdvertChanNet
-}
-
+alias -l DLF.Ops.AdvertChan { scon -a DLF.Ops.AdvertChanNet }
 alias -l DLF.Ops.AdvertChanNet {
   if ($server == $null) return
   var %i $chan(0)
@@ -1812,8 +1806,6 @@ alias -l DLF.Ops.VersionReply {
 
 on *:signal:DLF.Ops.AdvertPrivDLF: { DLF.Ops.AdvertPrivDLF $1- }
 alias -l DLF.Ops.AdvertPrivDLF {
-  ; No incoming debug event - so need a manual reset of tick offset
-  DLF.Watch.Offset
   DLF.Watch.Called DLF.Ops.AdvertPrivDLF : $1-
   var %idx $+($network,@,$1)
   if ($hfind(DLF.ops.privateAd,%idx)) return
@@ -2012,8 +2004,6 @@ alias -l DLF.DccSend.Receiving {
 
 alias -l DLF.DccSend.FileRcvd {
   var %fn $nopath($filename)
-  ; No incoming debug event - so need a manual reset of tick offset
-  DLF.Watch.Offset
   DLF.Watch.Called DLF.DccSend.FileRcvd %fn : $1-
   var %req $DLF.DccSend.GetRequest(%fn)
   if (%req == $null) return
@@ -2115,8 +2105,6 @@ alias -l DLF.DccSend.TrustAdd {
 
 on *:signal:DLF.DccSend.TrustRemove: DLF.DccSend.TrustRemove $1-
 alias -l DLF.DccSend.TrustRemove {
-  ; No incoming debug event - so need a manual reset of tick offset
-  DLF.Watch.Offset
   DLF.Watch.Called DLF.DccSend.TrustRemove Trust: Removed $2-
   .dcc trust -r $1
 }
@@ -3033,8 +3021,6 @@ alias -l DLF.Filter.Close {
 
 on *:signal:DLF.Win.CloseRen: { DLF.Win.CloseRen $1- }
 alias -l DLF.Win.CloseRen {
-  ; No incoming debug event - so need a manual reset of tick offset
-  DLF.Watch.Offset
   DLF.Watch.Called DLF.Win.CloseRen : $1-
   if ($window($2)) close -@ $2
   if ($window($1)) renwin $1 $2
@@ -6043,10 +6029,17 @@ alias -l DLF.Watch.Called {
 alias -l DLF.Watch.Log {
   if ($debug == $null) return
   if ($0 == 0) return
-  if ($1 isin <->) DLF.Watch.Offset
-  var %eventid
-  if ($eventid) %eventid = $eventid
-  var %l $timestamp $+ $DLF.Watch.Offset $burko(%eventid $1-)
+  var %ticks $ticks, %eventid
+  if (!$var(%DLF.watch.ticks,0)) set -e %DLF.watch.ticks %ticks
+  if ($eventid) {
+    %eventid = $eventid
+    if ((%DLF.watch.eventid != 0) && (%DLF.watch.eventid != $eventid)) set -e %DLF.watch.ticks %ticks
+  }
+  elseif ($1 == <-) set -e %DLF.watch.ticks %ticks
+  set -e %DLF.watch.eventid $eventid
+  %ticks = %ticks - %DLF.watch.ticks
+  %ticks = %ticks % 1000
+  var %l $timestamp $+ + $+ $base(%ticks,10,10,3) $burko(%eventid $1-)
   if (@* !iswm $debug) write $debug %l
   elseif ($window($debug)) {
     DLF.Win.CustomTrim $debug
@@ -6057,19 +6050,6 @@ alias -l DLF.Watch.Log {
     DLF.Search.Add $debug 1 %c %l
     aline -pi %c $debug %l
   }
-}
-
-; /DLF.Watch.Offset : reset ms offset
-; $DLF.Watch.Offset : returns 3-digit +ms offset value
-alias -l DLF.Watch.Offset {
-  var %ticks $ticks
-  if (!$var(%DLF.offsetticks,0) || (!$isid)) {
-    set -e %DLF.offsetticks %ticks
-    if (!$isid) return
-  }
-  var %ticks %ticks - %DLF.offsetticks
-  %ticks = %ticks % 1000
-  return + $+ $base(%ticks,10,10,3)
 }
 
 alias -l DLF.Halt {
