@@ -108,6 +108,7 @@ dlFilter uses the following code from other people:
       Close filter window now closes / hides (depending on keep in background) all Filter / FilterSearch windows.
       Options dialog is now associated with active window's connection so show of Filter / Ads makes correct window active.
       On start / load warn user if "Options/Sounds/Requests/Send '!nick file' as Private Message" is checked (since it misdirects triggers).
+      Fix interception of DCC ACCEPT CTCP messages preventing DCC SEND resumes.
 
 */
 
@@ -578,6 +579,7 @@ ctcp ^*:PING*:?: { DLF.Priv.ctcpBlock $1- }
 
 ctcp *:DCC CHAT *:?: { DLF.DccChat.Chat $1- }
 ctcp *:DCC SEND *:?: { DLF.DccSend.Send $1- }
+ctcp *:DCC ACCEPT *:?: { DLF.DccSend.Accept $1- }
 ctcp *:*:?: { DLF.Priv.ctcp $1- }
 ctcp *:*:%DLF.channels: { if ($DLF.Chan.IsChanEvent) DLF.Chan.ctcp $1- }
 
@@ -1477,13 +1479,13 @@ alias -l DLF.Priv.ctcpReply {
 alias -l DLF.Priv.SpamFilter {
  if (%DLF.opwarning.spamchan == 1) {
     var %msg $c(4,15,Private spam from $nick $br($address($nick,5)) $+ : $q($1-))
-    var %i $comchan($nick,0)
+    var %i $comchan($nick,0).op
     while (%i) {
-      var %chan $comchan($nick,%i)
-      if ($me isop %chan) .DLF.notice @ $+ $chan $logo %msg
+      var %chan $comchan($nick,%i).op
+      .DLF.notice @ $+ %chan $logo %msg
       dec %i
     }
-    DLF.Win.Echo Filter Blocked Private $nick %msg
+    DLF.Win.Echo Blocked Private $nick %msg
   }
   DLF.Win.Filter $1-
 }
@@ -1874,7 +1876,6 @@ alias -l DLF.DccSend.GetRequest {
       return $hfind(DLF.dccsend.requests,$+($network,|*|,%trig,|,%srch,|*),1,w).item
     }
   }
-  DLF.Watch.Log hfind(DLF.dccsend.requests, $+($network,|*|XDCC-,$nick,|*|*) ,1,w).item
   var %req $hfind(DLF.dccsend.requests,$+($network,|*|XDCC-,$nick,|*|*),1,w).item
   if (%req) return %req
   var %req $hfind(DLF.dccsend.requests,$+($network,|*|@,$nick,||),1,w).item
@@ -1953,7 +1954,7 @@ alias -l DLF.DccSend.SendNotice {
 
 alias -l DLF.DccSend.Send {
   DLF.Watch.Called DLF.DccSend.Send : $1-
-  var %fn $DLF.GetFileName($3-)
+  var %fn $noqt($gettok($3-,-4-1,$asc($space)))
   if ($chr(8238) isin %fn) {
     DLF.Win.Echo Blocked Private $nick DCC Send - filename contains malicious unicode U+8238
     DLF.Halt Blocked: DCC Send - filename contains malicious unicode U+8238
@@ -1963,7 +1964,7 @@ alias -l DLF.DccSend.Send {
   if ($DLF.DccSend.IsRequest(%fn)) {
     if ((%DLF.dccsend.autoaccept == 1) && (!%trusted)) DLF.DccSend.TrustAdd
     DLF.Watch.Log Accepted: DCC Send - you requested this file from this server
-    DLF.DccSend.Receiving %fn
+    DLF.DccSend.Receiving $1-
     return
   }
   if (!%trusted) {
@@ -1980,7 +1981,7 @@ alias -l DLF.DccSend.Send {
     DLF.Watch.Log DCC Send accepted from untrusted user due to file receiving options
   }
   else DLF.Watch.Log DCC Send accepted from trusted user
-  DLF.DccSend.Receiving %fn
+  DLF.DccSend.Receiving $1-
 }
 
 alias -l DLF.DccSend.Block {
@@ -1993,17 +1994,74 @@ alias -l DLF.DccSend.Block {
 }
 
 alias -l DLF.DccSend.Receiving {
-  var %req $DLF.DccSend.GetRequest($1-)
+  var %fn $noqt($gettok($3-,-4-1,$asc($space)))
+  DLF.DccSend.AddAccepted %fn
+  var %req $DLF.DccSend.GetRequest(%fn)
   if (%req == $null) return
   var %chan $gettok(%req,2,$asc(|))
   var %origfn $decode($gettok(%req,5,$asc(|)))
-  if (%origfn == $null) %origfn = $1-
+  if (%origfn == $null) %origfn = %fn
   var %secs 86400 - $hget(DLF.dccsend.requests,%req)
-  DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick starting $br(waited $duration(%secs,3))
+  var %starting starting
+  if ($dccIfFileExists == Resume) {
+    var %pathfile $+($getdir(%fn),%fn)
+    if ($isfile(%pathfile)) {
+      if ($file(%pathfile).size > 0) %starting = resuming
+    }
+  }
+  DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick %starting $br(waited $duration(%secs,3))
+}
+
+alias -l DLF.DccSend.Accept {
+  DLF.Watch.Called DLF.DccSend.Accept : $1-
+  var %fn $noqt($gettok($3-,-3-1,$asc($space)))
+  if ($DLF.DccSend.IsntAccepted(%fn)) DLF.Priv.ctcp $1-
+}
+
+alias -l DLF.DccSend.AddAccepted {
+  var %hash $DLF.DccSend.Hash($1-)
+  .hadd -mz DLF.dccsend.accepted %hash 300
+}
+
+alias -l DLF.DccSend.IsntAccepted {
+  var %hash $DLF.DccSend.Hash($1-)
+  if ($hget(DLF.dccsend.accepted,%hash)) return $false
+  return $true
+}
+
+alias -l DLF.DccSend.DelAccepted {
+  var %hash $DLF.DccSend.Hash($1-)
+  if ($hget(DLF.dccsend.accepted,%hash)) .hdel DLF.dccsend.accepted %hash
+}
+
+alias -l DLF.DccSend.Hash { return $encode($network $nick $1-) }
+
+alias -l DLF.DccSend.Retry {
+  if (!%DLF.serverretry) return $false
+  var %hash $DLF.DccSend.Hash($1-)
+  var %attempts $hget(DLF.dccsend.retries,%hash)
+  if (%attempts == 3) {
+    DLF.DccSend.RetryDelete $1-
+    return $false
+  }
+  if (%attempts == $null) {
+    ; First retry
+    .hadd -m DLF.dccsend.retries %hash 1
+  }
+  else {
+    .hinc DLF.dccsend.retries %hash
+  }
+  return $true
+}
+
+alias -l DLF.DccSend.RetryDelete {
+  var %hash $DLF.DccSend.Hash($1-)
+  if ($hget(DLF.dccsend.retries,%hash)) .hdel DLF.dccsend.retries %hash
 }
 
 alias -l DLF.DccSend.FileRcvd {
   var %fn $nopath($filename)
+  DLF.DccSend.DelAccepted %fn
   DLF.Watch.Called DLF.DccSend.FileRcvd %fn : $1-
   var %req $DLF.DccSend.GetRequest(%fn)
   if (%req == $null) return
@@ -2013,8 +2071,7 @@ alias -l DLF.DccSend.FileRcvd {
   var %trig $gettok(%req,3,$asc(|))
   var %origfn $decode($gettok(%req,5,$asc(|)))
   if (%origfn == $null) %origfn = %fn
-  var %hash $encode(%trig %origfn)
-  if ($hget(DLF.dccsend.retries,%hash)) .hdel DLF.dccsend.retries %hash
+  DLF.DccSend.RetryDelete %trig %origfn
   var %bytes $get(-1).rcvd / %dur
   DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick complete $br($duration(%dur,3) $bytes(%bytes,3).suf $+ /Sec)
   ; Some servers change spaces to underscores
@@ -2064,6 +2121,7 @@ alias -l DLF.DccSend.GetFailed {
 
   var %fn $nopath($filename)
   DLF.Watch.Called DLF.DccSend.GetFailed %fn : $1-
+  DLF.DccSend.DelAccepted %fn
   var %req $DLF.DccSend.GetRequest(%fn)
   if (%req == $null) return
   .hdel -s DLF.dccsend.requests %req
@@ -2071,24 +2129,8 @@ alias -l DLF.DccSend.GetFailed {
   var %trig $gettok(%req,3,$asc(|))
   var %origfn $decode($gettok(%req,5,$asc(|)))
   if (%origfn == $null) %origfn = %fn
-  var %hash $encode(%trig %origfn)
-  var %retry %DLF.serverretry
-  if (%retry) {
-    var %attempts $hget(DLF.dccsend.retries,%hash)
-    if (%attempts == $null) {
-      ; First retry
-      .hadd -m DLF.dccsend.retries %hash 1
-    }
-    elseif (%attempts == 3) {
-      .hdel DLF.dccsend.retries %hash
-      %retry = $false
-    }
-    else {
-      .hinc DLF.dccsend.retries %hash
-    }
-  }
   var %bytes $get(-1).rcvd / $get(-1).secs
-  var %retrying
+  var %retry $DLF.DccSend.Retry(%trig %origfn), %retrying
   if (%retry) %retrying = - $c(3,retrying)
   DLF.Win.Log Server ctcp %chan $nick DCC Get of %origfn from $nick incomplete $br($duration(%dur,3) $bytes(%bytes).suf $+ /Sec) %retrying
   if (xdcc-* iswm %trig) %trig = $null
@@ -5556,9 +5598,11 @@ alias -l DLF.IsServiceUser {
   return $false
 }
 
+; Remove trailing stuff from filename
+; Common (OmenServe) response has filename followed by e.g. ::INFO::
+; and colons are not allowable characters in file names
+; DCC SEND / ACCEPT messages have ipaddress port filesize or position following filename
 alias -l DLF.GetFileName {
-  ; common (OmenServe) response has filename followed by e.g. ::INFO::
-  ; and colons are not allowable characters in file names
   var %txt $gettok($replace($strip($1-),$nbsp,$space,$tab $+ $space,$space,$tab,$null),1,$asc(:))
   var %n $numtok(%txt,$asc($space))
   ; delete trailing info: CRC(*) or (*)
@@ -5913,6 +5957,14 @@ alias -l shortjoinsparts return $DLF.mIRCini(options,2,19)
 alias -l windowbuffer return $DLF.mIRCini(options,3,1)
 alias -l usesinglemsg return $DLF.mIRCini(options,0,22)
 alias -l sendPlingNickAsPrivate return $DLF.mIRCini(options,1,23)
+alias -l dccIfFileExists {
+  var %value = $DLF.mIRCini(options,1,27)
+  if (%value == 0) return Ask
+  if (%value == 1) return Resume
+  if (%value == 2) return Overwrite
+  if (%value == 3) return Cancel
+  return Unknown
+}
 
 alias -l DLF.mIRCini {
   var %item $2
