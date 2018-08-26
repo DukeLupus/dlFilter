@@ -109,6 +109,8 @@ dlFilter uses the following code from other people:
       Options dialog is now associated with active window's connection so show of Filter / Ads makes correct window active.
       On start / load warn user if "Options/Sounds/Requests/Send '!nick file' as Private Message" is checked (since it misdirects triggers).
       Fix interception of DCC ACCEPT CTCP messages preventing DCC SEND resumes.
+      Alert user if requested file already exists and mIRC is set to Cancel DCCs.
+      Improve DCC SEND start / resume / finished / interrupted messages.
 
 */
 
@@ -1279,7 +1281,7 @@ alias -l DLF.Chan.ctcpBlock {
 alias -l DLF.Chan.SpamFilter {
   if ($DLF.Options.IsOp && (%DLF.opwarning.spamchan == 1) && ($me isop $chan)) {
     var %msg $c(4,15,Channel spam from $nick $br($address($nick,5)) $+ : $q($1-))
-    .notice @ $+ $chan $logo %msg
+    .notice @ $+ $chan $DLF.logo %msg
     DLF.Win.Echo Filter Blocked $chan $nick %msg
   }
   DLF.Win.Filter $1-
@@ -1482,7 +1484,7 @@ alias -l DLF.Priv.SpamFilter {
     var %i $comchan($nick,0).op
     while (%i) {
       var %chan $comchan($nick,%i).op
-      .DLF.notice @ $+ %chan $logo %msg
+      .DLF.notice @ $+ %chan $DLF.logo %msg
       dec %i
     }
     DLF.Win.Echo Blocked Private $nick %msg
@@ -1855,6 +1857,12 @@ alias -l DLF.DccSend.Request {
   if (@* iswm %trig) %fn = $DLF.DccSend.FixString($2-)
   elseif (XDCC-* iswm %trig) %fn = $2-
   else %fn = $DLF.GetFileName($2-)
+  var %ifFileExists $dccIfFileExists, %pathfile $+($getdir(%fn),%fn)
+  if (($isfile(%pathfile)) && (%ifFileExists == Cancel)) {
+    DLF.Win.Log Server Warning $target $nick $qt(%fn) exists but "mIRC Options / DCC / If file exists" is set to "Cancel" so mIRC will cancel this download.
+    DLF.Win.Log Server Warning $target $nick Before your download starts either change this option to something else or delete the file.
+  }
+
   hadd -mz DLF.dccsend.requests $+($network,|,$chan,|,%trig,|,$replace(%fn,$space,_),|,$encode(%fn)) 86400
   DLF.Watch.Log DccSend request recorded: %trig %fn
 }
@@ -1995,20 +2003,21 @@ alias -l DLF.DccSend.Block {
 
 alias -l DLF.DccSend.Receiving {
   var %fn $noqt($gettok($3-,-4-1,$asc($space)))
-  DLF.DccSend.AddAccepted %fn
   var %req $DLF.DccSend.GetRequest(%fn)
   if (%req == $null) return
   var %chan $gettok(%req,2,$asc(|))
   var %origfn $decode($gettok(%req,5,$asc(|)))
   if (%origfn == $null) %origfn = %fn
-  var %secs 86400 - $hget(DLF.dccsend.requests,%req)
-  var %starting starting
-  if ($dccIfFileExists == Resume) {
-    var %pathfile $+($getdir(%fn),%fn)
-    if ($isfile(%pathfile)) {
-      if ($file(%pathfile).size > 0) %starting = resuming
+  var %starting starting, %ifFileExists $dccIfFileExists, %pathfile $+($getdir(%fn),%fn)
+  if ($isfile(%pathfile)) {
+    if (%ifFileExists == Cancel) {
+      DLF.Win.Log Server ctcp %chan $nick DCC Send from $nick rejected (invalid parameters) - $qt(%origfn) exists but "mIRC Options / DCC / If file exists" is set to "Cancel".
+      return
     }
+    if ((%ifFileExists == Resume) && ($file(%pathfile).size > 0)) %starting = resuming
   }
+  DLF.DccSend.AddAccepted %fn
+  var %secs 86400 - $hget(DLF.dccsend.requests,%req)
   DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick %starting $br(waited $duration(%secs,3))
 }
 
@@ -2067,13 +2076,12 @@ alias -l DLF.DccSend.FileRcvd {
   if (%req == $null) return
   .hdel DLF.dccsend.requests %req
   var %chan $gettok(%req,2,$asc(|))
-  var %dur $get(-1).secs
   var %trig $gettok(%req,3,$asc(|))
   var %origfn $decode($gettok(%req,5,$asc(|)))
   if (%origfn == $null) %origfn = %fn
   DLF.DccSend.RetryDelete %trig %origfn
-  var %bytes $get(-1).rcvd / %dur
-  DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick complete $br($duration(%dur,3) $bytes(%bytes,3).suf $+ /Sec)
+  var %bytes $get(-1).rcvd - $get(-1).resume
+  DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick complete $br(100% done - $bytes(%bytes,3).suf in $duration($get(-1).secs,3) = $bytes($get(-1).cps,3).suf $+ /Sec)
   ; Some servers change spaces to underscores
   ; But we cannot rename if Options / DCC / Folders / Command is set
   ; because it would run after this using the wrong filename
@@ -2129,10 +2137,13 @@ alias -l DLF.DccSend.GetFailed {
   var %trig $gettok(%req,3,$asc(|))
   var %origfn $decode($gettok(%req,5,$asc(|)))
   if (%origfn == $null) %origfn = %fn
-  var %bytes $get(-1).rcvd / $get(-1).secs
-  var %retry $DLF.DccSend.Retry(%trig %origfn), %retrying
+  var %retry $DLF.DccSend.Retry(%trig %origfn), %resume $dccIfFileExists, %retrying
+  if (%resume !isin Resume Overwrite) %retry = $false
   if (%retry) %retrying = - $c(3,retrying)
-  DLF.Win.Log Server ctcp %chan $nick DCC Get of %origfn from $nick incomplete $br($duration(%dur,3) $bytes(%bytes).suf $+ /Sec) %retrying
+  var %percent $floor($calc($get(-1).rcvd * 100 / $get(-1).size))
+  var %bytes $get(-1).rcvd - $get(-1).resume
+  DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick incomplete $br(%percent $+ % done - $bytes(%bytes).suf received in $duration($get(-1).secs,3) = $bytes($get(-1).cps).suf $+ /Sec) %retrying
+  if (%resume !isin Resume Ask) DLF.Win.Log Server Warning %chan $nick To improve your chances of downloading the whole file, set "mIRC Options / DCC / If file exists" to allow mIRC to resume receiving the file from the point it just failed rather than starting again.
   if (xdcc-* iswm %trig) %trig = $null
   if (%retry) DLF.Chan.EditSend %chan %trig $decode($gettok(%req,5,$asc(|)))
 }
@@ -5957,8 +5968,8 @@ alias -l shortjoinsparts return $DLF.mIRCini(options,2,19)
 alias -l windowbuffer return $DLF.mIRCini(options,3,1)
 alias -l usesinglemsg return $DLF.mIRCini(options,0,22)
 alias -l sendPlingNickAsPrivate return $DLF.mIRCini(options,1,23)
-alias -l dccIfFileExists {
-  var %value = $DLF.mIRCini(options,1,27)
+alias dccIfFileExists {
+  var %value = $DLF.mIRCini(options,3,27)
   if (%value == 0) return Ask
   if (%value == 1) return Resume
   if (%value == 2) return Overwrite
@@ -5966,7 +5977,7 @@ alias -l dccIfFileExists {
   return Unknown
 }
 
-alias -l DLF.mIRCini {
+alias DLF.mIRCini {
   var %item $2
   if ($2 isnum) %item = n $+ $2
   var %ini $readini($mircini,n,$1,%item)
