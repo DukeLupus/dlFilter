@@ -4495,10 +4495,6 @@ on *:sockread:DLF.Socket.Update: {
   var %line, %mark $sock($sockname).mark
   var %state $gettok(%mark,1,$asc($space))
   if (%state != Body) DLF.Socket.Error Cannot process response: Still processing %state
-  unset %DLF.version.web
-  unset %DLF.version.web.mirc
-  unset %DLF.version.beta
-  unset %DLF.version.beta.mirc
   while ($true) {
     sockread %line
     if ($sockerr > 0) DLF.Socket.SockErr sockread:Body
