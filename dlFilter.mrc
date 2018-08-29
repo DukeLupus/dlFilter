@@ -3,7 +3,7 @@ DLFILTER -=- Firewall, anti-spam for mIRC
 and message filter for file sharing channels.
 Authors: © DukeLupus and Sophist
 
-Annoyed by advertising messages from the various file serving bots? Fed up with endless channel messages from other users searching for and requesting files? Are the responses to your own requests getting lost in the crowd?
+Worried about hackers sending you malicious files without your consent? Annoyed by advertising messages from the various file serving bots? Fed up with endless channel messages from other users searching for and requesting files? Are the responses to your own requests getting lost in the crowd?
 
 This script filters out the crud, leaving only the useful messages displayed in the channel. By default, the filtered messages are thrown away, but you can direct them to custom windows if you wish. Functions include:
 
@@ -27,6 +27,7 @@ Roadmap
 • Integrate sbClient functionality and rename to sbFilter.
 • Support mIRC options for Socks4/5/Proxy for script update.
 • Support channel / user specific custom filters.
+• A security wizard that checks mIRC settings that could make you insecure, and helps you to set them to be more secure.
 
 Acknowledgements
 ================
@@ -42,10 +43,11 @@ dlFilter uses the following code from other people:
 /* CHANGE LOG
 
   Immediate TODO
-      On start / load ensure that Options / Sounds / Requests is not set (since it misdirects triggers). (Need an option to disable this.)
       Test location and filename for oNotice log files
       Be smarter about matching nicks responding to file requests with triggers when they don't quite match.
         (Add another field to the hash for the nick - check whether trigger exactly matches a nick and if not try to identify a close match (either by looking for matching @trigger in ads window or by looking for very similar nicks e.g. pondering vs. pondering42.)
+      Colour DCC SEND channel messages so as to distinguish filenames and sending user and stats.
+      If settings not AutoAccept (which uses temporary trust) then ask user (once per nick per session) if they want to Trust untrusted servers they are requesting files from.
 
   Ideas for possible future enhancements
       Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
@@ -111,6 +113,8 @@ dlFilter uses the following code from other people:
       Fix interception of DCC ACCEPT CTCP messages preventing DCC SEND resumes.
       Alert user if requested file already exists and mIRC is set to Cancel DCCs.
       Improve DCC SEND start / resume / finished / interrupted messages.
+
+2.08  ?
 
 */
 
