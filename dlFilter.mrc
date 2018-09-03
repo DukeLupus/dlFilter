@@ -1483,7 +1483,7 @@ alias -l DLF.Priv.ctcpReply {
 }
 
 alias -l DLF.Priv.SpamFilter {
- if (%DLF.opwarning.spamchan == 1) {
+  if (%DLF.opwarning.spamchan == 1) {
     var %msg $c(4,15,Private spam from $nick $br($address($nick,5)) $+ : $q($1-))
     var %i $comchan($nick,0).op
     while (%i) {
@@ -3727,7 +3727,7 @@ dialog -l DLF.Options.GUI {
   button "Close", 50, 129 214 37 11, ok default flat
 
   ; tab Channels
-  text "List the channels you want dlFilter to filter messages in. Use # by itself to make it filter all channels on all networks.", 105, 5 25 160 12, tab 1 multi
+  text "List the channels you want dlFilter to filter messages in. Use # by itself to make it filter all channels on all networks.", 105, 5 25 160 14, tab 1 multi
   text "Channel to add (select dropdown / type #chan or net#chan):", 110, 5 40 160 7, tab 1
   combo 120, 4 48 160 6, tab 1 drop edit
   button "Add", 130, 5 61 76 11, tab 1 flat disable
