@@ -615,7 +615,7 @@ raw 433:*: { DLF.Redirect $1- }
 ; Nick change too fast
 raw 438:*: { DLF.Redirect $1- }
 ; Channel requires authentication
-raw 477:*: { DLF.Redirect $1- }
+raw 477:*: { DLF.Redirect $1 $3-5 $2 $6- }
 
 alias -l DLF.Redirect {
   DLF.Watch.Called DLF.Redirect $1-
