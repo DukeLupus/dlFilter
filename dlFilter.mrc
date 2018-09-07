@@ -152,7 +152,7 @@ on *:start: {
   DLF.Initialise
   return
 
-  :error
+:error
   DLF.Error During start: $qt($error)
 }
 
@@ -936,7 +936,7 @@ alias -l DLF.Chan.Remove {
   if ($1) var %nc $+($2,$1), %chan $1
   else var %nc $+($network,$chan), %chan $chan
   DLF.Watch.Called DLF.Chan.Remove %nc $+ : $1-
-  if (!$DLF.Chan.IsDlfChan(%chan),$false) {
+  if (!$DLF.Chan.IsDlfChan(%chan,$false)) {
     DLF.Watch.Log RemoveChan: %chan already not filtered.
     return
   }
@@ -1483,6 +1483,7 @@ alias -l DLF.Priv.ctcpReply {
 }
 
 alias -l DLF.Priv.SpamFilter {
+echo -st DLF.Priv.SpamFilter $1-
   if (%DLF.opwarning.spamchan == 1) {
     var %msg $c(4,15,Private spam from $nick $br($address($nick,5)) $+ : $q($1-))
     var %i $comchan($nick,0).op
@@ -1532,7 +1533,7 @@ alias -l DLF.Priv.DollarDecode {
 }
 
 alias -l DLF.Priv.RegularUser {
-  DLF.Watch.Called DLF.Priv.RegularUser : $1-
+  DLF.Watch.Called DLF.Priv.RegularUser $1 : $2-
   if ($comchan($nick,0) == 0) {
     DLF.Watch.Log Not in common channel
     return
@@ -3715,7 +3716,7 @@ dialog -l DLF.Options.GUI {
   option dbu notheme
   link "Help", 15, 153 2 12 7, right
   text "", 20, 67 2 98 7, right hide
-  check "&Enable/disable dlFilter", 10, 2 2 62 8
+  check "&Enable/disable dlFilter", 10, 0 0 62 8
   tab "Channels", 1, 1 9 166 202
   tab "Filters", 3
   tab "Other", 5
@@ -4617,6 +4618,8 @@ on *:sockread:DLF.Socket.Download: {
   var %state $gettok(%mark,1,$asc($space))
   if (%state != Body) DLF.Socket.Error Cannot process response: Still processing %state
   var %newscript $qt($script $+ .new)
+  if ($isfile(%newscript)) .remove %newscript
+  if ($exists(%newscript)) DLF.Socket.Error Cannot delete file %newscript from previous attempt to update
   while ($true) {
     sockread &block
     if ($sockerr > 0) DLF.Socket.SockErr sockread:Body
@@ -4633,16 +4636,67 @@ on *:sockclose:DLF.Socket.Download: {
   if ($sockerr > 0) DLF.Socket.SockErr sockclose
   if ($sockbr > 0) bwrite %newscript -1 -1 &block
   if ($isfile(%oldscript)) .remove %oldscript
-  if ($exists(%oldscript)) .remove $script
+  if ($exists(%oldscript)) {
+    DLF.Warning Cannot save old version of $qt($nopath($script)) because saved version $qt($script) already exists and cannot be removed.
+    .remove $script
+  }
   else {
     .rename $qt($script) %oldscript
     %oldsaved = $true
   }
   .rename %newscript $qt($script)
-  if (%oldsaved) DLF.StatusAll Old version of dlFilter.mrc saved as $qt($nopath(%oldscript)) in case you need to revert.
+  if (%oldsaved) DLF.StatusAll Old version of $qt($nopath($script)) saved as $qt($nopath(%oldscript)) in case you need to revert.
   DLF.Options.Status New version of dlFilter downloaded and installed.
   if ($dialog(DLF.Options.GUI)) dialog -x DLF.Options.GUI
   DLF.Reload $DLF.LoadPosition
+}
+
+; Check that a directory is writable to avoid errors if it isn't.
+alias DLF.IsDirWritable {
+  var %dir $1
+  if ($isfile($1)) %dir = $nofile(%dir)
+  elseif ($isdir($1) && ($right($1,1) != \)) %dir = %dir $+ \
+  if (!$exists(%dir)) goto error
+  var %fn $qt($+(%dir,$file($script).name,.tmp))
+  if (!$exists(%fn)) write -cm2n %fn Writable?
+  if (!$exists(%fn)) goto error
+  .remove %fn
+  DLF.Watch.Log $qt(%dir) is writable
+  return $true
+
+:error
+  DLF.Watch.Log $qt(%dir) is not writable.
+  reseterror
+  return $false
+}
+
+; Check that a file is writable to avoid errors if it isn't.
+; Cannot check file NTFS permissions, so file writable if directory is writable and file does not have read-only attribute
+alias DLF.IsFileWritable {
+  if ($isfile($1) && (r isin $file($1).attr) return $false
+  return $DLF.IsDirWritable($nofile($1))
+}
+
+; Rename a file - handling errors if it isn't.
+alias -l DLF.Rename {
+  .rename $1-
+  return $true
+
+:error
+  DLF.Watch.Log DLF.Rename error: $qt($error)
+  reseterror
+  return $false
+}
+
+; Remove a file - handling errors if it isn't.
+alias -l DLF.Remove {
+  .remove $1-
+  return $true
+
+:error
+  DLF.Watch.Log DLF.Remove error: $qt($error)
+  reseterror
+  return $false
 }
 
 alias -l DLF.Download.Error {
@@ -5533,7 +5587,7 @@ alias -l DLF.GitReports {
   DLF.Watch.Log GitReports: URL too long $len(%url)
   return $false
 
-  :error
+:error
   DLF.Watch.Log GitReports: Error: $error
   reseterror
   return $false
@@ -5692,7 +5746,7 @@ alias -l urlencode {
   }
   return $replacex($1-,$chr(96),$+(%,60),$chr(93),$+(%,5D),$chr(91),$+(%,5B),$chr(64),$+(%,40),$chr(63),$+(%,3F),$chr(61),$+(%,3D),$chr(59),$+(%,3B),$chr(58),$+(%,3A),$chr(47),$+(%,2F),$chr(44),$+(%,2C),$chr(43),$+(%,2B),$chr(42),$+(%,2A),$chr(41),$+(%,29),$chr(40),$+(%,28),$chr(39),$+(%,27),$chr(38),$+(%,26),$chr(37),$+(%,25),$chr(37),$+(%,25),$chr(36),$+(%,24),$chr(35),$+(%,23),$chr(33),$+(%,21),$chr(32),$+(%,20),$chr(13),$+(%,0D),$chr(10),$+(%,0A),$chr(9),$+(%,09))
 
-  :error
+:error
   echo 2 -s * $ $+ urlencode: $error
   halt
 }
