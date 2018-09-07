@@ -114,7 +114,8 @@ dlFilter uses the following code from other people:
       Alert user if requested file already exists and mIRC is set to Cancel DCCs.
       Improve DCC SEND start / resume / finished / interrupted messages.
 
-2.08  ?
+2.08  Improve options dialog display on high resolution screens (e.g. 4K) when Windows scaling is > 100%.
+      Make options dialog tab sticky (i.e. when you close and reopen dialog, active tab is maintained.
 
 */
 
@@ -3712,109 +3713,109 @@ alias DLF.Options.Toggle { dialog $iif($dialog(DLF.Options.GUI),-c,-mdh) DLF.Opt
 
 dialog -l DLF.Options.GUI {
   title dlFilter v $+ $DLF.SetVersion
-  size -1 -1 168 227
-  option dbu notheme
-  link "Help", 15, 153 2 12 7, right
-  text "", 20, 67 2 98 7, right hide
-  check "&Enable/disable dlFilter", 10, 0 0 62 8
-  tab "Channels", 1, 1 9 166 202
+  size -1 -1 225 260
+  option map
+  link "Help", 15, 206 3 16 8, right
+  text "", 20, 92 2 130 8, right hide
+  check "&Enable/disable dlFilter", 10, 2 3 92 8
+  tab "Channels", 1, 2 11 222 231
   tab "Filters", 3
   tab "Other", 5
   tab "Ops", 7
   tab "Custom", 8
   tab "About", 9
-  check "Show/hide Filter wins", 30, 1 214 60 11, push
-  check "Show/hide Ads wins", 40, 65 214 60 11, push
-  button "Close", 50, 129 214 37 11, ok default flat
+  check "Show/hide Filter wins", 30, 2 244 78 14, push
+  check "Show/hide Ads wins", 40, 82 244 78 14, push
+  button "Close", 50, 162 244 61 14, ok default flat
 
   ; tab Channels
-  text "List the channels you want dlFilter to filter messages in. Use # by itself to make it filter all channels on all networks.", 105, 5 25 160 14, tab 1 multi
-  text "Channel to add (select dropdown / type #chan or net#chan):", 110, 5 40 160 7, tab 1
-  combo 120, 4 48 160 6, tab 1 drop edit
-  button "Add", 130, 5 61 76 11, tab 1 flat disable
-  button "Remove", 135, 86 61 76 11, tab 1 flat disable
-  list 140, 4 74 160 92, tab 1 vsbar size sort extsel
-  box " Update ", 150, 4 167 160 41, tab 1
-  check "Check for updates", 160, 7 176 74 6, tab 1
-  check "Check for &beta versions", 165, 86 176 74 6, tab 1
-  button "dlFilter website", 170, 7 185 74 11, tab 1 flat
-  button "Update dlFilter", 180, 86 185 74 11, tab 1 flat disable
-  text "Checking for dlFilter updates...", 190, 7 198 155 8, tab 1
+  text "List the channels you want dlFilter to filter messages in. Use # by itself to make it filter all channels on all networks.", 105, 7 28 213 16, tab 1 multi
+  text "Channel to add (select dropdown / type #chan or net#chan):", 110, 7 46 213 8, tab 1 nowrap
+  combo 120, 6 55 213 8, tab 1 drop edit
+  button "Add", 130, 6 71 104 14, tab 1 flat disable
+  button "Remove", 135, 115 71 104 14, tab 1 flat disable
+  list 140, 7 87 212 100, tab 1 vsbar size sort extsel
+  box " Update ", 150, 6 189 213 48, tab 1
+  check "Check for updates", 160, 11 199 100 8, tab 1
+  check "Check for &beta versions", 165, 116 199 100 8, tab 1
+  button "dlFilter website", 170, 10 211 100 14, tab 1 flat
+  button "Update dlFilter", 180, 115 211 100 14, tab 1 flat disable
+  text "Checking for dlFilter updates...", 190, 10 226 206 8, tab 1 nowrap
 
   ; tab Filters
-  box " Channel messages ", 305, 4 23 160 91, tab 3
-  check "Filter other users @search / @file / @locator / !get requests", 310, 7 32 155 6, tab 3
-  check "Filter server adverts and announcements", 315, 7 41 155 6, tab 3
-  check "Filter channel topic updates", 320, 7 50 155 6, tab 3
-  check "Filter channel mode changes (e.g. maximum user limits)", 325, 7 59 155 6, tab 3
-  check "Filter trivia games", 330, 7 68 155 6, tab 3
-  check "Filter server responses to my requests to separate window", 335, 7 77 155 6, tab 3
-  check "Filter ALL coloured messages (last resort - use cautiously)", 340, 7 86 155 6, tab 3
-  check "Filter private msgs from regular users IN filtered channels", 345, 7 95 155 6, tab 3
-  check "Filter private msgs from reg. users NOT IN filtered channels", 350, 7 104 155 6, tab 3
-  box " Advert / Filter Windows ", 360, 4 115 160 28, tab 3
-  check "Separate dlF windows per connection", 365, 7 124 155 6, tab 3
-  check "Keep Filter windows active in background", 370, 7 133 155 6, tab 3
-  box " Regular user events ", 375, 4 144 160 55, tab 3
-  check "Joins ...", 380, 7 153 53 6, tab 3
-  check "Parts ...", 382, 66 153 53 6, tab 3
-  check "Quits ...", 384, 120 153 53 6, tab 3
-  check "Nick changes ...", 386, 7 162 53 6, tab 3
-  check "Kicks ...", 388, 66 162 53 6, tab 3
-  check "Away and thank-you messages", 390, 7 171 155 6, tab 3
-  check "User mode changes", 395, 7 180 155 6, tab 3
-  check "Filter above user events for non-regular users", 397, 7 189 155 6, tab 3
+  box " Channel messages ", 305, 6 26 213 103, tab 3
+  check "Filter other users @search / @file / @locator / !get requests", 310, 10 36 206 8, tab 3
+  check "Filter server adverts and announcements", 315, 10 46 206 8, tab 3
+  check "Filter channel topic updates", 320, 10 56 206 8, tab 3
+  check "Filter channel mode changes (e.g. maximum user limits)", 325, 10 66 206 8, tab 3
+  check "Filter trivia games", 330, 10 76 206 8, tab 3
+  check "Filter server responses to my requests to separate window", 335, 10 86 206 8, tab 3
+  check "Filter ALL coloured messages (last resort - use cautiously)", 340, 10 96 206 8, tab 3
+  check "Filter private msgs from regular users IN filtered channels", 345, 10 106 206 8, tab 3
+  check "Filter private msgs from reg. users NOT IN filtered channels", 350, 10 116 206 8, tab 3
+  box " Advert / Filter Windows ", 360, 6 130 213 33, tab 3
+  check "Separate dlF windows per connection", 365, 10 140 206 8, tab 3
+  check "Keep Filter windows active in background", 370, 10 150 206 8, tab 3
+  box " Regular user events ", 375, 6 164 213 63, tab 3
+  check "Joins ...", 380, 10 174 68 8, tab 3
+  check "Parts ...", 382, 79 174 68 8, tab 3
+  check "Quits ...", 384, 148 174 68 8, tab 3
+  check "Nick changes ...", 386, 10 184 68 8, tab 3
+  check "Kicks ...", 388, 79 184 68 8, tab 3
+  check "Away and thank-you messages", 390, 10 194 206 8, tab 3
+  check "User mode changes", 395, 10 204 206 8, tab 3
+  check "Filter above user events for non-regular users", 397, 10 214 206 8, tab 3
 
   ; Tab Other
-  box " Extra functions ", 505, 4 23 160 37, tab 5
-  check "Collect @find/@locator results into a single window", 510, 7 32 155 6, tab 5
-  check "Display dlFilter channel efficiency in title bar", 515, 7 41 155 6, tab 5
-  check "Colour uncoloured fileservers in nickname list", 520, 7 50 155 6, tab 5
-  box " File requests ", 535, 4 61 160 73, tab 5
-  check "Auto accept files you have specifically requested", 540, 7 70 155 6, tab 5
-  check "Block ALL files you have NOT specifically requested. Or:", 545, 7 79 155 6, tab 5
-  check "Block potentially dangerous filetypes", 550, 15 88 147 6, tab 5
-  check "Block files from users not in a common channel", 555, 15 97 147 6, tab 5
-  check "Block files from users not in your mIRC DCC trust list", 560, 15 106 147 6, tab 5
-  check "Block files from regular users", 565, 15 115 147 6, tab 5
-  check "Retry incomplete file requests (up to 3 times)", 570, 7 124 155 6, tab 5
-  box " mIRC-wide ", 605, 4 135 160 73, tab 5
-  check "Check mIRC settings are secure (future enhancement)", 610, 7 144 155 6, tab 5 disable
-  check "Prevent non-Notify private message opening query window", 620, 7 153 155 6, tab 5
-  check "Filter private spam", 630, 7 162 155 6, tab 5
-  check "Filter private messages from users not in a common channel", 640, 7 171 155 6, tab 5
-  check "Block channel CTCP requests unless from an op", 655, 7 180 155 6, tab 5
-  check "Block IRC Finger requests (which share personal information)", 660, 7 189 155 6, tab 5
-  check "Load dlFilter last (rather than first)", 665, 7 198 155 6, tab 5
+  box " Extra functions ", 505, 6 26 213 43, tab 5
+  check "Collect @find/@locator results into a single window", 510, 10 36 206 8, tab 5
+  check "Display dlFilter channel efficiency in title bar", 515, 10 46 206 8, tab 5
+  check "Colour uncoloured fileservers in nickname list", 520, 10 56 206 8, tab 5
+  box " File requests ", 535, 6 70 213 83, tab 5
+  check "Auto accept files you have specifically requested", 540, 10 80 206 8, tab 5
+  check "Block ALL files you have NOT specifically requested. Or:", 545, 10 90 206 8, tab 5
+  check "Block potentially dangerous filetypes", 550, 21 100 195 8, tab 5
+  check "Block files from users not in a common channel", 555, 21 110 195 8, tab 5
+  check "Block files from users not in your mIRC DCC trust list", 560, 21 120 195 8, tab 5
+  check "Block files from regular users", 565, 21 130 195 8, tab 5
+  check "Retry incomplete file requests (up to 3 times)", 570, 10 140 206 8, tab 5
+  box " mIRC-wide ", 605, 6 154 213 83, tab 5
+  check "Check mIRC settings are secure (future enhancement)", 610, 10 164 206 8, tab 5 disable
+  check "Prevent non-Notify private message opening query window", 620, 10 174 206 8, tab 5
+  check "Filter private spam", 630, 10 184 206 8, tab 5
+  check "Filter private messages from users not in a common channel", 640, 10 194 206 8, tab 5
+  check "Block channel CTCP requests unless from an op", 655, 10 204 206 8, tab 5
+  check "Block IRC Finger requests (which share personal information)", 660, 10 214 206 8, tab 5
+  check "Load dlFilter last (rather than first)", 665, 10 224 206 8, tab 5
 
   ; tab Ops
-  text "These options are only enabled if you are an op on a filtered channel.", 705, 4 25 160 12, tab 7 multi
-  box " Channel Ops ", 710, 4 38 160 38, tab 7
-  check "Filter oNotices etc. to separate OpsTalk @#window ", 715, 7 48 155 6, tab 7
-  check "On channel spam, oNotify other ops", 725, 7 57 155 6, tab 7
-  check "On private spam, oNotify other ops in common channels", 730, 7 66 155 6, tab 7
-  box " dlFilter promotion ", 755, 4 77 160 38, tab 7
-  check "Advertise dlFilter in channels every", 760, 7 87 93 6, tab 7
-  edit "60", 765, 101 85 12 10, tab 7 right limit 2
-  text "mins", 770, 115 86 47 7, tab 7
-  check "... and filter them out", 780, 15 96 147 6, tab 7
-  check "Prompt individual existing dlFilter users to upgrade", 790, 7 105 155 6, tab 7
+  text "These options are only enabled if you are an op on a filtered channel.", 705, 7 28 213 16, tab 7 multi
+  box " Channel Ops ", 710, 6 46 213 43, tab 7
+  check "Filter oNotices etc. to separate OpsTalk @#window ", 715, 10 56 206 8, tab 7
+  check "On channel spam, oNotify other ops", 725, 10 66 206 8, tab 7
+  check "On private spam, oNotify other ops in common channels", 730, 10 76 206 8, tab 7
+  box " dlFilter promotion ", 755, 6 89 213 43, tab 7
+  check "Advertise dlFilter in channels every", 760, 10 100 125 8, tab 7
+  edit "60", 765, 135 99 14 10, tab 7 right limit 2
+  text "mins", 770, 150 100 47 8, tab 7
+  check "... and filter them out", 780, 21 110 195 8, tab 7
+  check "Prompt individual existing dlFilter users to upgrade", 790, 10 120 206 8, tab 7
 
   ; tab Custom
-  check "Enable custom filters", 810, 5 27 65 7, tab 8
-  text "Message type:", 820, 74 27 50 7, tab 8
-  combo 830, 114 25 50 10, tab 8 drop
-  edit "", 840, 4 37 160 10, tab 8 autohs
-  button "Add", 850, 5 51 76 11, tab 8 flat disable
-  button "Remove", 860, 86 51 76 11, tab 8 flat disable
-  list 870, 4 64 160 144, tab 8 hsbar vsbar size sort extsel
+  check "Enable custom filters", 810, 6 30 95 8, tab 8
+  text "Message type:", 820, 104 30 50 8, tab 8 nowrap
+  combo 830, 154 28 65 8, tab 8 drop
+  edit "", 840, 6 44 213 12, tab 8 autohs
+  button "Add", 850, 6 58 104 14, tab 8 flat disable
+  button "Remove", 860, 115 58 104 14, tab 8 flat disable
+  list 870, 7 74 212 162, tab 8 hsbar vsbar size sort extsel
 
   ; tab About
-  edit "", 920, 3 25 162 167, multi read vsbar tab 9
-  text "Download:", 980, 5 194 35 7, tab 9
-  link "https://github.com/DukeLupus/dlFilter/", 985, 45 194 120 7, tab 9
-  text "Report issues:", 990, 5 201 35 7, tab 9
-  link "https://gitreports.com/issue/DukeLupus/dlFilter/", 995, 45 201 120 7, tab 9
+  edit "", 920, 6 28 213 190, multi read vsbar tab 9
+  text "Download:", 980, 6 220 44 8, tab 9
+  link "https://github.com/DukeLupus/dlFilter/", 985, 55 220 166 8, tab 9
+  text "Report issues:", 990, 6 229 44 8, tab 9 nowrap
+  link "https://gitreports.com/issue/DukeLupus/dlFilter/", 995, 55 229 166 8, tab 9
 }
 
 alias -l DLF.Options.SetLinkedFields {
@@ -3874,6 +3875,8 @@ on *:dialog:DLF.Options.GUI:sclick:985,995: url -a $did(DLF.Options.GUI,$did)
 ; Handle all other checkbox clicks and save
 ; Should go last so that sclick for specific fields take precedence
 on *:dialog:DLF.Options.GUI:sclick:10-999: DLF.Options.ClickOption
+; On close save active tab
+on *:dialog:DLF.Options.GUI:close:0: DLF.Options.Close
 
 ; Initialise variables
 alias -l DLF.Options.Initialise {
@@ -4011,6 +4014,11 @@ alias -l DLF.Options.ToggleOption {
 }
 
 alias -l DLF.Options.Init {
+  ; Reactivate previously active tab
+  if (%DLF.optionstabactive !== $null) .timer 1 0 did -f DLF.Options.GUI %DLF.optionstabactive
+  ; Select control which doesn't display focus
+  .timer 1 0 did -f DLF.Options.GUI 15
+
   ; Disable Ops tab
   DLF.Options.OpsTab
 
@@ -4018,7 +4026,7 @@ alias -l DLF.Options.Init {
   var %ver $DLF.mIRCversion
   if (%ver != 0) {
     did -b DLF.Options.GUI 10
-    did -vo DLF.Options.GUI 20 1 Upgrade to %ver $+ +
+    did -vo DLF.Options.GUI 20 1 You need to upgrade to %ver $+ +
   }
   if (%DLF.enabled == 1) did -c DLF.Options.GUI 10
   if (%DLF.showfiltered == 1) did -c DLF.Options.GUI 30
@@ -4082,6 +4090,11 @@ alias -l DLF.Options.Init {
   DLF.Options.SetLinkedFields
   DLF.Update.Check
   DLF.Options.About
+}
+
+; Save active tab
+alias -l DLF.Options.Close {
+  set -e %DLF.optionstabactive $dialog(DLF.Options.GUI).tab
 }
 
 ; Enable / disable fields based on checkbox state
