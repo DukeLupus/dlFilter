@@ -3714,6 +3714,8 @@ alias DLF.Options.Toggle { dialog $iif($dialog(DLF.Options.GUI),-c,-mdh) DLF.Opt
 dialog -l DLF.Options.GUI {
   title dlFilter v $+ $DLF.SetVersion
   size -1 -1 225 260
+  ; map is undocumented solution to Windows 10 Display Scaling issue reported in https://github.com/DukeLupus/dlFilter/issues/72
+  ; solution was identified by mIRC author @Khaled in https://forums.mirc.com/ubbthreads.php/topics/263707
   option map
   link "Help", 15, 206 3 16 8, right
   text "", 20, 92 2 130 8, right hide
@@ -4014,6 +4016,9 @@ alias -l DLF.Options.ToggleOption {
 }
 
 alias -l DLF.Options.Init {
+  ; following lines use timer because tab activation fails in dialog INIT event
+  ; see https://forums.mirc.com/ubbthreads.php/topics/263718/Activating_dialog_tab_inside_I
+
   ; Reactivate previously active tab
   if (%DLF.optionstabactive !== $null) .timer 1 0 did -f DLF.Options.GUI %DLF.optionstabactive
   ; Select control which doesn't display focus
