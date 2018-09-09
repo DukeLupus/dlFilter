@@ -147,8 +147,7 @@ alias -l DLF.mIRCversion {
 ; ========== Initialisation / Termination ==========
 ; Reload script to reposition first/last and Initialise new variables
 on *:start: {
-  var %pos $DLF.LoadPosition
-  if ($script != $script(%pos)) DLF.Reload %pos
+  if ($script != $script($DLF.LoadPosition)) DLF.Reload
   DLF.Initialise
   return
 
@@ -158,8 +157,10 @@ on *:start: {
 
 ; Reload at defined position and reinitialise
 alias -l DLF.Reload {
-  .timer 1 0 .signal DLF.Initialise
-  .reload -rs $+ $1 $qt($script)
+  .timer -m 1 100 .signal DLF.Initialise
+  var %file $DLF.Script
+  .reload -rs $+ $DLF.LoadPosition $qt(%file)
+  if (%file != $script) .unload -rsn $qt($script)
   halt
 }
 
@@ -283,7 +284,7 @@ on *:unload: {
   }
   DLF.StatusAll Unloading complete.
   DLF.StatusAll $space
-  DLF.StatusAll To reload run /load -r $qt($script)
+  DLF.StatusAll To reload run /load -rs $qt($script)
   DLF.StatusAll $space
 }
 
@@ -2577,7 +2578,7 @@ alias -l DLF.Win.HighlightFlag {
 }
 
 alias -l DLF.Win.Echo {
-  DLF.Watch.Log DLF.Win.Echo $1-
+  DLF.Watch.Called DLF.Win.Echo $1-
   if ($halted) {
     DLF.Watch.Log Filtered: Already halted by previous script: $1-
     return
@@ -4211,7 +4212,7 @@ alias -l DLF.Options.Titlebar {
 
 alias -l DLF.Options.LoadLast {
   DLF.Options.Save
-  DLF.Reload $DLF.LoadPosition
+  DLF.Reload
 }
 
 alias -l DLF.Options.OpsAdPeriod {
@@ -4463,7 +4464,14 @@ alias -l DLF.Options.Status {
   DLF.StatusAll $1-
 }
 
+alias -l DLF.Options.Warning {
+  if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 190 1 Warning: $1-
+  DLF.Warning $1-
+}
+
 alias -l DLF.Options.Error {
+  if ($dialog(DLF.Options.GUI)) did -o DLF.Options.GUI 190 1 Error: $1-
+  DLF.Error $1-
 }
 
 ; ========== Check version for updates ==========
@@ -4572,7 +4580,7 @@ alias -l DLF.Update.DownloadAvailable {
     var %i $chan(0)
     while (%i) {
       var %chan = $chan(%i)
-      if ($DLF.Chan.IsDlfChan(%cchan)) DLF.Update.ChanAnnounce %chan $1-
+      if ($DLF.Chan.IsDlfChan(%chan)) DLF.Update.ChanAnnounce %chan $1-
       dec %i
     }
     dec %net
@@ -4604,12 +4612,21 @@ alias -l DLF.Update.ChanAnnounce {
 ; ========== Download new version ==========
 alias -l DLF.Download.Run {
   DLF.Options.Status Downloading new version of dlFilter...
-  var %newscript $qt($script $+ .new)
-  if ($isfile(%newscript)) .remove %newscript
+  var %newscript $DLF.NewScript
+  if ($isfile(%newscript)) DLF.Remove %newscript
   if ($exists(%newscript)) DLF.Socket.Error Unable to delete old temporary download file.
   var %branch master
   if ((%DLF.update.betas == 1) && (%DLF.version.beta > %DLF.version.web)) %branch = beta
   DLF.Socket.Get Download $+(https:,//raw.githubusercontent.com/DukeLupus/dlFilter/,%branch,/dlFilter.mrc)
+}
+
+alias -l DLF.Script {
+  if ($DLF.IsDirUnwritable($script)) return $mircdir $+ $nopath($script)
+  return $script
+}
+
+alias -l DLF.NewScript {
+  return $qt($DLF.Script $+ .new)
 }
 
 on *:sockread:DLF.Socket.Download: {
@@ -4617,64 +4634,69 @@ on *:sockread:DLF.Socket.Download: {
   var %mark $sock($sockname).mark
   var %state $gettok(%mark,1,$asc($space))
   if (%state != Body) DLF.Socket.Error Cannot process response: Still processing %state
-  var %newscript $qt($script $+ .new)
-  if ($isfile(%newscript)) .remove %newscript
-  if ($exists(%newscript)) DLF.Socket.Error Cannot delete file %newscript from previous attempt to update
-  while ($true) {
-    sockread &block
-    if ($sockerr > 0) DLF.Socket.SockErr sockread:Body
-    if ($sockbr == 0) break
-    bwrite %newscript -1 -1 &block
-  }
+  var %newscript $DLF.NewScript
+  while ($DLF.Download.Sockread(%newscript)) { noop }
+}
+
+alias -l DLF.Download.SockRead {
+  var %file $1-
+  sockread -f &block
+  if ($sockerr > 0) DLF.Socket.SockErr $event
+  if ($sockbr == 0) return $false
+  bwrite $1- -1 -1 &block
+  return $true
 }
 
 on *:sockclose:DLF.Socket.Download: {
-  var %newscript $qt($script $+ .new)
-  var %oldscript $qt($script $+ .v $+ $replace($DLF.SetVersion,.,))
-  var %oldsaved $false
-  sockread -f &block
-  if ($sockerr > 0) DLF.Socket.SockErr sockclose
-  if ($sockbr > 0) bwrite %newscript -1 -1 &block
-  if ($isfile(%oldscript)) .remove %oldscript
-  if ($exists(%oldscript)) {
-    DLF.Warning Cannot save old version of $qt($nopath($script)) because saved version $qt($script) already exists and cannot be removed.
-    .remove $script
+  var %newscript $DLF.NewScript
+  var %oldscript $qt($DLF.Script $+ .v $+ $replace($DLF.SetVersion,.,))
+
+  DLF.Download.Sockread %newscript
+
+  if ($nofile($script) == $nofile(%newscript)) {
+    if ($isfile(%oldscript)) .remove %oldscript
+    if ($exists(%oldscript)) {
+      DLF.Warning Cannot save old version of dlFilter because saved version %oldscript already exists and cannot be removed.
+    }
+    else {
+      .rename $qt($script) %oldscript
+      DLF.StatusAll Old version of $qt($nopath($script)) saved as $qt($nopath(%oldscript)) in case you need to revert.
+    }
   }
-  else {
-    .rename $qt($script) %oldscript
-    %oldsaved = $true
-  }
-  .rename %newscript $qt($script)
-  if (%oldsaved) DLF.StatusAll Old version of $qt($nopath($script)) saved as $qt($nopath(%oldscript)) in case you need to revert.
+  else DLF.Warning Old version of dlFilter kept in $qt($nofile($script)) $+ . New version is located in $qt($nofile(%newscript)) $+ .
+  var %script $qt($DLF.Script)
+  if ($exists(%script)) DLF.Remove %script
+  if ($exists(%script)) DLF.Error Cannot make downloaded version of dlFilter live because old version cannot be removed.
+  .rename %newscript %script
   DLF.Options.Status New version of dlFilter downloaded and installed.
   if ($dialog(DLF.Options.GUI)) dialog -x DLF.Options.GUI
-  DLF.Reload $DLF.LoadPosition
+  DLF.Reload
 }
 
 ; Check that a directory is writable to avoid errors if it isn't.
-alias DLF.IsDirWritable {
+alias DLF.IsDirUnwritable {
   var %dir $1
-  if ($isfile($1)) %dir = $nofile(%dir)
+  if (!$isdir($1)) %dir = $nofile(%dir)
   elseif ($isdir($1) && ($right($1,1) != \)) %dir = %dir $+ \
-  if (!$exists(%dir)) goto error
+  if (!$isdir(%dir)) goto error
   var %fn $qt($+(%dir,$file($script).name,.tmp))
   if (!$exists(%fn)) write -cm2n %fn Writable?
   if (!$exists(%fn)) goto error
   .remove %fn
   DLF.Watch.Log $qt(%dir) is writable
-  return $true
+  return $false
 
 :error
   DLF.Watch.Log $qt(%dir) is not writable.
   reseterror
-  return $false
+  return $true
 }
 
 ; Check that a file is writable to avoid errors if it isn't.
-; Cannot check file NTFS permissions, so file writable if directory is writable and file does not have read-only attribute
-alias DLF.IsFileWritable {
-  if ($isfile($1) && (r isin $file($1).attr) return $false
-  return $DLF.IsDirWritable($nofile($1))
+; Cannot check file NTFS permissions, so file is writable if directory is writable and file does not have read-only attribute
+alias DLF.IsFileUnwritable {
+  if ($isfile($1) && (r isin $file($1).attr) return $true
+  return $DLF.IsDirUnwritable($nofile($1))
 }
 
 ; Rename a file - handling errors if it isn't.
