@@ -3747,7 +3747,7 @@ dialog -l DLF.Options.GUI {
   check "Check for &beta versions", 165, 116 189 100 8, tab 1
   button "dlFilter website", 170, 10 201 100 14, tab 1 flat
   button "Update dlFilter", 180, 115 201 100 14, tab 1 flat disable
-  text "Checking for dlFilter updates...", 190, 10 216 206 18, tab 1
+  text "Checking for dlFilter updates...", 190, 10 216 206 18, tab 1 center
 
   ; tab Filters
   box " Channel messages ", 305, 6 26 213 103, tab 3
@@ -4573,16 +4573,16 @@ alias -l DLF.Update.CheckVersions {
         if ($floor(%DLF.version.beta) > $floor($DLF.SetVersion)) %comment = Major new version
         DLF.Update.DownloadAvailable beta %DLF.version.beta %DLF.version.beta.mirc %comment
       }
-      elseif (%DLF.version.beta == $DLF.SetVersion) DLF.Options.Status Running current version of dlFilter beta
-      else DLF.Options.Status Running newer version $br($DLF.SetVersion) than beta download $br(%DLF.version.beta)
+      elseif (%DLF.version.beta == $DLF.SetVersion) DLF.Options.Status Running current version of dlFilter beta.
+      else DLF.Options.Status Running newer version $br($DLF.SetVersion) than beta download $br(%DLF.version.beta) $+ .
     }
     elseif (%DLF.version.web > $DLF.SetVersion) {
       var %comment %DLF.version.web.comment
       if ($floor(%DLF.version.web) > $floor($DLF.SetVersion)) %comment = Major new version
       DLF.Update.DownloadAvailable production %DLF.version.web %DLF.version.web.mirc %comment
     }
-    elseif (%DLF.version.web == $DLF.SetVersion) DLF.Options.Status Running current version of dlFilter
-    else DLF.Options.Status Running newer version $br($DLF.SetVersion) than production download $br(%DLF.version.web)
+    elseif (%DLF.version.web == $DLF.SetVersion) DLF.Options.Status Running current version of dlFilter.
+    else DLF.Options.Status Running newer version $br($DLF.SetVersion) than production download $br(%DLF.version.web) $+ .
   }
   else DLF.Socket.Error dlFilter version missing!
 }
