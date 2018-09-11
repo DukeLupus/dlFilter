@@ -13,7 +13,9 @@ This script filters out the crud, leaving only the useful messages displayed in 
 • Limit spam messages of all types from other users
 • If you are a channel op, provide a separate chat window for operators
 
-This version is a significant upgrade from the previous major release 1.16 with significant new functionality, which we hope will encourage strong take-up.
+Version 2 is a significant upgrade from the previous major release 1.16 with significant new functionality, which we hope will encourage strong take-up.
+
+Version 2.08 fixes the updater and makes the Options dialog work on high resolution e.g. 4K screens with Windows 10 Display Scaling > 100%.
 
 Feedback on this new version is appreciated. dlFilter is now also an Open Source project, hosted on Github, and we welcome contributions of bug fixes and further improvement from the community.
 
@@ -116,13 +118,15 @@ dlFilter uses the following code from other people:
 
 2.08  Improve options dialog display on high resolution screens (e.g. 4K) when Windows scaling is > 100%.
       Make options dialog tab sticky (i.e. when you close and reopen dialog, active tab is maintained.
+      Fix downloads only keeping last section - may require a manual update.
+      Fix downloads when script is in a read-only directory.
 
 */
 
 ; Increase this when you have sufficient changes to justify a release
 ; When you want to trigger updates for existing users, change the version file.an
 alias -l DLF.SetVersion {
-  %DLF.version = 2.07
+  %DLF.version = 2.08
   return %DLF.version
 }
 
