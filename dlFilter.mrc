@@ -3741,13 +3741,13 @@ dialog -l DLF.Options.GUI {
   combo 120, 6 55 213 8, tab 1 drop edit
   button "Add", 130, 6 71 104 14, tab 1 flat disable
   button "Remove", 135, 115 71 104 14, tab 1 flat disable
-  list 140, 7 87 212 100, tab 1 vsbar size sort extsel
-  box " Update ", 150, 6 189 213 48, tab 1
-  check "Check for updates", 160, 11 199 100 8, tab 1
-  check "Check for &beta versions", 165, 116 199 100 8, tab 1
-  button "dlFilter website", 170, 10 211 100 14, tab 1 flat
-  button "Update dlFilter", 180, 115 211 100 14, tab 1 flat disable
-  text "Checking for dlFilter updates...", 190, 10 226 206 8, tab 1 nowrap
+  list 140, 7 87 212 90, tab 1 vsbar size sort extsel
+  box " Update ", 150, 6 179 213 58, tab 1
+  check "Check for updates", 160, 11 189 100 8, tab 1
+  check "Check for &beta versions", 165, 116 189 100 8, tab 1
+  button "dlFilter website", 170, 10 201 100 14, tab 1 flat
+  button "Update dlFilter", 180, 115 201 100 14, tab 1 flat disable
+  text "Checking for dlFilter updates...", 190, 10 216 206 18, tab 1
 
   ; tab Filters
   box " Channel messages ", 305, 6 26 213 103, tab 3
@@ -4588,8 +4588,9 @@ alias -l DLF.Update.CheckVersions {
 }
 
 alias -l DLF.Update.DownloadAvailable {
-  var %ver $1 version $2
-  if ($4-) %ver = %ver - $4-
+  var %ver $1 version $2 $+ .
+  if ($4-) %ver = $+(%ver,$space,This version:,$crlf,$4-)
+  else %ver = $+(%ver,.)
   if ($version >= $3) {
     DLF.Options.Status You can update to %ver
     did -e DLF.Options.GUI 180
