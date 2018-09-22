@@ -1066,8 +1066,8 @@ alias -l DLF.Chan.Text {
   }
   if ($hiswm(chantext.dlf,%txt)) {
     ; Someone else is sending channel ads - reset timer to prevent multiple ops flooding the channel
-    var %secs $timer(dlf.advert).secs + 30
-    set $+(-eu,%secs) $($+(%,DLF.opsnochanads.,$network,$chan),2) 1
+    var %secs $calc($timer(dlf.advert).secs + 30)
+    set $+(-eu,%secs) $+(%,DLF.opsnochanads.,$network,$chan) 1
     DLF.Win.Ads $1-
   }
   if (($me isop $chan) && (%DLF.ops.advertpriv == 1)) {
