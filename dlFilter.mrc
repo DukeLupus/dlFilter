@@ -1494,7 +1494,7 @@ alias -l DLF.Priv.ctcpReply {
 alias -l DLF.Priv.SpamFilter {
   if (%DLF.opwarning.spamchan == 1) {
     var %msg $c(1,15,Private spam received from $nick $br($address($nick,5)) $+ : $qt($1-))
-    var %i $comchan($nick,0).op
+    var %i $comchan($nick,0)
     while (%i) {
       var %chan $comchan($nick,%i)
       if ($comchan($nick,%i).op) .DLF.notice @ $+ %chan $DLF.logo %msg
