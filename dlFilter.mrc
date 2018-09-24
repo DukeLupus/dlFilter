@@ -121,6 +121,9 @@ dlFilter uses the following code from other people:
       Fix downloads only keeping last section - may require a manual update.
       Fix downloads when script is in a read-only directory.
 
+2.09  Fix error when DLF is being advertised by a channel op.
+      Fix 2 errors reporting spam from another user to channel ops.
+
 */
 
 ; Increase this when you have sufficient changes to justify a release
@@ -1489,13 +1492,12 @@ alias -l DLF.Priv.ctcpReply {
 }
 
 alias -l DLF.Priv.SpamFilter {
-echo -st DLF.Priv.SpamFilter $1-
   if (%DLF.opwarning.spamchan == 1) {
-    var %msg $c(4,15,Private spam from $nick $br($address($nick,5)) $+ : $q($1-))
+    var %msg $c(1,15,Private spam received from $nick $br($address($nick,5)) $+ : $qt($1-))
     var %i $comchan($nick,0).op
     while (%i) {
-      var %chan $comchan($nick,%i).op
-      .DLF.notice @ $+ %chan $DLF.logo %msg
+      var %chan $comchan($nick,%i)
+      if ($comchan($nick,%i).op) .DLF.notice @ $+ %chan $DLF.logo %msg
       dec %i
     }
     DLF.Win.Echo Blocked Private $nick %msg
@@ -6049,7 +6051,9 @@ alias -l DLF.ctcpEncode {
 }
 
 alias -l DLF.ComChanOp {
-  if ($left($1,1) isin $chantypes) return $false
+  var %target $1
+  if ($left(%target,1) isin @+) %target = $right(%target,-1)
+  if ($left(%target,1) isin $chantypes) return $false
   var %i $comchan($1,0)
   while (%i) {
     if ($comchan($1,%i).op) return $comchan($1,%i)
