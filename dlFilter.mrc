@@ -123,11 +123,13 @@ dlFilter uses the following code from other people:
 
 2.09  Fix error when DLF is being advertised by a channel op.
       Fix 2 errors reporting spam from another user to channel ops.
+      Include web version in channel advertising and show received adverts if current version does not match
+      Fix auto-accept of @search results where search includes an apostrophe
 
 */
 
 ; Increase this when you have sufficient changes to justify a release
-; When you want to trigger updates for existing users, change the version file.an
+; When you want to trigger updates for existing users, change the version file.
 alias -l DLF.SetVersion {
   %DLF.version = 2.08
   return %DLF.version
@@ -1293,7 +1295,7 @@ alias -l DLF.Chan.ctcpBlock {
 ; TODO - limit frequency of warnings about a specific user and send oNotice after a random period with cancel if reported by another DLF instance.
 alias -l DLF.Chan.SpamFilter {
   if ($DLF.Options.IsOp && (%DLF.opwarning.spamchan == 1) && ($me isop $chan)) {
-    var %msg $c(4,15,Channel spam from $nick $br($address($nick,5)) $+ : $q($1-))
+    var %msg $c(4,15,Channel spam from $nick $br($address($nick,5)) $+ : $qt($1-))
     .notice @ $+ $chan $DLF.logo %msg
     DLF.Win.Echo Filter Blocked $chan $nick %msg
   }
@@ -1715,7 +1717,7 @@ alias -l DLF.Ops.AdvertChanNet {
       continue
     }
     if (($DLF.Chan.IsDlfChan(%c,$false),$asc($comma)) && ($me isop %c)) {
-      var %msg $c(1,9,$DLF.logo Are the responses to your requests getting lost in the crowd? Are your @find responses spread about? If you are using mIRC as your IRC client, then download dlFilter from $u($c(2,https://github.com/DukeLupus/dlFilter/)) and make your time in %c less stressful.)
+      var %msg $c(1,9,$DLF.logo Are the responses to your requests getting lost in the crowd? Are your @find responses spread about? If you are using mIRC as your IRC client, then download dlFilter version %DLF.version.web from $u($c(2,https://github.com/DukeLupus/dlFilter/)) and make your time in %c less stressful.)
       if (%DLF.ops.advertchan.filter == 1) {
         .msg %c %msg
         DLF.Win.Log Filter text %c $me %msg
@@ -1881,8 +1883,9 @@ alias -l DLF.DccSend.Request {
 }
 
 alias DLF.DccSend.FixString {
-  var %s = $replace($strip($1-),$tab $+ $space,$space,$tab,$null)
-  return $remove(%s,¬,`,¦,!,",£,$,€,%,^,&,*,$lbr,$rbr,_,-,+,=,$lcurly,$rcurly,[,],:,;,@,',~,$hashtag,|,\,<,$comma,>,.,?,/)
+  var %tab $tab, %space $space
+  var %s = $replace($strip($1-),%tab $+ %space,%space,%tab,$null,',%space)
+  return $remove(%s,¬,`,¦,!,",£,$,€,%,^,&,*,$lbr,$rbr,_,-,+,=,$lcurly,$rcurly,[,],:,;,@,~,$hashtag,|,\,<,$comma,>,.,?,/)
 }
 
 alias -l DLF.DccSend.GetRequest {
@@ -1891,8 +1894,8 @@ alias -l DLF.DccSend.GetRequest {
   if (%req) return %req
   if (*_results_for_*.txt.zip iswmcs %fn) {
     var %nick $gettok(%fn,1,$asc(_)), %trig $DLF.SearchBot.TriggerFromNick($nick)
-    var %sbresult %nick $+ _results_for_
     if ((%trig) && ($istok($nick $nick $+ Bot Search SearchBot,%nick,$asc($space)))) {
+      var %sbresult %nick $+ _results_for_
       var %srch $right($removecs($gettok(%fn,1,$asc(.)),%sbresult),-1)
       return $hfind(DLF.dccsend.requests,$+($network,|*|,%trig,|,%srch,|*),1,w).item
     }
@@ -5302,7 +5305,8 @@ alias -l DLF.CreateHashTables {
   inc %matches $hget(DLF.channotice.trivia,0).item
 
   DLF.hmake DLF.chantext.dlf
-  DLF.hadd chantext.dlf $strip($DLF.logo) *
+  DLF.hadd chantext.dlf $strip($DLF.logo) * download dlFilter version %DLF.version *
+  DLF.hadd chantext.dlf $strip($DLF.logo) * download dlFilter from *
   inc %matches $hget(DLF.chantext.dlf,0).item
 
   DLF.hmake DLF.chantext.spam
