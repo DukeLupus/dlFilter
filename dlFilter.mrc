@@ -131,6 +131,7 @@ dlFilter uses the following code from other people:
       Don't echo notices to active window
       Don't echo anything to active windows which are custom windows unless an ochat window.
       Fix DCC Get resume reported bytes received when no bytes were received.
+      If advertising DLF, check for updates daily instead of weekly.
 
 */
 
