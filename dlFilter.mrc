@@ -126,6 +126,12 @@ dlFilter uses the following code from other people:
       Include web version in channel advertising and show received adverts if current version does not match
       Fix auto-accept of @search results where search includes an apostrophe
 
+2.10  Allow DCC Send resumes when running a file-server by not halting CTCP DCC RESUME.
+      Don't send ctcp to query window
+      Don't echo notices to active window
+      Don't echo anything to active windows which are custom windows unless an ochat window.
+      Fix DCC Get resume reported bytes received when no bytes were received.
+
 */
 
 ; Increase this when you have sufficient changes to justify a release
@@ -597,6 +603,7 @@ ctcp ^*:PING*:?: { DLF.Priv.ctcpBlock $1- }
 ctcp *:DCC CHAT *:?: { DLF.DccChat.Chat $1- }
 ctcp *:DCC SEND *:?: { DLF.DccSend.Send $1- }
 ctcp *:DCC ACCEPT *:?: { DLF.DccSend.Accept $1- }
+ctcp *:DCC RESUME *:?: { noop }
 ctcp *:*:?: { DLF.Priv.ctcp $1- }
 ctcp *:*:%DLF.channels: { if ($DLF.Chan.IsChanEvent) DLF.Chan.ctcp $1- }
 
@@ -1472,7 +1479,7 @@ alias -l DLF.Priv.ctcp {
   DLF.Watch.Called DLF.Priv.ctcp : $1-
   if ($1 == TRIGGER) DLF.SearchBot.SetTriggers $1-
   DLF.Custom.Filter privctcp $1-
-  DLF.Priv.QueryOpen $1-
+;  DLF.Priv.QueryOpen $1-
   DLF.Priv.CommonChan $1-
   DLF.Priv.RegularUser ctcp $1-
   DLF.Win.Echo $event Private $nick $1-
@@ -2050,8 +2057,9 @@ alias -l DLF.DccSend.AddAccepted {
 
 alias -l DLF.DccSend.IsntAccepted {
   var %hash $DLF.DccSend.Hash($1-)
-  if ($hget(DLF.dccsend.accepted,%hash)) return $false
-  return $true
+  if (!$hget(DLF.dccsend.accepted,%hash)) return $true
+  .hdel DLF.dccsend.accepted %hash
+  return $false
 }
 
 alias -l DLF.DccSend.DelAccepted {
@@ -2157,7 +2165,8 @@ alias -l DLF.DccSend.GetFailed {
   if (%resume !isin Resume Overwrite) %retry = $false
   if (%retry) %retrying = - $c(3,retrying)
   var %percent $floor($calc($get(-1).rcvd * 100 / $get(-1).size))
-  var %bytes $get(-1).rcvd - $get(-1).resume
+  var %bytes $get(-1).rcvd
+  if (%bytes > 0) %bytes = $calc(%bytes - $get(-1).resume)
   DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick incomplete $br(%percent $+ % done - $bytes(%bytes).suf received in $duration($get(-1).secs,3) = $bytes($get(-1).cps).suf $+ /Sec) %retrying
   if (%resume !isin Resume Ask) DLF.Win.Log Server Warning %chan $nick To improve your chances of downloading the whole file, set "mIRC Options / DCC / If file exists" to allow mIRC to resume receiving the file from the point it just failed rather than starting again.
   if (xdcc-* iswm %trig) %trig = $null
@@ -2602,10 +2611,10 @@ alias -l DLF.Win.Echo {
     echo %flags $+ s %col %line
     DLF.Watch.Log Echoed: To Status Window
   }
-  elseif ($2 == Message) {
-    echo %flags $+ d %col %line
-    DLF.Watch.Log Echoed: To Status Window
-  }
+;  elseif ($2 == Message) {
+;    echo %flags $+ d %col %line
+;    DLF.Watch.Log Echoed: To Single-Message Window
+;  }
   elseif ($2 == @find) {
     var %chans $DLF.@find.IsResponse
     var %i $numtok(%chans,$asc($space))
@@ -2633,13 +2642,13 @@ alias -l DLF.Win.Echo {
   }
   elseif (($2 == Private) && ($usesinglemsg == 1) && (%su == $false) && ($query($3) == $null)) {
     echo %flags $+ d %col %line
-    DLF.Watch.Log Echoed: To single message window
+    DLF.Watch.Log Echoed: To Single-Message window
   }
   elseif (($2 == Private) && ($query($3)) && ($1 != notice)) {
     echo %flags %col $3 %line
     DLF.Watch.Log Echoed: To query window
   }
-  elseif (($2 == Private) && ($notify($3))) {
+  elseif (($2 == Private) && ($notify($3)) && ($1 != notice) && (($window($active).type !isin custom listbox) || ($left($active,2) == @#))) {
     echo %flags $+ a %col %line
     DLF.Watch.Log Echoed: To active window $br($active)
   }
@@ -3890,7 +3899,7 @@ on *:dialog:DLF.Options.GUI:sclick:10-999: DLF.Options.ClickOption
 ; On close save active tab
 on *:dialog:DLF.Options.GUI:close:0: DLF.Options.Close
 
-; Initialise variables
+; - variables
 alias -l DLF.Options.Initialise {
   ; Options Dialog variables in display order
 
@@ -4513,7 +4522,10 @@ alias -l DLF.Update.Check {
   var %days %days / 86400
   var %days $int(%days)
   DLF.Watch.Log DLF.Update.Check: %days since last run
-  if ((%days >= 7) || ((%DLF.update.betas) && (%days >= 1))) DLF.Update.Run
+  if ((%days >= 7) $&
+   || ((%DLF.update.betas) && (%days >= 1)) $&
+   || ((%DLF.ops.advertchan) && (%days >= 1) && ($DLF.Options.IsOp)) $&
+   ) DLF.Update.Run
   else DLF.Update.CheckVersions
 }
 
