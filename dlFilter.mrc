@@ -132,6 +132,7 @@ dlFilter uses the following code from other people:
       Don't echo anything to active windows which are custom windows unless an ochat window.
       Fix DCC Get resume reported bytes received when no bytes were received.
       If advertising DLF, check for updates daily instead of weekly.
+      Tweak ops advertising filtering to not filter if advertised version is > this version.
 
 */
 
@@ -1079,9 +1080,10 @@ alias -l DLF.Chan.Text {
   }
   if ($hiswm(chantext.dlf,%txt)) {
     ; Someone else is sending channel ads - reset timer to prevent multiple ops flooding the channel
-    var %secs $calc($timer(dlf.advert).secs + 30)
+    var %secs $calc($timer(DLF.Adverts).secs + 30)
     set $+(-eu,%secs) $+(%,DLF.opsnochanads.,$network,$chan) 1
-    DLF.Win.Ads $1-
+    if (version !isin %txt) DLF.Win.Ads $1-
+    elseif ($gettok(%txt,$calc($findtok(%txt,version,1,$asc($space))+1),$asc($space)) <= %DLF.version) DLF.Win.Ads $1-
   }
   if (($me isop $chan) && (%DLF.ops.advertpriv == 1)) {
     if (@find * iswm %txt) DLF.Ops.Advert@find $1-
@@ -4607,7 +4609,7 @@ alias -l DLF.Update.CheckVersions {
 
 alias -l DLF.Update.DownloadAvailable {
   var %ver $1 version $2 $+ .
-  if ($4-) %ver = $+(%ver,$space,This version:,$crlf,$4-)
+  if ($4-) %ver = $+(%ver,$space,$crlf,$4-)
   else %ver = $+(%ver,.)
   if ($version >= $3) {
     DLF.Options.Status You can update to %ver
@@ -5596,7 +5598,7 @@ alias -l DLF.CreateHashTables {
 ; ========== Status and error messages ==========
 alias -l DLF.logo return $rev([dlFilter])
 alias -l DLF.StatusAll {
-  var %m $DLF.logo $c(1,9,$1-)
+  var %m $DLF.logo $+ $c(1,9,$+($space,$1-))
   scon -a echo -ti2nbfs %m
   if (($window($active).type !isin status custom listbox) || ($left($active,2) == @#)) echo -ti2na %m
 }
