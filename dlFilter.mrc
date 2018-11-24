@@ -142,6 +142,7 @@ dlFilter uses the following code from other people:
       Fix incorrect blocking of DCC Sends from users who have been manually trusted.
       Fix filtering of DLF advertising messages
       Highlight new event in debug window
+      Fix onotices when not active window
 
 */
 
@@ -3548,7 +3549,7 @@ menu @#* {
 }
 
 alias -l DLF.oNotice.Input {
-  var %chan $right($active,-1)
+  var %chan $right($winscript,-1)
   DLF.Watch.Called DLF.oNotice.Input %chan : $1-
   if ($gettok(%chan,-1,$asc(.)) == $network) %chan = $deltok(%chan,-1,$asc(.))
   var %omsg $1-
