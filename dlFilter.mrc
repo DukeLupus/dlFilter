@@ -133,6 +133,8 @@ dlFilter uses the following code from other people:
       Fix DCC Get resume reported bytes received when no bytes were received.
       If advertising DLF, check for updates daily instead of weekly.
       Tweak ops advertising filtering to not filter if advertised version is > this version.
+      Replace capture of trigger requests using ON INPUT to use ON PARSELINE instead
+      (in order to capture requests made by other scripts - and retries by DLF).
       Fix misplaced channel menu lines
 
 */
@@ -541,6 +543,33 @@ alias -l DLF.TopicRedirect {
 }
 
 on *:input:*: { DLF.Event.Input $1- }
+; Remove trailing CR if it exists
+alias -l parseline {
+  if ($asc($right($parseline,1)) != 10) return $parseline
+  return $left($parseline,-1)
+}
+
+; if a search window, refilter on new search string
+on *:input:@dlF.*Search.*: { DLF.Search.Show $winscript $1- }
+; if an oNotice window, process as oNotice text
+on *:input:@#*: { DLF.oNotice.Input $1- }
+on *:input:#: { DLF.Event.Input $chan $1- }
+on *:input:?: { DLF.Event.Input Private $1- }
+on $*:parseline:out:$(/^PRIVMSG .* :[@!].*/): {
+  tokenize 32 $.parseline
+  var %request $right($3-,-1)
+  if (%request == @SearchBot-Trigger) return
+  var %trig $gettok(%request,1,$asc($space))
+  if ((%trig == @find) || (%trig == @locator)) DLF.@find.Request $2-
+  else DLF.DccSend.Request $2 %request
+}
+on *:parseline:in:$($+(* PRIVMSG ,$me, :,$chr(1),DCC SEND *)): { echo -s DGET ParseIn $.parseline }
+on *:parseline:out:$($+(PRIVMSG *:,$chr(1),DCC SEND * ,$longip($ip), *,$chr(1),*)): { echo -s SEND ParseOut $.parseline }
+on *:parseline:out:$($+(PRIVMSG *:,$chr(1),DCC ACCEPT *,$chr(1),*)): { echo -s ACPT ParseOut $.parseline }
+on *:parseline:out:$($+(PRIVMSG *:,$chr(1),DCC RESUME *,$chr(1),*)): { echo -s RESM ParseOut $.parseline }
+on *:parseline:out:PRIVMSG #*: { echo -s CHAN ParseOut $.parseline }
+on $*:parseline:out:$($+(/^PRIVMSG .* :[^,$chr(1),]/)): { echo -s PRIV ParseOut $.parseline }
+on *:parseline:out:PRIVMSG *: { echo -s DFLT ParseOut $.parseline }
 on *:filercvd:*: DLF.DccSend.FileRcvd $1-
 on *:getfail:*: DLF.DccSend.GetFailed $1-
 
@@ -685,20 +714,11 @@ alias -l DLF.AlreadyHalted { if ($halted) DLF.Watch.Log Filtered: Already halted
 ; ========== Event splitters ==========
 ; Command typed by user
 alias -l DLF.Event.Input {
-  DLF.Watch.Called DLF.Event.Input : $1-
+  DLF.Watch.Called DLF.Event.Input $1 : $2-
   var %win $winscript
-  ; if a search window, refilter on new search string
-  if (@dlF.*Search.* iswm %win) DLF.Search.Show %win $1-
-  ; if a ctcp request, record it to match to replies
-  elseif ($1 == /ctcp) DLF.ctcpSend.Request %win $1-
-  ; if an oNotice window, process as oNotice text
-  elseif (@#* iswm %win) DLF.oNotice.Input $1-
-  ; if in dlF channel, then handle @find / other triggers
-  elseif ($DLF.Chan.IsDlfChan(%win)) {
-    if (($1 == @find) || ($1 == @locator)) DLF.@find.Request $1-
-    elseif (($left($1,1) isin !@) && ($len($1) > 1)) DLF.DccSend.Request $1-
-    elseif ($1 $3 $4 == /MSG XDCC SEND) DLF.DccSend.Request $+(XDCC-,$2) $1-
-  }
+  ; if a ctcp or xdcc request, record it to match to replies
+  if ($2 == /ctcp) DLF.ctcpSend.Request $1-
+  elseif ($2 $4 $5 == /MSG XDCC SEND) DLF.DccSend.Request $1 $+(XDCC-,$3) $2-
 }
 
 ; Record ctcp requests issued by the user for 60s so we can determine whether ctcpreply is solicited or unsolicited
@@ -1145,7 +1165,7 @@ alias -l DLF.Chan.Notice {
 
 alias -l DLF.Chan.ctcp {
   DLF.Watch.Called DLF.Chan.ctcp : $1-
-  if ($1 == SLOTS) DLF.SearchBot.GetTriggers
+  if ($1 == SLOTS) DLF.SearchBot.GetTriggers $chan
   DLF.Custom.Filter chanctcp $1-
   if (($1 !== SLOTS) && ($DLF.Chan.IsNotify)) return
   if ($hiswm(chanctcp.spam,$1-)) DLF.Win.Filter $1-
@@ -1877,19 +1897,19 @@ alias -l DLF.Ops.AdvertPrivDLF {
 
 ; ========== DCC Send ==========
 alias -l DLF.DccSend.Request {
-  DLF.Watch.Called DLF.DccSend.Request : $1-
-  DLF.SearchBot.GetTriggers
-  var %trig $strip($1), %fn
-  if (@* iswm %trig) %fn = $DLF.DccSend.FixString($2-)
-  elseif (XDCC-* iswm %trig) %fn = $2-
-  else %fn = $DLF.GetFileName($2-)
+  DLF.Watch.Called DLF.DccSend.Request $1 : $2-
+  DLF.SearchBot.GetTriggers $1
+  var %trig $strip($2), %fn
+  if (@* iswm %trig) %fn = $DLF.DccSend.FixString($3-)
+  elseif (XDCC-* iswm %trig) %fn = $3-
+  else %fn = $DLF.GetFileName($3-)
   var %ifFileExists $dccIfFileExists, %pathfile $+($getdir(%fn),%fn)
   if (($isfile(%pathfile)) && (%ifFileExists == Cancel)) {
     DLF.Win.Log Server Warning $target $nick $qt(%fn) exists but "mIRC Options / DCC / If file exists" is set to "Cancel" so mIRC will cancel this download.
     DLF.Win.Log Server Warning $target $nick Before your download starts either change this option to something else or delete the file.
   }
 
-  hadd -mz DLF.dccsend.requests $+($network,|,$chan,|,%trig,|,$replace(%fn,$space,_),|,$encode(%fn)) 86400
+  hadd -mz DLF.dccsend.requests $+($network,|,$1,|,%trig,|,$replace(%fn,$space,_),|,$encode(%fn)) 86400
   DLF.Watch.Log DccSend request recorded: %trig %fn
 }
 
@@ -1905,8 +1925,9 @@ alias -l DLF.DccSend.GetRequest {
   if (%req) return %req
   if (*_results_for_*.txt.zip iswmcs %fn) {
     var %nick $gettok(%fn,1,$asc(_)), %trig $DLF.SearchBot.TriggerFromNick($nick)
-    if ((%trig) && ($istok($nick $nick $+ Bot Search SearchBot,%nick,$asc($space)))) {
-      var %sbresult %nick $+ _results_for_
+    var %potential $nick $nick $+ Bot Search SearchBot, %i $findtok(%potential,%nick,$asc($space))
+    if ((%trig) && (%i != $null)) {
+      var %sbresult $gettok(%potential,%i,$asc($space)) $+ _results_for_
       var %srch $right($removecs($gettok(%fn,1,$asc(.)),%sbresult),-1)
       return $hfind(DLF.dccsend.requests,$+($network,|*|,%trig,|,%srch,|*),1,w).item
     }
@@ -1915,7 +1936,8 @@ alias -l DLF.DccSend.GetRequest {
   if (%req) return %req
   var %req $hfind(DLF.dccsend.requests,$+($network,|*|@,$nick,||),1,w).item
   if (%req) return %req
-  return $hfind(DLF.dccsend.requests,$+($network,|*|@,$nick,-*||),1,w).item
+  var %req $hfind(DLF.dccsend.requests,$+($network,|*|@,$nick,-*||),1,w).item
+  return %req
 }
 
 alias -l DLF.DccSend.IsRequest {
@@ -2279,14 +2301,14 @@ alias -l DLF.DccChat.Open {
 ; ========== SearchBot Triggers ==========
 ; hash table index network|channel|nick|trigger
 alias -l DLF.SearchBot.GetTriggers {
-  DLF.Watch.Called DLF.SearchBot.GetTriggers : $1-
-  var %nc = $hget(DLF.sbrequests,$+($network,$chan))
+  DLF.Watch.Called DLF.SearchBot.GetTriggers $1 : $2-
+  var %nc = $hget(DLF.sbrequests,$+($network,$1))
   if (%nc != $null) return
   DLF.Watch.Log SearchBot: Requesting Triggers
   var %ttl $DLF.SearchBot.TTL
-  hadd -mzu $+ %ttl DLF.sbrequests $+($network,$chan) %ttl
-  hadd -mzu60 DLF.sbcurrentreqs $+($network,$chan) 60
-  .msg $chan @SearchBot-Trigger
+  hadd -mzu $+ %ttl DLF.sbrequests $+($network,$1) %ttl
+  hadd -mzu60 DLF.sbcurrentreqs $+($network,$1) 60
+  .msg $1 @SearchBot-Trigger
 }
 
 ; ctcp TRIGGER network chan trigger
