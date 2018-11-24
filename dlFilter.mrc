@@ -139,6 +139,7 @@ dlFilter uses the following code from other people:
       (in order to capture requests made by other scripts - and retries by DLF).
       Fix misplaced channel menu lines
       Add function to repeat Notify users on / offline to additional windows
+      Fix incorrect blocking of DCC Sends from users who have been manually trusted.
       Fix filtering of DLF advertising messages
 
 */
@@ -2024,7 +2025,7 @@ alias -l DLF.DccSend.Send {
     DLF.Win.Echo Blocked Private $nick DCC Send - filename contains malicious unicode U+8238
     DLF.Halt Blocked: DCC Send - filename contains malicious unicode U+8238
   }
-  var %trusted $DLF.DccSend.IsTrusted($nick)
+  var %trusted $DLF.DccSend.IsTrusted
   if (%trusted) DLF.Watch.Log User is in your DCC trust list
   if ($DLF.DccSend.IsRequest(%fn)) {
     if ((%DLF.dccsend.autoaccept == 1) && (!%trusted)) DLF.DccSend.TrustAdd
@@ -2229,17 +2230,25 @@ alias -l DLF.DccSend.TrustAddress {
   return $+(%addr,:,$network)
 }
 
+; Returns true if $nick has been explicitly trusted by the user (but false if temp trusted by DLF)
 alias -l DLF.DccSend.IsTrusted {
-  if ($timer($DLF.DccSend.TrustTimer) != $null) return $false
-  var %addr $address($1,6)
+  if ($timer($DLF.DccSend.TrustTimer($DLF.DccSend.TrustAddress)) != $null) return $false
+  var %addr $fulladdress
   if (%addr == $null) return $false
   var %i $trust(0)
   while (%i) {
-    var %trust $trust(%i), %network $gettok(%trust,2,$asc(:))
+    var %trust $trust(%i), %trusted $gettok(%trust,1,$asc(:)), %network $gettok(%trust,2,$asc(:))
     dec %i
     if ((%network !== $null) && (%network != $network)) continue
-    if (($numtok(%trust,$asc(!)) < 2) && (%trust == $gettok(%addr,1,$asc(!)))) return $true
-    if (%trust iswm %addr) return $true
+    if ($(!) !isin %trusted) {
+      if (@ isin %trusted) {
+        if ($left(%trusted,1) != *) %trusted = * $+ %trusted
+        %trusted = *! $+ %trusted
+      }
+      else %trusted = %trusted $+ !*@*
+    }
+    elseif ($(!*) !isin %trusted) %trusted = $+($gettok(%trusted,1,$asc(!)),!*,$gettok(%trusted,2-,$asc(!)))
+    if (%trusted iswm %addr) return $true
   }
   return $false
 }
