@@ -143,6 +143,7 @@ dlFilter uses the following code from other people:
       Fix filtering of DLF advertising messages
       Highlight new event in debug window
       Fix onotices when not active window
+      Fix filenames with embedded CR/LF
 
 */
 
@@ -5775,7 +5776,7 @@ alias -l DLF.IsServiceUser {
 ; and colons are not allowable characters in file names
 ; DCC SEND / ACCEPT messages have ipaddress port filesize or position following filename
 alias -l DLF.GetFileName {
-  var %txt $gettok($replace($strip($1-),$nbsp,$space,$tab $+ $space,$space,$tab,$null),1,$asc(:))
+  var %txt $gettok($replace($strip($1-),$nbsp,$space,$tab $+ $space,$space,$tab,$null,$cr,$null,$lf,$null),1,$asc(:))
   var %n $numtok(%txt,$asc($space))
   ; delete trailing info: CRC(*) or (*)
   while ($numtok(%txt,$asc($space))) {
