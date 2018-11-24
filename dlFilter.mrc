@@ -3502,7 +3502,7 @@ alias -l DLF.@find.SendTovPowerGet {
   var %win $active
   var %lines $sline(%win,0)
   if (!%lines) halt
-  DLF.Watch.Called DLF.@find.SendToAutoGet %lines files: $1-
+  DLF.Watch.Called DLF.@find.SendTovPowerGet %lines files: $1-
   DLF.@find.ResetColours
   var %i 1
   while (%i <= %lines) {
