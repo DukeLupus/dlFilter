@@ -133,6 +133,7 @@ dlFilter uses the following code from other people:
       Fix DCC Get resume reported bytes received when no bytes were received.
       If advertising DLF, check for updates daily instead of weekly.
       Move some options between tabs in options dialogue.
+      Use $fulladdress instead of $address($nick,5)
       Tweak ops advertising filtering to not filter if advertised version is > this version.
       Replace capture of trigger requests using ON INPUT to use ON PARSELINE instead
       (in order to capture requests made by other scripts - and retries by DLF).
@@ -1327,7 +1328,7 @@ alias -l DLF.Chan.ctcpBlock {
 ; TODO - limit frequency of warnings about a specific user and send oNotice after a random period with cancel if reported by another DLF instance.
 alias -l DLF.Chan.SpamFilter {
   if ($DLF.Options.IsOp && (%DLF.opwarning.spamchan == 1) && ($me isop $chan)) {
-    var %msg $c(4,15,Channel spam from $nick $br($address($nick,5)) $+ : $qt($1-))
+    var %msg $c(4,15,Channel spam from $nick $br($fulladdress) $+ : $qt($1-))
     .notice @ $+ $chan $DLF.logo %msg
     DLF.Win.Echo Filter Blocked $chan $nick %msg
   }
@@ -1527,7 +1528,7 @@ alias -l DLF.Priv.ctcpReply {
 
 alias -l DLF.Priv.SpamFilter {
   if (%DLF.opwarning.spamchan == 1) {
-    var %msg $c(1,15,Private spam received from $nick $br($address($nick,5)) $+ : $qt($1-))
+    var %msg $c(1,15,Private spam received from $nick $br($fulladdress) $+ : $qt($1-))
     var %i $comchan($nick,0)
     while (%i) {
       var %chan $comchan($nick,%i)
@@ -2217,9 +2218,7 @@ alias -l DLF.DccSend.TrustRemove {
 alias -l DLF.DccSend.TrustTimer { return $+(DLFRemoveTrust,:,$DLF.DccSend.TrustAddress,:,$network) }
 
 alias -l DLF.DccSend.TrustAddress {
-  ; Use $address(nick,6) because $address(nick,5) fails if user name is >10 characters
-  var %addr $ial($nick)
-  if (%addr == $null) %addr = $address($nick,6)
+  var %addr $fulladdress
   if (%addr == $null) %addr = $nick
   return $+(%addr,:,$network)
 }
