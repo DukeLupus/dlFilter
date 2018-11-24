@@ -139,6 +139,7 @@ dlFilter uses the following code from other people:
       (in order to capture requests made by other scripts - and retries by DLF).
       Fix misplaced channel menu lines
       Add function to repeat Notify users on / offline to additional windows
+      Fix filtering of DLF advertising messages
 
 */
 
@@ -5349,7 +5350,7 @@ alias -l DLF.CreateHashTables {
   inc %matches $hget(DLF.channotice.trivia,0).item
 
   DLF.hmake DLF.chantext.dlf
-  DLF.hadd chantext.dlf $strip($DLF.logo) * download dlFilter version %DLF.version *
+  DLF.hadd chantext.dlf $strip($DLF.logo) * download dlFilter version * from *
   DLF.hadd chantext.dlf $strip($DLF.logo) * download dlFilter from *
   inc %matches $hget(DLF.chantext.dlf,0).item
 
