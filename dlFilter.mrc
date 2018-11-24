@@ -144,6 +144,7 @@ dlFilter uses the following code from other people:
       Highlight new event in debug window
       Fix onotices when not active window
       Fix filenames with embedded CR/LF
+      Fix trust timers not unique
 
 */
 
@@ -2214,7 +2215,7 @@ alias -l DLF.DccSend.GetFailed {
 alias -l DLF.DccSend.TrustAdd {
   var %addr $DLF.DccSend.TrustAddress
   var %desc $nick $br(%addr)
-  [ $+(.timer,$DLF.DccSend.TrustTimer) ] 1 10 .signal DLF.DccSend.TrustRemove %addr %desc
+  [ $+(.timer,$DLF.DccSend.TrustTimer(%addr)) ] 1 5 .signal DLF.DccSend.TrustRemove %addr %desc
   .dcc trust %addr
   DLF.Watch.Log Trust: Added %desc
 }
@@ -2225,7 +2226,7 @@ alias -l DLF.DccSend.TrustRemove {
   .dcc trust -r $1
 }
 
-alias -l DLF.DccSend.TrustTimer { return $+(DLFRemoveTrust,:,$DLF.DccSend.TrustAddress,:,$network) }
+alias -l DLF.DccSend.TrustTimer { return $+(DLFRemoveTrust,:,$1,:,$network) }
 
 alias -l DLF.DccSend.TrustAddress {
   var %addr $fulladdress
