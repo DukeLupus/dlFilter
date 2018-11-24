@@ -2080,8 +2080,7 @@ alias -l DLF.DccSend.Receiving {
     }
     if ((%ifFileExists == Resume) && ($file(%pathfile).size > 0)) %starting = resuming
   }
-  var %secs 86400 - $hget(DLF.dccsend.requests,%req)
-  DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick %starting $br(waited $duration(%secs,3))
+  DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick %starting
 }
 
 alias -l DLF.DccSend.Hash { return $encode($network $nick $1-) }
