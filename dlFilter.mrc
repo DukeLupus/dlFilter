@@ -132,6 +132,7 @@ dlFilter uses the following code from other people:
       Don't echo anything to active windows which are custom windows unless an ochat window.
       Fix DCC Get resume reported bytes received when no bytes were received.
       If advertising DLF, check for updates daily instead of weekly.
+      Move some options between tabs in options dialogue.
       Tweak ops advertising filtering to not filter if advertised version is > this version.
       Replace capture of trigger requests using ON INPUT to use ON PARSELINE instead
       (in order to capture requests made by other scripts - and retries by DLF).
@@ -3758,16 +3759,16 @@ alias DLF.Options.Toggle { dialog $iif($dialog(DLF.Options.GUI),-c,-mdh) DLF.Opt
 
 dialog -l DLF.Options.GUI {
   title dlFilter v $+ $DLF.SetVersion
-  size -1 -1 225 260
+  size -1 -1 231 260
   ; map is undocumented solution to Windows 10 Display Scaling issue reported in https://github.com/DukeLupus/dlFilter/issues/72
   ; solution was identified by mIRC author @Khaled in https://forums.mirc.com/ubbthreads.php/topics/263707
   option map
   link "Help", 15, 206 3 16 8, right
   text "", 20, 92 2 130 8, right hide
   check "&Enable/disable dlFilter", 10, 2 3 92 8
-  tab "Channels", 1, 2 11 222 231
+  tab "Channels", 1, 2 11 228 231
   tab "Filters", 3
-  tab "Other", 5
+  tab "Firewall", 5
   tab "Ops", 7
   tab "Custom", 8
   tab "About", 9
@@ -3790,7 +3791,7 @@ dialog -l DLF.Options.GUI {
   text "Checking for dlFilter updates...", 190, 10 216 206 18, tab 1 center
 
   ; tab Filters
-  box " Channel messages ", 305, 6 26 213 103, tab 3
+  box " Channel messages ", 305, 6 26 213 113, tab 3
   check "Filter other users @search / @file / @locator / !get requests", 310, 10 36 206 8, tab 3
   check "Filter server adverts and announcements", 315, 10 46 206 8, tab 3
   check "Filter channel topic updates", 320, 10 56 206 8, tab 3
@@ -3800,23 +3801,24 @@ dialog -l DLF.Options.GUI {
   check "Filter ALL coloured messages (last resort - use cautiously)", 340, 10 96 206 8, tab 3
   check "Filter private msgs from regular users IN filtered channels", 345, 10 106 206 8, tab 3
   check "Filter private msgs from reg. users NOT IN filtered channels", 350, 10 116 206 8, tab 3
-  box " Advert / Filter Windows ", 360, 6 130 213 33, tab 3
-  check "Separate dlF windows per connection", 365, 10 140 206 8, tab 3
-  check "Keep Filter windows active in background", 370, 10 150 206 8, tab 3
-  box " Regular user events ", 375, 6 164 213 63, tab 3
-  check "Joins ...", 380, 10 174 68 8, tab 3
-  check "Parts ...", 382, 79 174 68 8, tab 3
-  check "Quits ...", 384, 148 174 68 8, tab 3
-  check "Nick changes ...", 386, 10 184 68 8, tab 3
-  check "Kicks ...", 388, 79 184 68 8, tab 3
-  check "Away and thank-you messages", 390, 10 194 206 8, tab 3
-  check "User mode changes", 395, 10 204 206 8, tab 3
-  check "Filter above user events for non-regular users", 397, 10 214 206 8, tab 3
+  check "Display dlFilter's channel filtering efficiency in title bar", 355, 10 126 206 8, tab 3
+  box " Advert / Filter Windows ", 360, 6 140 213 33, tab 3
+  check "Separate dlF windows per connection", 365, 10 150 206 8, tab 3
+  check "Keep Filter windows active in background", 370, 10 160 206 8, tab 3
+  box " Regular user events ", 375, 6 174 213 63, tab 3
+  check "Joins ...", 380, 10 184 68 8, tab 3
+  check "Parts ...", 382, 79 184 68 8, tab 3
+  check "Quits ...", 384, 148 184 68 8, tab 3
+  check "Nick changes ...", 386, 10 194 68 8, tab 3
+  check "Kicks ...", 388, 79 194 68 8, tab 3
+  check "Away and thank-you messages", 390, 10 204 206 8, tab 3
+  check "User mode changes", 395, 10 214 206 8, tab 3
+  check "Filter above user events for non-regular users", 397, 10 224 206 8, tab 3
 
   ; Tab Other
-  box " Extra functions ", 505, 6 26 213 43, tab 5
-  check "Collect @find/@locator results into a single window", 510, 10 36 206 8, tab 5
-  check "Display dlFilter channel efficiency in title bar", 515, 10 46 206 8, tab 5
+  text "These functions apply to all channels on all networks:", 501, 6 27 213 8, tab 5 nowrap
+  box " Extra functions ", 505, 6 36 213 33, tab 5
+  check "Collect @find/@locator results into a single window", 510, 10 46 206 8, tab 5
   check "Colour uncoloured fileservers in nickname list", 520, 10 56 206 8, tab 5
   box " File requests ", 535, 6 70 213 83, tab 5
   check "Auto accept files you have specifically requested", 540, 10 80 206 8, tab 5
@@ -3898,7 +3900,7 @@ on *:dialog:DLF.Options.GUI:sclick:365: DLF.Options.PerConnection
 ; Background Ads / Filter option clicked
 on *:dialog:DLF.Options.GUI:sclick:365: DLF.Options.Background
 ; Titlebar option clicked
-on *:dialog:DLF.Options.GUI:sclick:515: DLF.Options.Titlebar
+on *:dialog:DLF.Options.GUI:sclick:355: DLF.Options.Titlebar
 ; Load last option clicked
 on *:dialog:DLF.Options.GUI:sclick:665: DLF.Options.LoadLast
 ; oNotice option clicked
@@ -4105,7 +4107,7 @@ alias -l DLF.Options.Init {
   if (%DLF.filter.modesuser == 1) did -c DLF.Options.GUI 395
   if (%DLF.filter.regular == 1) did -c DLF.Options.GUI 397
   if (%DLF.searchresults == 1) did -c DLF.Options.GUI 510
-  if (%DLF.titlebar.stats == 1) did -c DLF.Options.GUI 515
+  if (%DLF.titlebar.stats == 1) did -c DLF.Options.GUI 355
   if (%DLF.colornicks == 1) did -c DLF.Options.GUI 520
   if (%DLF.dccsend.autoaccept == 1) did -c DLF.Options.GUI 540
   if (%DLF.dccsend.requested == 1) {
@@ -4195,7 +4197,7 @@ alias -l DLF.Options.Save {
   %DLF.filter.modesuser = $did(DLF.Options.GUI,395).state
   %DLF.filter.regular = $did(DLF.Options.GUI,397).state
   %DLF.searchresults = $did(DLF.Options.GUI,510).state
-  %DLF.titlebar.stats = $did(DLF.Options.GUI,515).state
+  %DLF.titlebar.stats = $did(DLF.Options.GUI,355).state
   %DLF.colornicks = $did(DLF.Options.GUI,520).state
   %DLF.dccsend.autoaccept = $did(DLF.Options.GUI,540).state
   %DLF.dccsend.requested = $did(DLF.Options.GUI,545).state
