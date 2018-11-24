@@ -145,6 +145,7 @@ dlFilter uses the following code from other people:
       Fix onotices when not active window
       Fix filenames with embedded CR/LF
       Fix trust timers not unique
+      Fix onotice users not being removed on quit
 
 */
 
@@ -854,8 +855,9 @@ alias -l DLF.Event.Nick {
 alias -l DLF.Event.Quit {
   DLF.Watch.Called DLF.Event.Quit : $1-
   DLF.AlreadyHalted $1-
-  ; Remove all users from oNotice window
-  DLF.oNotice.DelNickAllChans
+  ; Remove user from oNotice window
+  DLF.oNotice.DelNick
+  ; Recolour responses in @find windows
   DLF.@find.ColourNick $nick 14
   if ($DLF.Chan.IsUserEvent) {
     DLF.Ads.ColourLines $event $nick
