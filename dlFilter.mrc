@@ -644,7 +644,7 @@ ctcp ^*:PING*:?: { DLF.Priv.ctcpBlock $1- }
 
 ctcp *:DCC CHAT *:?: { DLF.DccChat.Chat $1- }
 ctcp *:DCC SEND *:?: { DLF.DccSend.Send $1- }
-ctcp *:DCC ACCEPT *:?: { DLF.DccSend.Accept $1- }
+ctcp *:DCC ACCEPT *:?: { noop }
 ctcp *:DCC RESUME *:?: { noop }
 ctcp *:*:?: { DLF.Priv.ctcp $1- }
 ctcp *:*:%DLF.channels: { if ($DLF.Chan.IsChanEvent) DLF.Chan.ctcp $1- }
@@ -2080,32 +2080,8 @@ alias -l DLF.DccSend.Receiving {
     }
     if ((%ifFileExists == Resume) && ($file(%pathfile).size > 0)) %starting = resuming
   }
-  DLF.DccSend.AddAccepted %fn
   var %secs 86400 - $hget(DLF.dccsend.requests,%req)
   DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick %starting $br(waited $duration(%secs,3))
-}
-
-alias -l DLF.DccSend.Accept {
-  DLF.Watch.Called DLF.DccSend.Accept : $1-
-  var %fn $noqt($gettok($3-,-3-1,$asc($space)))
-  if ($DLF.DccSend.IsntAccepted(%fn)) DLF.Priv.ctcp $1-
-}
-
-alias -l DLF.DccSend.AddAccepted {
-  var %hash $DLF.DccSend.Hash($1-)
-  .hadd -mz DLF.dccsend.accepted %hash 300
-}
-
-alias -l DLF.DccSend.IsntAccepted {
-  var %hash $DLF.DccSend.Hash($1-)
-  if (!$hget(DLF.dccsend.accepted,%hash)) return $true
-  .hdel DLF.dccsend.accepted %hash
-  return $false
-}
-
-alias -l DLF.DccSend.DelAccepted {
-  var %hash $DLF.DccSend.Hash($1-)
-  if ($hget(DLF.dccsend.accepted,%hash)) .hdel DLF.dccsend.accepted %hash
 }
 
 alias -l DLF.DccSend.Hash { return $encode($network $nick $1-) }
@@ -2135,7 +2111,6 @@ alias -l DLF.DccSend.RetryDelete {
 
 alias -l DLF.DccSend.FileRcvd {
   var %fn $nopath($filename)
-  DLF.DccSend.DelAccepted %fn
   DLF.Watch.Called DLF.DccSend.FileRcvd %fn : $1-
   var %req $DLF.DccSend.GetRequest(%fn)
   if (%req == $null) return
@@ -2194,7 +2169,6 @@ alias -l DLF.DccSend.GetFailed {
 
   var %fn $nopath($filename)
   DLF.Watch.Called DLF.DccSend.GetFailed %fn : $1-
-  DLF.DccSend.DelAccepted %fn
   var %req $DLF.DccSend.GetRequest(%fn)
   if (%req == $null) return
   .hdel -s DLF.dccsend.requests %req
