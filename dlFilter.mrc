@@ -138,6 +138,7 @@ dlFilter uses the following code from other people:
       Replace capture of trigger requests using ON INPUT to use ON PARSELINE instead
       (in order to capture requests made by other scripts - and retries by DLF).
       Fix misplaced channel menu lines
+      Add function to repeat Notify users on / offline to additional windows
 
 */
 
@@ -684,6 +685,10 @@ on *:active:*: { DLF.Stats.Active }
 
 ; Process Ctrl-C on @find window
 on *:keydown:@dlf.@find.*:*: { if ((!$keyrpt) && ($keyval == 3)) DLF.@find.CopyLines }
+
+; Echo notice users online/offline to query windows
+on *:notify: { if (($query($nick)) && ($query($nick).wid != $activewid)) echo -ct Notify $nick * $nick is on IRC }
+on *:unotify: { if (($query($nick)) && ($query($nick).wid != $activewid)) echo -ct Notify $nick * $nick $sbr($address) has left IRC }
 
 #dlf_events end
 
