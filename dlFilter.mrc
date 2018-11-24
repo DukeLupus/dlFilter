@@ -141,6 +141,7 @@ dlFilter uses the following code from other people:
       Add function to repeat Notify users on / offline to additional windows
       Fix incorrect blocking of DCC Sends from users who have been manually trusted.
       Fix filtering of DLF advertising messages
+      Highlight new event in debug window
 
 */
 
@@ -6268,6 +6269,7 @@ alias -l DLF.Watch.Log {
   elseif ($window($debug)) {
     DLF.Win.CustomTrim $debug
     var %c 3
+    if (%ticks == 0) %c = 10
     if ($1 == <-) %c = 1
     elseif ($1 == ->) %c = 12
     elseif ($1 == Halted:) %c = 4
