@@ -133,6 +133,7 @@ dlFilter uses the following code from other people:
       Fix DCC Get resume reported bytes received when no bytes were received.
       If advertising DLF, check for updates daily instead of weekly.
       Tweak ops advertising filtering to not filter if advertised version is > this version.
+      Fix misplaced channel menu lines
 
 */
 
@@ -336,14 +337,14 @@ menu channel {
     DLF.Chan.Set $hashtag
     DLF.StatusAll $c(6,Channels set to $c(4,$hashtag))
   }
-  -
-  $iif($DLF.oNotice.IsOp($chan),Open oNotice chat window) : DLF.oNotice.Open
   .-
   .$iif($DLF.Trivia.IsTriviaChan($menu),$iif(%DLF.filter.trivia,Don't filter,Filter) trivia questions): DLF.Options.ToggleOption filter.trivia 330
   .$iif(%DLF.filter.controlcodes,Don't filter,Filter) coloured messages: DLF.Options.ToggleOption filter.controlcodes 340
   .$iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Options.ToggleShowFilter
   .$iif(%DLF.serverads,Hide,Show) ads window(s): DLF.Options.ToggleShowAds
   .Options: DLF.Options.Show
+  -
+  $iif($DLF.oNotice.IsOp($chan),Open oNotice chat window) : DLF.oNotice.Open
 }
 
 ; ============================== Event catching ==============================
