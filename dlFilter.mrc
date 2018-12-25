@@ -147,6 +147,12 @@ dlFilter uses the following code from other people:
       Fix trust timers not unique
       Fix onotice users not being removed on quit
 
+      Handle DCC resume better when file exists but sending file has spaces replaced by underscores
+      Fix resume for files which have been renamed to remove underscores.
+      Improve file transfer stats and fix stats for resumed files.
+      Fix DCC Send tracking to cope with requests where server is DCC passive
+      Handle DCC send requests received as a result of your DCC SEND with passive set.
+
 */
 
 ; Increase this when you have sufficient changes to justify a release
@@ -552,7 +558,6 @@ alias -l DLF.TopicRedirect {
   halt
 }
 
-on *:input:*: { DLF.Event.Input $1- }
 ; Remove trailing CR if it exists
 alias -l parseline {
   if ($asc($right($parseline,1)) != 10) return $parseline
@@ -860,6 +865,7 @@ alias -l DLF.Event.Quit {
   ; Recolour responses in @find windows
   DLF.@find.ColourNick $nick 14
   if ($DLF.Chan.IsUserEvent) {
+    ; Recolour responses in ads windows
     DLF.Ads.ColourLines $event $nick
     if (%DLF.filter.quits) DLF.User.NoChannel $1-
   }
@@ -1938,6 +1944,8 @@ alias -l DLF.DccSend.GetRequest {
   var %fn $replace($noqt($DLF.GetFileName($1-)),$space,_)
   var %req $hfind(DLF.dccsend.requests,$+($network,|*|!,$nick,|,%fn,*|*),1,w).item
   if (%req) return %req
+  var %req $hfind(DLF.dccsend.requests,$+($network,|*|!,$nick,-*|,%fn,*|*),1,w).item
+  if (%req) return %req
   if (*_results_for_*.txt.zip iswmcs %fn) {
     var %nick $gettok(%fn,1,$asc(_)), %trig $DLF.SearchBot.TriggerFromNick($nick)
     var %potential $nick $nick $+ Bot Search SearchBot, %i $findtok(%potential,%nick,$asc($space))
@@ -1959,7 +1967,7 @@ alias -l DLF.DccSend.IsRequest {
   var %fn $noqt($DLF.GetFileName($1-))
   var %req $DLF.DccSend.GetRequest(%fn)
   if (%req == $null) return $false
-  DLF.Watch.Log DccSend Request found: %req
+  ;DLF.Watch.Log DccSend Request found: %req
   var %trig $gettok(%req,3,$asc(|))
   if (!* iswm %trig) {
     if (($right(%trig,-1) != $nick) && ($gettok($right(%trig,-1),1,$asc(-)) != $nick)) return $false
@@ -2026,7 +2034,7 @@ alias -l DLF.DccSend.SendNotice {
 
 alias -l DLF.DccSend.Send {
   DLF.Watch.Called DLF.DccSend.Send : $1-
-  var %fn $noqt($gettok($3-,-4-1,$asc($space)))
+  var %fn $DLF.DccSend.GetFilename($3-)
   if ($chr(8238) isin %fn) {
     DLF.Win.Echo Blocked Private $nick DCC Send - filename contains malicious unicode U+8238
     DLF.Halt Blocked: DCC Send - filename contains malicious unicode U+8238
@@ -2066,21 +2074,68 @@ alias -l DLF.DccSend.Block {
 }
 
 alias -l DLF.DccSend.Receiving {
-  var %fn $noqt($gettok($3-,-4-1,$asc($space)))
+  var %fn $DLF.DccSend.GetFilename($3-)
+  var %size $false, %i $poscs($3-,%fn)
+  if (%i) {
+    %i = %i + $len(%fn)
+    var %rest $right($3-,- $+ %i)
+    %size = $gettok(%rest,3,$asc($space))
+  }
   var %req $DLF.DccSend.GetRequest(%fn)
   if (%req == $null) return
   var %chan $gettok(%req,2,$asc(|))
   var %origfn $decode($gettok(%req,5,$asc(|)))
   if (%origfn == $null) %origfn = %fn
-  var %starting starting, %ifFileExists $dccIfFileExists, %pathfile $+($getdir(%fn),%fn)
-  if ($isfile(%pathfile)) {
+
+  var %file $+($getdir(%fn),%fn), %origfile $+($getdir(%fn),%origfn), %ifFileExists $dccIfFileExists
+  var %secs 86400 - $hget(DLF.dccsend.requests,%req), %waited waited $duration(%secs,3), %starting starting $br(%waited)
+  ; if origfn exists we need to rename it to fn in order for resume to work.
+  if ((%file != %origfile) && ($isfile(%origfile))) {
+    if ($isfile(%file)) .remove %file
+    .rename $qt(%origfile) $qt(%file)
+  }
+  if ($isfile(%file)) {
     if (%ifFileExists == Cancel) {
       DLF.Win.Log Server ctcp %chan $nick DCC Send from $nick rejected (invalid parameters) - $qt(%origfn) exists but "mIRC Options / DCC / If file exists" is set to "Cancel".
       return
     }
-    if ((%ifFileExists == Resume) && ($file(%pathfile).size > 0)) %starting = resuming
+    if (%ifFileExists == Resume) {
+      var %done $file(%file).size
+      if (%done > 0) {
+        %starting = resuming
+        if (%size) %starting = %starting $br($int($calc(%done * 100 / %size)) $+ % done - %waited)
+        else %starting = %starting $br(%waited)
+      }
+    }
   }
   DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick %starting
+}
+
+; Get the DCC filename from the CTCP DCC SEND command.
+; The number of tokens that follow the filename depend upon whether this is passive DCC or not.
+alias -l DLF.DccSend.GetFilename {
+  ; /CTCP DCC SEND can take the following formats
+  ; 1. DCC SEND <filename> <serverip> <port> - original
+  ; 2. DCC SEND <filename> <serverip> <port> <file size> - active
+  ; 3. DCC SEND <filename> <serverip> 0      <filesize> <token> - passive original send request
+  ; 4. DCC SEND <filename> <clientip> <port> <filesize> <token> - passive reverse send request in opposite direction
+  ;
+  ; The filename can take the following formats:
+  ; A. filename with spaces.ext
+  ; B. filename_without_spaces.ext
+  ; C. "quoted filename with spaces.ext"
+  ; D. "quoted_filename_without_spaces.ext"
+
+  ; The code below supports filename formats C. & D. for all DCC SEND formats,
+  ; and filename formats A. and B. for DCC SEND formats 2. and 3,
+  ; and filename format B. for DCC SEND format 1.
+
+  tokenize 32 $1-
+  if ($1-2 == DCC SEND) tokenize 32 $3-
+  if ($left($1-,1) == ") return $gettok($right($1-,-1),1,$asc("))
+  if ($0 == 3) return $1
+  if ($gettok($1-,-3,$asc($space)) == 0) return $gettok($1-,-5-1,$asc($space))
+  return $gettok($1-,-4-1,$asc($space))
 }
 
 alias -l DLF.DccSend.Hash { return $encode($network $nick $1-) }
@@ -2319,6 +2374,38 @@ alias -l DLF.SearchBot.NickFromTrigger {
 
 alias -l DLF.SearchBot.TriggerFromNick {
   return $gettok($hfind(DLF.searchbots,$+($network,|*|,$1,|*),1,w).item,4,$asc(|))
+}
+
+alias DLF.SearchBots {
+  echo -a $crlf
+  var %filter $+($network,|,$active,|*|*), %list
+  if ($left($active,1) != $hashtag) {
+    %filter = $+($network,|*|*|*)
+    echo -a dlFilter: Searchbots on $network
+  }
+  else echo -a dlFilter: Searchbots in $active
+  echo -a --------------------------------
+  var %i $hfind(DLF.searchbots,%filter,0,w).item
+  if (%i == 0) {
+    echo -a No search bots
+    return
+  }
+  while (%i) {
+    var %item $hfind(DLF.searchbots,%filter,%i,w).item
+    var %secs $hfind(DLF.searchbots,%filter,%i,w).data
+    var %chan $gettok(%item,2,$asc(|))
+    var %nick $gettok(%item,3,$asc(|))
+    var %trig $gettok(%item,4,$asc(|))
+    %list = $addtok(%list,%chan %nick %trig,$asc(|))
+    dec %i
+  }
+  %list = $sorttok(%list,$asc(|),r)
+  %i = $numtok(%list,$asc(|))
+  while (%i) {
+    var %item $gettok(%list,%i,$asc(|))
+    echo -a %item
+    dec %i
+  }
 }
 
 ; 24 hours = 86400s
