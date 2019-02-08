@@ -202,7 +202,7 @@ alias -l DLF.Reload {
 }
 
 ; Define the script loading position
-alias DLF.LoadPosition {
+alias -l DLF.LoadPosition {
   if (%DLF.loadlast) return $script(0)
   if ((sbClient.* iswm $nopath($script(1))) || (sbClient.* iswm $nopath($script(2)))) return 2
   return 1
@@ -582,8 +582,8 @@ on *:parseline:in:$($+(* PRIVMSG ,$me, :,$chr(1),DCC SEND *)): { echo -s DGET Pa
 on *:parseline:out:$($+(PRIVMSG *:,$chr(1),DCC SEND * ,$longip($ip), *,$chr(1),*)): { echo -s SEND ParseOut $.parseline }
 on *:parseline:out:$($+(PRIVMSG *:,$chr(1),DCC ACCEPT *,$chr(1),*)): { echo -s ACPT ParseOut $.parseline }
 on *:parseline:out:$($+(PRIVMSG *:,$chr(1),DCC RESUME *,$chr(1),*)): { echo -s RESM ParseOut $.parseline }
-on *:parseline:out:PRIVMSG #*: { echo -s CHAN ParseOut $.parseline }
-on $*:parseline:out:$($+(/^PRIVMSG .* :[^,$chr(1),]/)): { echo -s PRIV ParseOut $.parseline }
+;on *:parseline:out:PRIVMSG #*: { echo -s CHAN ParseOut $.parseline }
+;on $*:parseline:out:$($+(/^PRIVMSG .* :[^,$chr(1),]/)): { echo -s PRIV ParseOut $.parseline }
 on *:parseline:out:PRIVMSG *: { echo -s DFLT ParseOut $.parseline }
 on *:filercvd:*: DLF.DccSend.FileRcvd $1-
 on *:getfail:*: DLF.DccSend.GetFailed $1-
@@ -1949,9 +1949,11 @@ alias -l DLF.DccSend.GetRequest {
   if (*_results_for_*.txt.zip iswmcs %fn) {
     var %nick $gettok(%fn,1,$asc(_)), %trig $DLF.SearchBot.TriggerFromNick($nick)
     var %potential $nick $nick $+ Bot Search SearchBot, %i $findtok(%potential,%nick,$asc($space))
+;echo -a nick %nick , trig %trig , i %i
     if ((%trig) && (%i != $null)) {
       var %sbresult $gettok(%potential,%i,$asc($space)) $+ _results_for_
       var %srch $right($removecs($gettok(%fn,1,$asc(.)),%sbresult),-1)
+;echo -a sbresult %sbresult , srch %srch
       return $hfind(DLF.dccsend.requests,$+($network,|*|,%trig,|,%srch,|*),1,w).item
     }
   }
@@ -2109,6 +2111,11 @@ alias -l DLF.DccSend.Receiving {
     }
   }
   DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick %starting
+;echo -s DLF.DccSend.Receiving Fn %fn
+;echo -s Starting %starting , IfFileExists %ifFileExists
+;echo -s Pathfile %pathfile
+;echo -s Req %req
+;echo -s Origfn %origfn
 }
 
 ; Get the DCC filename from the CTCP DCC SEND command.
@@ -5430,6 +5437,18 @@ alias -l DLF.CreateHashTables {
   inc %matches $hget(DLF.chantext.dlf,0).item
 
   DLF.hmake DLF.chantext.spam
+  DLF.hadd chantext.spam *http*sex*
+  DLF.hadd chantext.spam *sex*http*
+  DLF.hadd chantext.spam *http*xxx*
+  DLF.hadd chantext.spam *xxx*http*
+  DLF.hadd chantext.spam *http*porn*
+  DLF.hadd chantext.spam *porn*http*
+  DLF.hadd chantext.spam *www*sex*
+  DLF.hadd chantext.spam *sex*www*
+  DLF.hadd chantext.spam *www*xxx*
+  DLF.hadd chantext.spam *xxx*www*
+  DLF.hadd chantext.spam *http*masturbate*
+  DLF.hadd chantext.spam *masturbate*http*
   inc %matches $hget(DLF.chantext.spam,0).item
 
   DLF.hmake DLF.chanaction.away
@@ -5488,16 +5507,19 @@ alias -l DLF.CreateHashTables {
 
   DLF.hmake DLF.privtext.spam
   DLF.hadd privtext.spam *http*sex*
-  DLF.hadd privtext.spam *http*xxx*
-  DLF.hadd privtext.spam *porn*http*
   DLF.hadd privtext.spam *sex*http*
-  DLF.hadd privtext.spam *sex*www*
-  DLF.hadd privtext.spam *www*sex*
-  DLF.hadd privtext.spam *www*xxx*
+  DLF.hadd privtext.spam *http*xxx*
   DLF.hadd privtext.spam *xxx*http*
+  DLF.hadd privtext.spam *http*porn*
+  DLF.hadd privtext.spam *porn*http*
+  DLF.hadd privtext.spam *www*sex*
+  DLF.hadd privtext.spam *sex*www*
+  DLF.hadd privtext.spam *www*xxx*
   DLF.hadd privtext.spam *xxx*www*
-  DLF.hadd privtext.spam *masturbate*http*
   DLF.hadd privtext.spam *http*masturbate*
+  DLF.hadd privtext.spam *masturbate*http*
+  DLF.hadd privtext.spam *private*show*http*
+  DLF.hadd privtext.spam *http*private*show*
   inc %matches $hget(DLF.privtext.spam,0).item
 
   DLF.hmake DLF.privaction.spam
