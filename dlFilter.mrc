@@ -1401,7 +1401,7 @@ alias -l DLF.Trivia.Filter {
   DLF.Win.Filter $1-
 }
 
-alias DLF.Trivia.IsTriviaChan { return $hfind(DLF.trivia.bots,$+($network,$chan,@,*),0,w) }
+alias -l DLF.Trivia.IsTriviaChan { return $hfind(DLF.trivia.bots,$+($network,$chan,@,*),0,w) }
 alias -l DLF.Trivia.IsTriviaBot {
   var %idx = $+($network,$chan,@,$nick)
   if (!$hget(DLF.trivia.bots,%idx).item) return $false
@@ -1409,7 +1409,7 @@ alias -l DLF.Trivia.IsTriviaBot {
   return $true
 }
 
-alias DLF.Trivia.Hint {
+alias -l DLF.Trivia.Hint {
   DLF.Watch.Called DLF.Trivia.Hint : $1-
   var %hint $DLF.strip($1-)
   var %reletter $+([-*.'"&a-z0-9,$comma,])
@@ -2416,7 +2416,7 @@ alias -l DLF.SearchBot.SetTriggers {
   if ($hget(DLF.sbcurrentreqs,$+($2,$3)) != $null) DLF.Win.Filter $event Private $nick $1-
 }
 
-alias DLF.SearchBot.NickFromTrigger {
+alias -l DLF.SearchBot.NickFromTrigger {
   var %chan = *
   if ($2 != $null) %chan = $2
   return $gettok($hfind(DLF.searchbots,$+($network,|,%chan,|*|,$1),1,w).item,3,$asc(|))
@@ -4874,7 +4874,7 @@ on *:sockclose:DLF.Socket.Download: {
 }
 
 ; Check that a directory is writable to avoid errors if it isn't.
-alias DLF.IsDirUnwritable {
+alias -l DLF.IsDirUnwritable {
   var %dir $1
   if (!$isdir($1)) %dir = $nofile(%dir)
   elseif ($isdir($1) && ($right($1,1) != \)) %dir = %dir $+ \
@@ -4894,7 +4894,7 @@ alias DLF.IsDirUnwritable {
 
 ; Check that a file is writable to avoid errors if it isn't.
 ; Cannot check file NTFS permissions, so file is writable if directory is writable and file does not have read-only attribute
-alias DLF.IsFileUnwritable {
+alias -l DLF.IsFileUnwritable {
   if ($isfile($1) && (r isin $file($1).attr) return $true
   return $DLF.IsDirUnwritable($nofile($1))
 }
