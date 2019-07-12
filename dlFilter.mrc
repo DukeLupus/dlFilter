@@ -47,9 +47,28 @@ dlFilter uses the following code from other people:
   Immediate TODO
       Test location and filename for oNotice log files
       Be smarter about matching nicks responding to file requests with triggers when they don't quite match.
-        (Add another field to the hash for the nick - check whether trigger exactly matches a nick and if not try to identify a close match (either by looking for matching @trigger in ads window or by looking for very similar nicks e.g. pondering vs. pondering42.)
+        (Add another field to the hash for the nick - check whether trigger exactly matches a nick and if not try to identify a close match (either by looking for matching @trigger in ads window or by looking for very similar nicks e.g. pondering vs. pondering42. Or check the ads windows for equivalent @ triggers.)
+      Autoaccept files from dcc trusted nicks. (Autoaccept works for matching nicks, but not for gets from nicks which do not match trigger.)
+      Copy files received which are not identified as triggers to current window.
+      Handle search response files where "-" is replaced by space. (Analyse sbserver to see how it handles special characters.)
       Colour DCC SEND channel messages so as to distinguish filenames and sending user and stats.
       If settings not AutoAccept (which uses temporary trust) then ask user (once per nick per session) if they want to Trust untrusted servers they are requesting files from.
+      Autoaccept / autotrust from all voiced or opped or half-opped nicks.
+
+      Does not auto-accept when at least one manually trusted nick
+      Does not auto-accept search results for search with a hyphenated word or fullstop.
+      File Get retry clears input box.
+      DCC RESUME doesn't seem to work properly.
+      DCC RESUME should start again from the beginning if file is already fully downloaded.
+
+      Remove DLF.sbrequests/DLF.sbcurrentreqs for network#channel on part/quit/join (so that we get a list of bots every time we join and don't have a stale list)
+      Reset stats for a channel on JOIN.
+      Sort out spaces in private DCC Send messages
+      If "CRC(xxxxx)" is in the DCC Send Notice then when file completes, check the CRC is correct and flag if not.
+      If Op, option to highlight to self or other ops or ban user after x spam messages / reports from other ops.
+      If user disables or unloads, remove stats from channel titles.
+      Add option for showing parts and joins etc. for anyone who has spoken in channel (i.e. any non-filtered messages).
+      Tracking search bot triggers needs improving to handle parts and joins.
 
   Ideas for possible future enhancements
       Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
@@ -64,6 +83,7 @@ dlFilter uses the following code from other people:
         (Use On Keydown to capture and check keystrokes, have a key field for each of the options to toggle.)
         (Might be better as a separate script with documented commands you can paste in.
       Add right click menu items to @find windows to re-sort list by trigger and filename.
+      Add @dlFilter / !dlFilter to serve dlFilter if running current version.
 
 2.00  Major version number for release.
 2.01  Send file blocking messages to common channel.
@@ -81,7 +101,6 @@ dlFilter uses the following code from other people:
         DLF halts messages that are filtered (not displayed as standard) or which DLF wants to display in a different window than mIRC's default.
         This can cause conflicts with other scripts that also halt messages in order to display them themselves.
         Other scripts should check $halted==$false before acting on or echoing messages related to the event.
-
         Note: Previously we said running first "avoids problems where other scripts halt events preventing this scripts events from running",
         however mIRC runs events in all scripts unless the ON statement is prefixed with an "&".
 
@@ -203,7 +222,7 @@ alias -l DLF.Reload {
 }
 
 ; Define the script loading position
-alias DLF.LoadPosition {
+alias -l DLF.LoadPosition {
   if (%DLF.loadlast) return $script(0)
   if ((sbClient.* iswm $nopath($script(1))) || (sbClient.* iswm $nopath($script(2)))) return 2
   return 1
@@ -579,13 +598,16 @@ on $*:parseline:out:$(/^PRIVMSG .* :[@!].*/): {
   if ((%trig == @find) || (%trig == @locator)) DLF.@find.Request $2-
   else DLF.DccSend.Request $2 %request
 }
-on *:parseline:in:$($+(* PRIVMSG ,$me, :,$chr(1),DCC SEND *)): { echo -s DGET ParseIn $.parseline }
-on *:parseline:out:$($+(PRIVMSG *:,$chr(1),DCC SEND * ,$longip($ip), *,$chr(1),*)): { echo -s SEND ParseOut $.parseline }
-on *:parseline:out:$($+(PRIVMSG *:,$chr(1),DCC ACCEPT *,$chr(1),*)): { echo -s ACPT ParseOut $.parseline }
-on *:parseline:out:$($+(PRIVMSG *:,$chr(1),DCC RESUME *,$chr(1),*)): { echo -s RESM ParseOut $.parseline }
-on *:parseline:out:PRIVMSG #*: { echo -s CHAN ParseOut $.parseline }
-on $*:parseline:out:$($+(/^PRIVMSG .* :[^,$chr(1),]/)): { echo -s PRIV ParseOut $.parseline }
-on *:parseline:out:PRIVMSG *: { echo -s DFLT ParseOut $.parseline }
+;on *:parseline:in:$($+(* PRIVMSG ,$me, :,$chr(1),DCC SEND *)): { echo -s DCC SEND ParseIn $.parseline }
+;on *:parseline:in:$($+(* PRIVMSG ,$me, :,$chr(1),DCC ACCEPT *,$chr(1),*)): { echo -s DCC ACCEPT ParseIn $.parseline }
+;on *:parseline:in:$($+(* PRIVMSG ,$me, :,$chr(1),DCC RESUME *,$chr(1),*)): { echo -s DCC RESUME ParseIn $.parseline }
+;on *:parseline:in:$(*PRIVMSG *:*DCC *): { echo -s DCC ParseIn $.parseline }
+;on *:parseline:out:$($+(PRIVMSG *:,$chr(1),DCC SEND * ,$longip($ip), *,$chr(1),*)): { echo -s SEND ParseOut $.parseline }
+;on *:parseline:out:$($+(PRIVMSG *:,$chr(1),DCC ACCEPT *,$chr(1),*)): { echo -s DCC ACCEPT ParseOut $.parseline }
+;on *:parseline:out:$($+(PRIVMSG *:,$chr(1),DCC RESUME *,$chr(1),*)): { echo -s DCC RESUME ParseOut $.parseline }
+;on *:parseline:out:PRIVMSG #*: { echo -s CHAN ParseOut $.parseline }
+;on $*:parseline:out:$($+(/^PRIVMSG .* :[^,$chr(1),]/)): { echo -s PRIV ParseOut $.parseline }
+;on *:parseline:out:PRIVMSG *: { echo -s DFLT ParseOut $.parseline }
 on *:filercvd:*: DLF.DccSend.FileRcvd $1-
 on *:getfail:*: DLF.DccSend.GetFailed $1-
 
@@ -650,6 +672,7 @@ ctcp ^*:PING*:?: { DLF.Priv.ctcpBlock $1- }
 
 ctcp *:DCC CHAT *:?: { DLF.DccChat.Chat $1- }
 ctcp *:DCC SEND *:?: { DLF.DccSend.Send $1- }
+; Do not process DCC ACCEPT and RESUME - allow mIRC to handle them.
 ctcp *:DCC ACCEPT *:?: { noop }
 ctcp *:DCC RESUME *:?: { noop }
 ctcp *:*:?: { DLF.Priv.ctcp $1- }
@@ -1525,7 +1548,6 @@ alias -l DLF.Priv.ctcp {
   DLF.Watch.Called DLF.Priv.ctcp : $1-
   if ($1 == TRIGGER) DLF.SearchBot.SetTriggers $1-
   DLF.Custom.Filter privctcp $1-
-;  DLF.Priv.QueryOpen $1-
   DLF.Priv.CommonChan $1-
   DLF.Priv.RegularUser ctcp $1-
   DLF.Win.Echo $event Private $nick $1-
@@ -1936,9 +1958,12 @@ alias -l DLF.DccSend.Request {
 }
 
 alias DLF.DccSend.FixString {
+alias -l DLF.DccSend.FixString {
   var %tab $tab, %space $space
   var %s = $replace($strip($1-),%tab $+ %space,%space,%tab,$null,',%space)
   return $remove(%s,¬,`,¦,!,",£,$,€,%,^,&,*,$lbr,$rbr,_,-,+,=,$lcurly,$rcurly,[,],:,;,@,~,$hashtag,|,\,<,$comma,>,.,?,/)
+  %s = $remove(%s,¬,`,¦,!,",£,$,€,%,^,&,*,$lbr,$rbr,_,-,+,=,$lcurly,$rcurly,[,],:,;,@,~,$hashtag,|,\,<,$comma,>,.,?,/)
+  return %s
 }
 
 alias -l DLF.DccSend.GetRequest {
@@ -1950,9 +1975,11 @@ alias -l DLF.DccSend.GetRequest {
   if (*_results_for_*.txt.zip iswmcs %fn) {
     var %nick $gettok(%fn,1,$asc(_)), %trig $DLF.SearchBot.TriggerFromNick($nick)
     var %potential $nick $nick $+ Bot Search SearchBot, %i $findtok(%potential,%nick,$asc($space))
+    ;echo -a nick %nick , trig %trig , i %i
     if ((%trig) && (%i != $null)) {
       var %sbresult $gettok(%potential,%i,$asc($space)) $+ _results_for_
       var %srch $right($removecs($gettok(%fn,1,$asc(.)),%sbresult),-1)
+      ;echo -a sbresult %sbresult , srch %srch
       return $hfind(DLF.dccsend.requests,$+($network,|*|,%trig,|,%srch,|*),1,w).item
     }
   }
@@ -2110,6 +2137,11 @@ alias -l DLF.DccSend.Receiving {
     }
   }
   DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick %starting
+  ;echo -s DLF.DccSend.Receiving Fn %fn
+  ;echo -s Starting %starting , IfFileExists %ifFileExists
+  ;echo -s Pathfile %pathfile
+  ;echo -s Req %req
+  ;echo -s Origfn %origfn
 }
 
 ; Get the DCC filename from the CTCP DCC SEND command.
@@ -2217,11 +2249,6 @@ alias -l DLF.DccSend.IsNotGetCommand {
 }
 
 alias -l DLF.DccSend.GetFailed {
-
-; To try to identify when user cancels, report the $get and $window properties to status window
-; echo -s DCC get: Nick: $get(-1) $+ , Size: $get(-1).size $+ , Secs: $get(-1).secs $+ , Rcvd: $get(-1).rcvd $+ , Idle: $get(-1).idle $+ , Wid: $get(-1).wid $+ , Active: $activewid
-; return
-
   var %fn $nopath($filename)
   DLF.Watch.Called DLF.DccSend.GetFailed %fn : $1-
   var %req $DLF.DccSend.GetRequest(%fn)
@@ -2345,7 +2372,7 @@ alias -l DLF.DccChat.Chat {
 ; Hopefully handling a dcc chat open event is unnecessary because we have halted unwanted requests
 alias -l DLF.DccChat.Open {
   DLF.Watch.Called DLF.DccChat.Open : $1-
-  echo -stf DLF.DccChat.Open called: target $target $+, nick $nick $+ : $1-
+  ;echo -stf DLF.DccChat.Open called: target $target $+, nick $nick $+ : $1-
 }
 
 ; ========== SearchBot Triggers ==========
@@ -2719,10 +2746,10 @@ alias -l DLF.Win.Echo {
     echo %flags $+ s %col %line
     DLF.Watch.Log Echoed: To Status Window
   }
-;  elseif ($2 == Message) {
-;    echo %flags $+ d %col %line
-;    DLF.Watch.Log Echoed: To Single-Message Window
-;  }
+  ;  elseif ($2 == Message) {
+  ;    echo %flags $+ d %col %line
+  ;    DLF.Watch.Log Echoed: To Single-Message Window
+  ;  }
   elseif ($2 == @find) {
     var %chans $DLF.@find.IsResponse
     var %i $numtok(%chans,$asc($space))
@@ -5326,6 +5353,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.fileserv No matches found!
   DLF.hadd chantext.fileserv «*» *: (*) * (* gets, size:*) (/ctcp * xdcc send *)
   DLF.hadd chantext.fileserv Mill§cript users double click search results to get pack (v0.2.0 and up only)
+  DLF.hadd chantext.fileserv * mircSearcher lets you search and tag files *
   inc %matches $hget(DLF.chantext.fileserv,0).item
 
   DLF.hmake DLF.chantext.triviahint
@@ -5768,7 +5796,6 @@ alias -l DLF.GitReports {
   if ($1 != $null) %url = $+(%url,issue_title=,$urlencode($1))
   if ($2 != $null) %url = $+(%url,&details=,$urlencode($2))
   if ($len(%url) <= 2048) return %url
-  echo -s GitReports: URL too long $len(%url)
   DLF.Watch.Log GitReports: URL too long $len(%url)
   return $false
 
@@ -6260,7 +6287,7 @@ alias DLF.mIRCiniDelta {
     }
   }
 
-; Save current mIRCini
+  ; Save current mIRCini
   set -e %DLF.mIRCiniTemp $qt($tempfn)
   bread $qt($mircini) 0 $file($mircini).size &DLFmIRCini
   bwrite -c %DLF.mIRCiniTemp 0 -1 &DLFmIRCini
@@ -6296,7 +6323,6 @@ alias DLF.Watch {
 alias DLF.Watch.Filter {
   tokenize $asc($space) $1-
   var %text $2-
-;  tokenize $asc($space)) $1-
   var %tags
   if (@* iswm %text) {
     %tags = $gettok(%text,1,$asc(:))
