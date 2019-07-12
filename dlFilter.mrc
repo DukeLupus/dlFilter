@@ -173,6 +173,7 @@ dlFilter uses the following code from other people:
       Handle DCC send requests received as a result of your DCC SEND with passive set.
       Query for searchbots if search is done for trigger not in table (to avoid blocked response files).
       Additional filters.
+      Additional menu items.
 
 */
 
@@ -352,9 +353,11 @@ menu menubar {
   .$iif(%DLF.filter.controlcodes,Don't filter,Filter) coloured messages: DLF.Options.ToggleOption filter.controlcodes 340
   .$iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Options.ToggleShowFilter
   .$iif(%DLF.serverads,Hide,Show) ads window(s): DLF.Options.ToggleShowAds
-  .Options: DLF.Options.Show
-  .Visit dlFilter website: .url -a https://github.com/DukeLupus/dlFilter/
   .-
+  .List channel filter stats: DLF.Stats
+  .Options: DLF.Options.Show
+  .-
+  .Visit dlFilter website: .url -a https://github.com/DukeLupus/dlFilter/
   .Unload dlFilter: if ($?!="Do you want to unload dlFilter?" == $true) .unload -rs $qt($script)
 }
 
@@ -363,6 +366,9 @@ menu status {
   .$iif(%DLF.filter.controlcodes,Don't filter,Filter) coloured messages: DLF.Options.ToggleOption filter.controlcodes 340
   .$iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Options.ToggleShowFilter
   .$iif(%DLF.serverads,Hide,Show) ads window(s): DLF.Options.ToggleShowAds
+  .-
+  .List channel filter stats: DLF.Stats
+  .List Searchbots on $network: DLF.Searchbots
   .Options: DLF.Options.Show
 }
 
@@ -381,6 +387,10 @@ menu channel {
   .$iif(%DLF.filter.controlcodes,Don't filter,Filter) coloured messages: DLF.Options.ToggleOption filter.controlcodes 340
   .$iif(%DLF.showfiltered,Hide,Show) filter window(s): DLF.Options.ToggleShowFilter
   .$iif(%DLF.serverads,Hide,Show) ads window(s): DLF.Options.ToggleShowAds
+  .-
+  .List channel filter stats: DLF.Stats
+  .List outstanding file requests: DLF.Requests
+  .List Searchbots in $chan: DLF.Searchbots
   .Options: DLF.Options.Show
   -
   $iif($DLF.oNotice.IsOp($chan),Open oNotice chat window) : DLF.oNotice.Open
