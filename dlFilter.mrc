@@ -152,6 +152,7 @@ dlFilter uses the following code from other people:
       Improve file transfer stats and fix stats for resumed files.
       Fix DCC Send tracking to cope with requests where server is DCC passive
       Handle DCC send requests received as a result of your DCC SEND with passive set.
+      Additional filters.
 
 */
 
@@ -5430,6 +5431,18 @@ alias -l DLF.CreateHashTables {
   inc %matches $hget(DLF.chantext.dlf,0).item
 
   DLF.hmake DLF.chantext.spam
+  DLF.hadd chantext.spam *http*sex*
+  DLF.hadd chantext.spam *sex*http*
+  DLF.hadd chantext.spam *http*xxx*
+  DLF.hadd chantext.spam *xxx*http*
+  DLF.hadd chantext.spam *http*porn*
+  DLF.hadd chantext.spam *porn*http*
+  DLF.hadd chantext.spam *www*sex*
+  DLF.hadd chantext.spam *sex*www*
+  DLF.hadd chantext.spam *www*xxx*
+  DLF.hadd chantext.spam *xxx*www*
+  DLF.hadd chantext.spam *http*masturbate*
+  DLF.hadd chantext.spam *masturbate*http*
   inc %matches $hget(DLF.chantext.spam,0).item
 
   DLF.hmake DLF.chanaction.away
@@ -5488,16 +5501,17 @@ alias -l DLF.CreateHashTables {
 
   DLF.hmake DLF.privtext.spam
   DLF.hadd privtext.spam *http*sex*
-  DLF.hadd privtext.spam *http*xxx*
-  DLF.hadd privtext.spam *porn*http*
   DLF.hadd privtext.spam *sex*http*
-  DLF.hadd privtext.spam *sex*www*
-  DLF.hadd privtext.spam *www*sex*
-  DLF.hadd privtext.spam *www*xxx*
+  DLF.hadd privtext.spam *http*xxx*
   DLF.hadd privtext.spam *xxx*http*
+  DLF.hadd privtext.spam *http*porn*
+  DLF.hadd privtext.spam *porn*http*
+  DLF.hadd privtext.spam *www*sex*
+  DLF.hadd privtext.spam *sex*www*
+  DLF.hadd privtext.spam *www*xxx*
   DLF.hadd privtext.spam *xxx*www*
-  DLF.hadd privtext.spam *masturbate*http*
   DLF.hadd privtext.spam *http*masturbate*
+  DLF.hadd privtext.spam *masturbate*http*
   inc %matches $hget(DLF.privtext.spam,0).item
 
   DLF.hmake DLF.privaction.spam
