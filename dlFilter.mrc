@@ -171,6 +171,7 @@ dlFilter uses the following code from other people:
       Improve file transfer stats and fix stats for resumed files.
       Fix DCC Send tracking to cope with requests where server is DCC passive
       Handle DCC send requests received as a result of your DCC SEND with passive set.
+      Query for searchbots if search is done for trigger not in table (to avoid blocked response files).
       Additional filters.
 
 */
@@ -1942,9 +1943,11 @@ alias -l DLF.Ops.AdvertPrivDLF {
 ; ========== DCC Send ==========
 alias -l DLF.DccSend.Request {
   DLF.Watch.Called DLF.DccSend.Request $1 : $2-
-  DLF.SearchBot.GetTriggers $1
   var %trig $strip($2), %fn
-  if (@* iswm %trig) %fn = $DLF.DccSend.FixString($3-)
+  if (@search* iswm %trig) {
+    DLF.SearchBot.GetTriggers $1 %trig
+    %fn = $DLF.DccSend.FixString($3-)
+  }
   elseif (XDCC-* iswm %trig) %fn = $3-
   else %fn = $DLF.GetFileName($3-)
   var %ifFileExists $dccIfFileExists, %pathfile $+($getdir(%fn),%fn)
@@ -1957,11 +1960,9 @@ alias -l DLF.DccSend.Request {
   DLF.Watch.Log DccSend request recorded: %trig %fn
 }
 
-alias DLF.DccSend.FixString {
 alias -l DLF.DccSend.FixString {
   var %tab $tab, %space $space
   var %s = $replace($strip($1-),%tab $+ %space,%space,%tab,$null,',%space)
-  return $remove(%s,¬,`,¦,!,",£,$,€,%,^,&,*,$lbr,$rbr,_,-,+,=,$lcurly,$rcurly,[,],:,;,@,~,$hashtag,|,\,<,$comma,>,.,?,/)
   %s = $remove(%s,¬,`,¦,!,",£,$,€,%,^,&,*,$lbr,$rbr,_,-,+,=,$lcurly,$rcurly,[,],:,;,@,~,$hashtag,|,\,<,$comma,>,.,?,/)
   return %s
 }
@@ -2379,8 +2380,17 @@ alias -l DLF.DccChat.Open {
 ; hash table index network|channel|nick|trigger
 alias -l DLF.SearchBot.GetTriggers {
   DLF.Watch.Called DLF.SearchBot.GetTriggers $1 : $2-
-  var %nc = $hget(DLF.sbrequests,$+($network,$1))
-  if (%nc != $null) return
+  var %nc = $+($network,$1)
+  ; If current trigger request is active, don't send another one
+  var %req = $hget(DLF.sbcurrentreqs,%nc)
+  if (%req != $null) return
+  ; If we have previously requested but not had any responses then try again.
+  %req = $hget(DLF.sbrequests,$+($network,$1))
+  var %bots = $hfind(DLF.searchbots,$+($network,|,$1,|*),0,w).item
+  if ((%req != $null) && (%bots > 0) && ($2 == $null)) return
+  ; If trigger is a search and it is not in the searchbots table then re-request triggers
+  var %nick = $DLF.SearchBot.NickFromTrigger($2,$1)
+  if (%nick != $null) return
   DLF.Watch.Log SearchBot: Requesting Triggers
   var %ttl $DLF.SearchBot.TTL
   hadd -mzu $+ %ttl DLF.sbrequests $+($network,$1) %ttl
@@ -2392,16 +2402,20 @@ alias -l DLF.SearchBot.GetTriggers {
 alias -l DLF.SearchBot.SetTriggers {
   DLF.Watch.Called DLF.SearchBot.SetTriggers : $1-
   var %ttl $DLF.SearchBot.TTL
-  hadd -mzu $+ %ttl DLF.searchbots $+($network,|,$3,|,$nick,|,$4) %ttl
-  if ($hget(DLF.sbcurrentreqs,$+($network,$3)) != $null) DLF.Win.Filter $event Private $nick $1-
+  hadd -mzu $+ %ttl DLF.searchbots $+($2,|,$3,|,$nick,|,$4) %ttl
+  if ($hget(DLF.sbcurrentreqs,$+($2,$3)) != $null) DLF.Win.Filter $event Private $nick $1-
 }
 
-alias -l DLF.SearchBot.NickFromTrigger {
-  return $gettok($hfind(DLF.searchbots,$+($network,|*|*|,$1),1,w).item,3,$asc(|))
+alias DLF.SearchBot.NickFromTrigger {
+  var %chan = *
+  if ($2 != $null) %chan = $2
+  return $gettok($hfind(DLF.searchbots,$+($network,|,%chan,|*|,$1),1,w).item,3,$asc(|))
 }
 
 alias -l DLF.SearchBot.TriggerFromNick {
-  return $gettok($hfind(DLF.searchbots,$+($network,|*|,$1,|*),1,w).item,4,$asc(|))
+  var %chan = *
+  if ($2 != $null) %chan = $2
+  return $gettok($hfind(DLF.searchbots,$+($network,|,%chan,|,$1,|*),1,w).item,4,$asc(|))
 }
 
 alias DLF.SearchBots {
