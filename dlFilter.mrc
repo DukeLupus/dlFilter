@@ -5347,6 +5347,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce Command syntax: !REQUEST ADD|FILL|UNFILL|DEL|LIST|CONFIRM|COMMANDS [parameters]
   DLF.hadd chantext.announce ?? * packs ??  * of * slots open
   DLF.hadd chantext.announce the README.txt file to know how to request audiobooks*
+  DLF.hadd chantext.announce To request a book use @request*
   inc %matches $hget(DLF.chantext.announce,0).item
 
   DLF.hmake DLF.chantext.always
