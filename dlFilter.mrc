@@ -355,6 +355,8 @@ menu menubar {
   .$iif(%DLF.serverads,Hide,Show) ads window(s): DLF.Options.ToggleShowAds
   .-
   .List channel filter stats: DLF.Stats
+  .-
+  .Reload filter definitions: DLF.CreateHashTables
   .Options: DLF.Options.Show
   .-
   .Visit dlFilter website: .url -a https://github.com/DukeLupus/dlFilter/
@@ -369,6 +371,8 @@ menu status {
   .-
   .List channel filter stats: DLF.Stats
   .List Searchbots on $network: DLF.Searchbots
+  .-
+  .Reload filter definitions: DLF.CreateHashTables
   .Options: DLF.Options.Show
 }
 
@@ -391,6 +395,8 @@ menu channel {
   .List channel filter stats: DLF.Stats
   .List outstanding file requests: DLF.Requests
   .List Searchbots in $chan: DLF.Searchbots
+  .-
+  .Reload filter definitions: DLF.CreateHashTables
   .Options: DLF.Options.Show
   -
   $iif($DLF.oNotice.IsOp($chan),Open oNotice chat window) : DLF.oNotice.Open
