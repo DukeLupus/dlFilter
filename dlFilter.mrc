@@ -67,8 +67,10 @@ dlFilter uses the following code from other people:
       If "CRC(xxxxx)" is in the DCC Send Notice then when file completes, check the CRC is correct and flag if not.
       If Op, option to highlight to self or other ops or ban user after x spam messages / reports from other ops.
       If user disables or unloads, remove stats from channel titles.
-      Add option for showing parts and joins etc. for anyone who has spoken in channel (i.e. any non-filtered messages).
+      Add option for showing parts and joins etc. for anyone who has spoken in channel (non-filtered messages)
+        or anyone who user has communicated with or notify users or users who were ops / hops / voiced when they last parted/quit.
       Tracking search bot triggers needs improving to handle parts and joins.
+      If channel joined has mode +d (can't send for 30s), don't send e.g. searchbot trigger request for 30s.
 
   Ideas for possible future enhancements
       Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
