@@ -184,7 +184,7 @@ dlFilter uses the following code from other people:
 ; Increase this when you have sufficient changes to justify a release
 ; When you want to trigger updates for existing users, change the version file.
 alias -l DLF.SetVersion {
-  %DLF.version = 2.09
+  %DLF.version = 2.10
   return %DLF.version
 }
 
