@@ -61,7 +61,6 @@ dlFilter uses the following code from other people:
       DCC RESUME doesn't seem to work properly.
       DCC RESUME should start again from the beginning if file is already fully downloaded.
 
-      Remove DLF.sbrequests/DLF.sbcurrentreqs for network#channel on part/quit/join (so that we get a list of bots every time we join and don't have a stale list)
       Reset stats for a channel on JOIN.
       Sort out spaces in private DCC Send messages
       If "CRC(xxxxx)" is in the DCC Send Notice then when file completes, check the CRC is correct and flag if not.
@@ -69,8 +68,6 @@ dlFilter uses the following code from other people:
       If user disables or unloads, remove stats from channel titles.
       Add option for showing parts and joins etc. for anyone who has spoken in channel (non-filtered messages)
         or anyone who user has communicated with or notify users or users who were ops / hops / voiced when they last parted/quit.
-      Tracking search bot triggers needs improving to handle parts and joins.
-      If channel joined has mode +d (can't send for 30s), don't send e.g. searchbot trigger request for 30s.
 
   Ideas for possible future enhancements
       Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
@@ -176,6 +173,11 @@ dlFilter uses the following code from other people:
       Query for searchbots if search is done for trigger not in table (to avoid blocked response files).
       Additional filters.
       Additional menu items.
+      Fix search responses not being autoaccepted. Triggers not being requested because @search-Triggers sent too early in channel with mode +d talk delay.
+      Remove search triggers when you leave channel so that they are re-requested when you join in case list has changed.
+      Re-request search triggers if nick search* joins or @search* called and nick/trigger is not in table.
+      Fix handling of self join / part calling routines twice.
+      Fix dlf.watch for quit server response.
 
 */
 
@@ -436,26 +438,26 @@ on ^*:join:#: {
   if ($1-) %txt = : $1-
   if ($shortjoinsparts) %joins = Joins:
   else %joined = has joined $chan $+ %txt
-  DLF.Event.Join %joins $nick $br($address) %joined %txt
+  if ($nick !== $me) DLF.Event.Join %joins $nick $br($address) %joined %txt
+  else DLF.Event.MeJoin $1-
+  if (search* iswm $nick) DLF.SearchBot.GetTriggers $1 $nick
 }
 
-on me:*:join:#: {
-  DLF.Event.MeJoin $1-
-}
+; raw 324 Channel mode response
+raw 324:*: { DLF.SearchBot.MeJoin $2- }
 
-raw 366:*: {
-  DLF.Event.MeJoinComplete $1-
-}
+; raw 324 Channel user list complete
+raw 366:*: { DLF.Event.MeJoinComplete $1- }
 
 on ^*:part:#: {
   var %txt, %parts, %hasleft
   if ($1-) %txt = $br($1-)
   if ($shortjoinsparts) %parts = Parts:
   else %hasleft = has left $chan %txt
-  DLF.Event.Leave %parts $nick $br($address) %hasleft %txt
+  var %msg %parts $nick $br($address) %hasleft %txt
+  if ($nick !== $me) DLF.Event.Leave %msg
+  else DLF.Event.MeLeave %msg
 }
-
-on me:*:part:#: { DLF.Event.MeLeave $1- }
 
 on ^*:kick:#: {
   var %txt, %addr, %fromchan
@@ -478,11 +480,6 @@ on ^*:quit: {
   if ($shortjoinsparts) %quits = Quits:
   else %quit = quit
   DLF.Event.Quit $nick %quits $nick $br($address) %quit %txt
-}
-
-; Not sure that ever triggers - when you quit ON DISCONNECT is called
-on me:*:quit: {
-  DLF.Event.Disconnect $1-
 }
 
 on *:connect: {
@@ -874,6 +871,7 @@ alias -l DLF.Event.Leave {
 alias -l DLF.Event.MeLeave {
   DLF.Watch.Called DLF.Event.MeLeave : $1-
   DLF.AlreadyHalted $1-
+  DLF.SearchBot.MeLeave $chan
   ; Remove all users from oNotice window
   DLF.oNotice.DelNickAllChans
   ; Colour find responses now that I am no longer in channel
@@ -931,6 +929,7 @@ alias -l DLF.Event.JustConnected {
 alias -l DLF.Event.Disconnect {
   DLF.Watch.Called DLF.Event.Disconnect : $1-
   DLF.AlreadyHalted $1-
+  DLF.SearchBot.Disconnect
   DLF.oNotice.DelNickAllChans
   ; Colour find responses now that I am no longer in channel
   DLF.@find.ColourMe $event
@@ -2395,25 +2394,63 @@ alias -l DLF.DccChat.Open {
 }
 
 ; ========== SearchBot Triggers ==========
+alias -l DLF.SearchBot.MeJoin {
+  ; Record channel delay if channel has mode +d
+  DLF.Watch.Called DLF.SearchBot.MeJoin $1 : $2-
+  var %i $numtok($2-,$space)
+  while (%i) {
+    if (+*d* iswm $gettok($2-,%i,$asc($space))) {
+      var %delay $gettok($2-,-1,$asc($space))
+      DLF.Watch.Log Searchbot: Recording that $1 has talk delay: %delay
+      if (%delay == $null) %delay = 30
+      hadd -mzu $+ %delay DLF.sbchandelay $+($network,$1) %delay
+      break
+    }
+    dec %i
+  }
+}
+
+alias -l DLF.SearchBot.MeLeave {
+  DLF.Watch.Called DLF.SearchBot.MeLeave $1 : $2-
+  var %nc $+($network,$1)
+  .timer $+ DLF.sbgetriggers. $+ %nc off
+  if ($hget(DLF.sbchandelay) !== $null) hdel DLF.sbchandelay %nc
+}
+
+alias -l DLF.SearchBot.Disconnect {
+  DLF.Watch.Called DLF.SearchBot.Disconnect $1 : $2-
+  var %i $chan(0)
+  while (%i) {
+    DLF.SearchBot.MeLeave $chan(%i)
+    dec %i
+  }
+}
+
 ; hash table index network|channel|nick|trigger
 alias -l DLF.SearchBot.GetTriggers {
   DLF.Watch.Called DLF.SearchBot.GetTriggers $1 : $2-
-  var %nc = $+($network,$1)
+  var %nc $+($network,$1)
   ; If current trigger request is active, don't send another one
-  var %req = $hget(DLF.sbcurrentreqs,%nc)
+  var %req $hget(DLF.sbcurrentreqs,%nc)
   if (%req != $null) return
   ; If we have previously requested but not had any responses then try again.
-  %req = $hget(DLF.sbrequests,$+($network,$1))
+  %req = $hget(DLF.sbrequests,%nc)
   var %bots = $hfind(DLF.searchbots,$+($network,|,$1,|*),0,w).item
   if ((%req != $null) && (%bots > 0) && ($2 == $null)) return
   ; If trigger is a search and it is not in the searchbots table then re-request triggers
-  var %nick = $DLF.SearchBot.NickFromTrigger($2,$1)
+  if (@* iswm $2) var %nick $DLF.SearchBot.NickFromTrigger($2,$1)
+  else var %nick $DLF.SearchBot.TriggerFromNick($2,$1)
   if (%nick != $null) return
-  DLF.Watch.Log SearchBot: Requesting Triggers
-  var %ttl $DLF.SearchBot.TTL
-  hadd -mzu $+ %ttl DLF.sbrequests $+($network,$1) %ttl
-  hadd -mzu60 DLF.sbcurrentreqs $+($network,$1) 60
-  .msg $1 @SearchBot-Trigger
+  ; Check for channel mode +d and delay request until request will not be rejected
+  var %delay $hget(DLF.sbchandelay,%nc)
+  if (%delay == $null) %delay = 0
+  var %ttl $DLF.SearchBot.TTL + %delay
+  var %timeout 60 + %delay
+  hadd -mzu $+ %ttl DLF.sbrequests %nc %ttl
+  hadd -mzu $+ %timeout DLF.sbcurrentreqs %nc %timeout
+  DLF.Watch.Log SearchBot: Requesting Triggers for %nc in %delay seconds
+  if (%delay == 0) .msg $1 @SearchBot-Trigger
+  else .timer $+ DLF.sbgetriggers. $+ %nc 1 %delay .msg $1 @SearchBot-Trigger
 }
 
 ; ctcp TRIGGER network chan trigger
@@ -6362,9 +6399,15 @@ alias DLF.Watch.Filter {
     %text = : $+ $gettok(%text,2-,$asc(:))
   }
   var %user
-  if (($1 == <-) && (:* iswm %text)) {
+  if ($1 == <-) {
+    if (:* iswm %text) {
     %user = $right($gettok(%text,1,$asc($space)),-1)
     %text = $gettok(%text,2-,$asc($space))
+    }
+    else {
+      DLF.Watch.Log $1-
+      return
+    }
   }
   elseif ($1 == ->) {
     %user = $gettok(%text,1,$asc($space))
@@ -6407,7 +6450,7 @@ alias -l DLF.Watch.Log {
   elseif ($window($debug)) {
     DLF.Win.CustomTrim $debug
     var %c 3
-    if (%ticks == 0) %c = 10
+    if (%ticks == 0) %c = 6
     if ($1 == <-) %c = 1
     elseif ($1 == ->) %c = 12
     elseif ($1 == Halted:) %c = 4
