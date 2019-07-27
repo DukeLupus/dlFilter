@@ -50,16 +50,18 @@ dlFilter uses the following code from other people:
         (Add another field to the hash for the nick - check whether trigger exactly matches a nick and if not try to identify a close match (either by looking for matching @trigger in ads window or by looking for very similar nicks e.g. pondering vs. pondering42. Or check the ads windows for equivalent @ triggers.)
       Autoaccept files from dcc trusted nicks. (Autoaccept works for matching nicks, but not for gets from nicks which do not match trigger.)
       Copy files received which are not identified as triggers to current window.
-      Handle search response files where "-" is replaced by space. (Analyse sbserver to see how it handles special characters.)
       Colour DCC SEND channel messages so as to distinguish filenames and sending user and stats.
       If settings not AutoAccept (which uses temporary trust) then ask user (once per nick per session) if they want to Trust untrusted servers they are requesting files from.
       Autoaccept / autotrust from all voiced or opped or half-opped nicks.
 
-      Does not auto-accept when at least one manually trusted nick
-      Does not auto-accept search results for search with a hyphenated word or fullstop.
+      Handle search response files where "-" is replaced by space. (Analyse sbserver to see how it handles special characters.)
+        Does not auto-accept when at least one manually trusted nick
+        Does not auto-accept search results for search with a hyphenated word or fullstop.
       File Get retry clears input box.
       DCC RESUME doesn't seem to work properly.
       DCC RESUME should start again from the beginning if file is already fully downloaded.
+      DCC RESUME when file already fully downloaded says Resumed but never completes.
+        Status window has: DCC Send from xxxxx rejected (invalid parameters)
 
       Reset stats for a channel on JOIN.
       Sort out spaces in private DCC Send messages
@@ -68,6 +70,7 @@ dlFilter uses the following code from other people:
       If user disables or unloads, remove stats from channel titles.
       Add option for showing parts and joins etc. for anyone who has spoken in channel (non-filtered messages)
         or anyone who user has communicated with or notify users or users who were ops / hops / voiced when they last parted/quit.
+      Ops oNotice about spammer needs to be more intelligent - not just on a single spam message from a user like "Hello."
 
   Ideas for possible future enhancements
       Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
@@ -178,6 +181,8 @@ dlFilter uses the following code from other people:
       Re-request search triggers if nick search* joins or @search* called and nick/trigger is not in table.
       Fix handling of self join / part calling routines twice.
       Fix dlf.watch for quit server response.
+
+2.11  Fix bug with missing variable when changing Ads window lines if server changes nick. (Thx to Ook for reporting this.)
 
 */
 
@@ -2042,7 +2047,7 @@ alias -l DLF.DccSend.IsTrigger {
     var %chan $gettok(%req,2,$asc(|))
     var %user $gettok($right($gettok(%req,3,$asc(|)),-1),1,$asc(-))
     if ((%user == $nick) && ($nick(%chan,$nick) != $null)) {
-      DLF.Watch.Log User request found: %user
+      DLF.Watch.Log User request found: Sent to %user in %chan
       return $true
     }
     dec %i
@@ -2892,7 +2897,7 @@ alias -l DLF.Win.Echo {
       %sent = $addtok(%sent,%chan,$asc($comma))
       dec %i
     }
-    DLF.Watch.Log Echoed: To common channels %sent
+    DLF.Watch.Log Echoed: To common channel(s) %sent
   }
 }
 
@@ -3152,7 +3157,7 @@ alias -l DLF.Ads.NickChg {
   if (!$window(%win)) return
   DLF.Watch.Called DLF.Ads.NickChg
   ; Delete any existing lines for $newnick
-  var %match $DLF.Ads.NickChgMatch($newnick)
+  var %match $DLF.Ads.NickChgMatch($newnick), %i $fline(%win,%match,0)
   while (%i) {
     var %ln $fline(%win,%match,%i)
     dec %i
