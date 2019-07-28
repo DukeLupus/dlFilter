@@ -55,8 +55,8 @@ dlFilter uses the following code from other people:
       Autoaccept / autotrust from all voiced or opped or half-opped nicks.
 
       Handle search response files where "-" is replaced by space. (Analyse sbserver to see how it handles special characters.)
-        Does not auto-accept when at least one manually trusted nick
         Does not auto-accept search results for search with a hyphenated word or fullstop.
+      Does not auto-accept when at least one manually trusted nick (probably a mIRC bug - do we want to code a workaround or perhaps a popup warning message).
       File Get retry clears input box.
       DCC RESUME doesn't seem to work properly.
       DCC RESUME should start again from the beginning if file is already fully downloaded.
@@ -70,7 +70,15 @@ dlFilter uses the following code from other people:
       If user disables or unloads, remove stats from channel titles.
       Add option for showing parts and joins etc. for anyone who has spoken in channel (non-filtered messages)
         or anyone who user has communicated with or notify users or users who were ops / hops / voiced when they last parted/quit.
+      Option to maintain list of servers (using SLOTS or Ads) and hide anything (with colours?) that they send when you haven't requested anything from them.
+      Message to all dlf channels when you enable or disable DLF.
+
       Ops oNotice about spammer needs to be more intelligent - not just on a single spam message from a user like "Hello."
+      Fix oNotice list of people leaving / people changing nicks
+      Copy all ops messages to oNotice window i.e. any joins / parts bans kicks etc. by or of Ops.
+      Option to auto-open oNotice window when you are opped in a channel (if there are at least 2 ops).
+      Autoaccept DCC chat from trusted nicks. May need to set autoaccept from everyone and then cancel those you don't want to accept.
+      File transfer messages (red) from trusted nicks not appearing in windows.
 
   Ideas for possible future enhancements
       Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
@@ -79,7 +87,7 @@ dlFilter uses the following code from other people:
       Manage filetype ignore list like trust list i.e. temp add for requested filetypes.
       More menu options equivalent to dialog options
       Make it work on AdiIRC and update version check to handle AdiIRC versions.
-      Merge in sbClient functionality
+      Merge in sbClient functionality + add functionality to process CSEv2 DCC results.
       Trim lines from Ads window for servers which have been offline for xx hours.
       Configurable F1 etc. aliases to toggle Options, Ads, Filters, Catch-all by F key or other keys.
         (Use On Keydown to capture and check keystrokes, have a key field for each of the options to toggle.)
@@ -187,7 +195,7 @@ dlFilter uses the following code from other people:
       Added check for searchbots in channel before requesting searchbot triggers
       Fixed over frequent @searchbot-trigger calls when a non-existent search trigger is used.
 
-2.11
+2.12
 
 */
 
@@ -2096,6 +2104,7 @@ alias -l DLF.DccSend.Send {
     DLF.Halt Blocked: DCC Send - filename contains malicious unicode U+8238
   }
   var %trusted $DLF.DccSend.IsTrusted
+;echo -a DLF.DccSend.Send Trusted: %trusted Requested: $DLF.DccSend.IsRequest(%fn)
   if (%trusted) DLF.Watch.Log User is in your DCC trust list
   if ($DLF.DccSend.IsRequest(%fn)) {
     if ((%DLF.dccsend.autoaccept == 1) && (!%trusted)) DLF.DccSend.TrustAdd
@@ -2165,11 +2174,11 @@ alias -l DLF.DccSend.Receiving {
     }
   }
   DLF.Win.Log Server ctcp %chan $nick DCC Get of $qt(%origfn) from $nick %starting
-  ;echo -s DLF.DccSend.Receiving Fn %fn
-  ;echo -s Starting %starting , IfFileExists %ifFileExists
-  ;echo -s Pathfile %pathfile
-  ;echo -s Req %req
-  ;echo -s Origfn %origfn
+;echo -a DLF.DccSend.Receiving Fn %fn
+;echo -a Req %req Chan %chan Origfn %origfn
+;echo -a File %file
+;echo -a Origfile %origfile
+;echo -a Starting %starting , IfFileExists %ifFileExists
 }
 
 ; Get the DCC filename from the CTCP DCC SEND command.
@@ -5232,7 +5241,8 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *Trigger*@*
   DLF.hadd chantext.ads *Trigger*ctcp*
   DLF.hadd chantext.ads *Total*File Transfer in Progress*slot*empty*
-  DLF.hadd chantext.ads *Type @* list of *
+  DLF.hadd chantext.ads *Type* @* list of*
+  DLF.hadd chantext.ads *Type* @* my list*
   DLF.hadd chantext.ads *[BWI]*@*
   DLF.hadd chantext.ads @ * is now open via ftp @*
   DLF.hadd chantext.ads @ --*
@@ -5282,7 +5292,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *Receive Successful*Thanks for*
   DLF.hadd chantext.announce *Received*From*Size*Speed*Time*since*
   DLF.hadd chantext.announce *ROLL TIDE*Now Playing*mp3*
-  DLF.hadd chantext.announce *sent*to*total sent*files*
+  DLF.hadd chantext.announce *sent*to*total sent*
   DLF.hadd chantext.announce *OS-Limits v*
   DLF.hadd chantext.announce *sets away*auto idle away*since*
   DLF.hadd chantext.announce *Thank You*for serving in*
@@ -5323,12 +5333,18 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce *Welcome * person No* to join*
   DLF.hadd chantext.announce *'s current status * Points this WEEK * Points this MONTH*
   DLF.hadd chantext.announce *- ??/??/????  *  Ajouté par *
+  DLF.hadd chantext.announce Normal
+  DLF.hadd chantext.announce Priority
+  DLF.hadd chantext.announce Server Priority
+  DLF.hadd chantext.announce Servers Priority
   DLF.hadd chantext.announce Mode: Normal
   DLF.hadd chantext.announce Mode: Server* Priority
-  DLF.hadd chantext.announce Normal
+  DLF.hadd chantext.announce ? Mode: Normal ?
+  DLF.hadd chantext.announce ? Mode: Server* Priority ?
   DLF.hadd chantext.announce ø
   DLF.hadd chantext.announce *Je Vient Juste De Reçevoir * De La Pars De * Pour Un Total De * Fichier(s)*
   DLF.hadd chantext.announce *The fastest Average Send Speeds captured last hour are*
+  DLF.hadd chantext.announce *If your server doesn't work please turn it off*
   DLF.hadd chantext.announce *Todays Most Popular Servers - as of *
   DLF.hadd chantext.announce *Todays Top Leechers - as of *
   DLF.hadd chantext.announce *I have just voiced * for being kewl And sharing*
@@ -5389,6 +5405,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce Je Viens D'envoyer: * © À: * © Total De Fichiers Partagés: * © Hier J'ai Envoyé: * Fichiers © Aujourd'hui J'ai Envoyé [à * ]: * Fichiers © OS-Limites V*
   DLF.hadd chantext.announce *sent*at*to*total sent*files*yesterday*files*today*
   DLF.hadd chantext.announce Mode: Server Priority
+  DLF.hadd chantext.announce Sends: * @ Mode: * @
   DLF.hadd chantext.announce * packs * slots open, Record: *
   DLF.hadd chantext.announce * Brought To You By *
   DLF.hadd chantext.announce * XDCC Server *
@@ -5430,6 +5447,10 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce ?? * packs ??  * of * slots open
   DLF.hadd chantext.announce the README.txt file to know how to request audiobooks*
   DLF.hadd chantext.announce To request a book use @request*
+  DLF.hadd chantext.announce * ? ? ? NOUVEAU ? ? ? NOUVEAU ? ? ? : *
+  DLF.hadd chantext.announce * download et bon partage. Tapez *
+  DLF.hadd chantext.announce * Transfer* Speed-O-Meter *
+  DLF.hadd chantext.announce @ Type: !*
   inc %matches $hget(DLF.chantext.announce,0).item
 
   DLF.hmake DLF.chantext.always
@@ -5473,11 +5494,15 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.triviahint 1st Hint: *
   DLF.hadd chantext.triviahint 2nd Hint: *
   DLF.hadd chantext.triviahint 3rd Hint: *
+  DLF.hadd chantext.triviahint Hint1: *
+  DLF.hadd chantext.triviahint Hint2: *
+  DLF.hadd chantext.triviahint Hint3: *
   inc %matches $hget(DLF.chantext.triviahint,0).item
 
   DLF.hmake DLF.chantext.trivia
+  DLF.hadd chantext.trivia TBtriv v1.32 by TroyBoy - *
   DLF.hadd chantext.trivia KAOS: * Question Value : *
-  DLF.hadd chantext.trivia KAOS * Answers
+  DLF.hadd chantext.trivia KAOS* Answers
   DLF.hadd chantext.trivia ???.*
   DLF.hadd chantext.trivia *S Top * #*: *
   DLF.hadd chantext.trivia *S Ago* Top * #*: *
@@ -5486,6 +5511,18 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia Top JACKPOT scorers: * #*: *
   DLF.hadd chantext.trivia TOP* PLAYERS * #*: *
   DLF.hadd chantext.trivia Top Player of*: *: *
+  DLF.hadd chantext.trivia BEST IN A WEEK Top 10 - *
+  DLF.hadd chantext.trivia BEST IN A MONTH Top 10 - *
+  DLF.hadd chantext.trivia BEST SPEED Top 10 - *
+  DLF.hadd chantext.trivia FASTEST TIME Top 10 - *
+  DLF.hadd chantext.trivia LONGEST ROW Top 10 - *
+  DLF.hadd chantext.trivia MOST MEGA BONUS Top 10 - *
+  DLF.hadd chantext.trivia MOST JACKPOT Top 10 - *
+  DLF.hadd chantext.trivia Last MONTHS Top 3 - *
+  DLF.hadd chantext.trivia Last WEEKS Top 3 - *
+  DLF.hadd chantext.trivia This MONTHS Top 1-10: *
+  DLF.hadd chantext.trivia TOTAL points Top 10 - *
+  DLF.hadd chantext.trivia All-time Records - Wins *
   DLF.hadd chantext.trivia BogusTrivia v*
   DLF.hadd chantext.trivia *TrivBot2001*
   DLF.hadd chantext.trivia *WQuizz 2*
@@ -5510,6 +5547,9 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia Trivia Starting in * seconds, get ready!!!
   DLF.hadd chantext.trivia Resetting * SCORES
   DLF.hadd chantext.trivia Trivia Stopped by *
+  DLF.hadd chantext.trivia WEEKLY Scores reset in: *
+  DLF.hadd chantext.trivia This WEEKS Top 1-10: *
+  DLF.hadd chantext.trivia Trivia Stats: *
   ; Question end
   DLF.hadd chantext.trivia Times up! The answer was -> * <-
   DLF.hadd chantext.trivia TIMES UP! *The answers were [ * ][ * ]*
@@ -5517,7 +5557,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia NOBODY GOT ANY OF THE ANSWERS !!!
   DLF.hadd chantext.trivia You've Guessed Them All !!! *The answers were [ * ][ * ]*
   DLF.hadd chantext.trivia Total Number Answered Correctly: * from a possible * !
-  DLF.hadd chantext.trivia YES, *  got the answer -> * <-  in * sec*s, and gets * points
+  DLF.hadd chantext.trivia YES, * got the answer -> * <-  in * sec*s*, and gets * points*
   DLF.hadd chantext.trivia You got it *! The answer was "*". You got it in * seconds and are awarded * Points
   DLF.hadd chantext.trivia Unbelievable!! * got the answer "*" in only * seconds earning * Points
   DLF.hadd chantext.trivia That's the way *! The answer was "*". You got it in * seconds, scooping up * Points
@@ -5527,6 +5567,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia Everyone, High-5 * for getting the answer "*" and scoring * Points
   DLF.hadd chantext.trivia Congratulations *! The answer was "*". You got it in * seconds, raising your score by * Points
   DLF.hadd chantext.trivia Way to go *!! You answered "*" in * seconds for * Points
+  DLF.hadd chantext.trivia * needs * points to replace * at pos *
   DLF.hadd chantext.trivia * wins * Points for *
   DLF.hadd chantext.trivia * has won * in a row!* Total Points *
   DLF.hadd chantext.trivia * in a Row !!! I Think that * is * !!! Is Everybody Asleep!?*
@@ -5536,6 +5577,10 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia Cleared Top * Variables
   DLF.hadd chantext.trivia Cleared Top * Scores
   DLF.hadd chantext.trivia *Trivia* Loading...
+  DLF.hadd chantext.trivia Q????  *
+  DLF.hadd chantext.trivia *Matching answers so far: * from a possible * secs remaining
+  DLF.hadd chantext.trivia * points for each matching answer. TOTAL: *
+  DLF.hadd chantext.trivia Times Up! You missed: *
   ; French trivia
   DLF.hadd chantext.trivia Le Quizz démarre dans * secondes, préparez-vous!
   DLF.hadd chantext.trivia Les * meilleurs : 1.*
@@ -5634,6 +5679,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chanctcp.spam SOUND *
   DLF.hadd chanctcp.spam WMA *
   DLF.hadd chanctcp.spam SLOTS *
+  DLF.hadd chanctcp.spam ZIP *
   inc %matches $hget(DLF.chanctcp.spam,0).item
 
   DLF.hmake DLF.chanctcp.server
@@ -5780,10 +5826,10 @@ alias -l DLF.CreateHashTables {
   inc %matches $hget(DLF.privnotice.dnd,0).item
 
   DLF.hmake DLF.ctcp.reply
-  DLF.hadd ctcp.reply SLOTS*
-  DLF.hadd ctcp.reply ERRMSG*
-  DLF.hadd ctcp.reply MP3*
-  DLF.hadd ctcp.reply ZIP*
+;  DLF.hadd ctcp.reply SLOTS*
+;  DLF.hadd ctcp.reply ERRMSG*
+;  DLF.hadd ctcp.reply MP3*
+;  DLF.hadd ctcp.reply ZIP*
   inc %matches $hget(DLF.ctcp.reply,0).item
 
   DLF.hmake DLF.find.header
