@@ -187,12 +187,14 @@ dlFilter uses the following code from other people:
       Added check for searchbots in channel before requesting searchbot triggers
       Fixed over frequent @searchbot-trigger calls when a non-existent search trigger is used.
 
+2.11
+
 */
 
 ; Increase this when you have sufficient changes to justify a release
 ; When you want to trigger updates for existing users, change the version file.
 alias -l DLF.SetVersion {
-  %DLF.version = 2.10
+  %DLF.version = 2.11
   return %DLF.version
 }
 
