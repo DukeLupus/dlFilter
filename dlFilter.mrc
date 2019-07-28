@@ -183,6 +183,9 @@ dlFilter uses the following code from other people:
       Fix dlf.watch for quit server response.
 
 2.11  Fix bug with missing variable when changing Ads window lines if server changes nick. (Thx to Ook for reporting this.)
+      Added generalised support for searchbot names i.e. seek* & locate* as well as search*
+      Added check for searchbots in channel before requesting searchbot triggers
+      Fixed over frequent @searchbot-trigger calls when a non-existent search trigger is used.
 
 */
 
@@ -445,7 +448,7 @@ on ^*:join:#: {
   else %joined = has joined $chan $+ %txt
   if ($nick !== $me) DLF.Event.Join %joins $nick $br($address) %joined %txt
   else DLF.Event.MeJoin $1-
-  if (search* iswm $nick) DLF.SearchBot.GetTriggers $1 $nick
+  if ($DLF.IsSearchbot($nick)) DLF.SearchBot.GetTriggers $1 $nick
 }
 
 ; raw 324 Channel mode response
@@ -1965,8 +1968,8 @@ alias -l DLF.Ops.AdvertPrivDLF {
 ; ========== DCC Send ==========
 alias -l DLF.DccSend.Request {
   DLF.Watch.Called DLF.DccSend.Request $1 : $2-
-  var %trig $strip($2), %fn
-  if (@search* iswm %trig) {
+  var %trig $strip($2), %sb $right(%trig,-1), %fn
+  if ((@* iswm %trig) && ($DLF.IsSearchbot(%sb))) {
     DLF.SearchBot.GetTriggers $1 %trig
     %fn = $DLF.DccSend.FixString($3-)
   }
@@ -2431,27 +2434,56 @@ alias -l DLF.SearchBot.Disconnect {
   }
 }
 
+; DLF.SearchBot.GetTriggers is called in 3 circumstances:
+;   1. CTCP SLOTS received: GetTriggers #chan
+;   2. Nick search* joins a channel: GetTriggers #chan nick
+;   3. User runs @search* trigger: GetTriggers #chan @trigger
+;
+; Trigger request runs if:
+;   A. Triggers have not been run on this network#channel previously; or
+;   B. Triggers have been run but had no previous response; or
+;   C. Nick / trigger is not in the table
+; providing that:
+;   a. Trigger request has not previously been run in this network#channel in the last xx seconds; AND
+;   b. There is at least one searchbot nick in the channel
+;   c. @trigger has not been called in the last yy seconds.
+;
 ; hash table index network|channel|nick|trigger
 alias -l DLF.SearchBot.GetTriggers {
+  var %chanminperiod 300, %trigminperiod 3600
   DLF.Watch.Called DLF.SearchBot.GetTriggers $1 : $2-
   var %nc $+($network,$1)
-  ; If current trigger request is active, don't send another one
+  ; a. If current trigger request is active, don't send another one
   var %req $hget(DLF.sbcurrentreqs,%nc)
   if (%req != $null) return
-  ; If we have previously requested but not had any responses then try again.
+  ; b. If no searchbots in the channel, don't request
+  if ($DLF.ChanHasSearchbots($1) == $false) return
+  ; A. If we have already requested triggers and we have previously had responses; And
+  ; B. This not a nick/trigger request
+  ; then don't try again.
   %req = $hget(DLF.sbrequests,%nc)
-  var %bots = $hfind(DLF.searchbots,$+($network,|,$1,|*),0,w).item
+  var %bots = $hfind(DLF.sbots,$+($network,|,$1,|*),0,w).item
   if ((%req != $null) && (%bots > 0) && ($2 == $null)) return
-  ; If trigger is a search and it is not in the searchbots table then re-request triggers
-  if (@* iswm $2) var %nick $DLF.SearchBot.NickFromTrigger($2,$1)
-  else var %nick $DLF.SearchBot.TriggerFromNick($2,$1)
-  if (%nick != $null) return
-  ; Check for channel mode +d and delay request until request will not be rejected
-  var %delay $hget(DLF.sbchandelay,%nc)
+  ; Check for channel mode +d and calculate additional delay until request will not be rejected
+  var %delay $hget(DLF.sbchandelay,%nc), %timeout
   if (%delay == $null) %delay = 0
-  var %ttl $DLF.SearchBot.TTL + %delay
-  var %timeout 60 + %delay
-  hadd -mzu $+ %ttl DLF.sbrequests %nc %ttl
+  ; c. If trigger/nick and trigger request in last yy seconds then forget it
+  if ($2 != $null) {
+    ; C. If request trigger is already in the searchbots table then don't bother
+    if (@* iswm $2) %req = $DLF.SearchBot.NickFromTrigger($2,$1)
+    else %req = $DLF.SearchBot.TriggerFromNick($2,$1)
+    if (%req != $null) return
+    var %nick = $2
+    if (@* iswm $2) %nick = $right($2,-1)
+    %nick = $(%nc,|,%nick)
+    %req = $hget(DLF.sbrequestnicks,%nick)
+    if (%req != $null) return
+    %timeout = %trigminperiod + %delay
+    hadd -mzu $+ %timeout DLF.sbrequestnicks %nick %timeout
+  }
+  %timeout = $DLF.SearchBot.TTL + %delay
+  hadd -mzu $+ %timeout DLF.sbrequests %nc %timeout
+  %timeout = %chanminperiod + %delay
   hadd -mzu $+ %timeout DLF.sbcurrentreqs %nc %timeout
   DLF.Watch.Log SearchBot: Requesting Triggers for %nc in %delay seconds
   if (%delay == 0) .msg $1 @SearchBot-Trigger
@@ -2462,20 +2494,20 @@ alias -l DLF.SearchBot.GetTriggers {
 alias -l DLF.SearchBot.SetTriggers {
   DLF.Watch.Called DLF.SearchBot.SetTriggers : $1-
   var %ttl $DLF.SearchBot.TTL
-  hadd -mzu $+ %ttl DLF.searchbots $+($2,|,$3,|,$nick,|,$4) %ttl
+  hadd -mzu $+ %ttl DLF.sbots $+($2,|,$3,|,$nick,|,$4) %ttl
   if ($hget(DLF.sbcurrentreqs,$+($2,$3)) != $null) DLF.Win.Filter $event Private $nick $1-
 }
 
 alias -l DLF.SearchBot.NickFromTrigger {
   var %chan = *
   if ($2 != $null) %chan = $2
-  return $gettok($hfind(DLF.searchbots,$+($network,|,%chan,|*|,$1),1,w).item,3,$asc(|))
+  return $gettok($hfind(DLF.sbots,$+($network,|,%chan,|*|,$1),1,w).item,3,$asc(|))
 }
 
 alias -l DLF.SearchBot.TriggerFromNick {
   var %chan = *
   if ($2 != $null) %chan = $2
-  return $gettok($hfind(DLF.searchbots,$+($network,|,%chan,|,$1,|*),1,w).item,4,$asc(|))
+  return $gettok($hfind(DLF.sbots,$+($network,|,%chan,|,$1,|*),1,w).item,4,$asc(|))
 }
 
 alias DLF.SearchBots {
@@ -2487,14 +2519,14 @@ alias DLF.SearchBots {
   }
   else echo -a dlFilter: Searchbots in $active
   echo -a --------------------------------
-  var %i $hfind(DLF.searchbots,%filter,0,w).item
+  var %i $hfind(DLF.sbots,%filter,0,w).item
   if (%i == 0) {
     echo -a No search bots
     return
   }
   while (%i) {
-    var %item $hfind(DLF.searchbots,%filter,%i,w).item
-    var %secs $hfind(DLF.searchbots,%filter,%i,w).data
+    var %item $hfind(DLF.sbots,%filter,%i,w).item
+    var %secs $hfind(DLF.sbots,%filter,%i,w).data
     var %chan $gettok(%item,2,$asc(|))
     var %nick $gettok(%item,3,$asc(|))
     var %trig $gettok(%item,4,$asc(|))
@@ -4198,12 +4230,16 @@ alias -l DLF.Options.Initialise {
   DLF.Options.InitOption win-server.strip 0
   DLF.Options.InitOption win-onotice.timestamp 1
   DLF.Options.InitOption win-onotice.log 1
+
+  ; List of nicks considered to be searchbots
+  ; TODO Will be exposed in options dialog once sbClient functionality is integrated
+  DLF.Options.InitOption searchbot.nicks search* seek* locate*
 }
 
 alias -l DLF.Options.InitOption {
   var %var $+(%,DLF.,$1)
   if ( [ [ %var ] ] != $null) return
-  [ [ %var ] ] = $2
+  [ [ %var ] ] = $2-
   if (%DLF.JustLoaded) set -u1 %DLF.OptionInit $true
 }
 
@@ -5742,9 +5778,10 @@ alias -l DLF.CreateHashTables {
   inc %matches $hget(DLF.privnotice.dnd,0).item
 
   DLF.hmake DLF.ctcp.reply
+  DLF.hadd ctcp.reply SLOTS*
   DLF.hadd ctcp.reply ERRMSG*
   DLF.hadd ctcp.reply MP3*
-  DLF.hadd ctcp.reply SLOTS*
+  DLF.hadd ctcp.reply ZIP*
   inc %matches $hget(DLF.ctcp.reply,0).item
 
   DLF.hmake DLF.find.header
@@ -5815,6 +5852,7 @@ alias -l DLF.CreateHashTables {
   inc %matches $hget(DLF.find.result,0).item
 
   DLF.StatusAll Added %matches wildcard templates
+
 }
 
 ; ========== Status and error messages ==========
@@ -5894,6 +5932,25 @@ alias -l DLF.chan {
 alias -l DLF.nick {
   if ($nick != $null) return $nick
   return -
+}
+
+alias -l DLF.IsSearchbot {
+  var %i $numtok(%DLF.searchbot.nicks,$asc($space))
+  while (%i) {
+    if ($gettok(%DLF.searchbot.nicks,%i,$asc($space)) iswm $1) return $true
+    dec %i
+  }
+  return $false
+}
+
+alias -l DLF.ChanHasSearchbots {
+  var %i $numtok(%DLF.searchbot.nicks,$asc($space))
+  while (%i) {
+    var %temp $gettok(%DLF.searchbot.nicks,%i,$asc($space))
+    if ($ialchan(%temp,$1,0) > 0) return $true
+    dec %i
+  }
+  return $false
 }
 
 alias -l DLF.IsRegularUser {
