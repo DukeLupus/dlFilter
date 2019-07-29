@@ -48,7 +48,6 @@ dlFilter uses the following code from other people:
       Test location and filename for oNotice log files
       Be smarter about matching nicks responding to file requests with triggers when they don't quite match.
         (Add another field to the hash for the nick - check whether trigger exactly matches a nick and if not try to identify a close match (either by looking for matching @trigger in ads window or by looking for very similar nicks e.g. pondering vs. pondering42. Or check the ads windows for equivalent @ triggers.)
-      Autoaccept files from dcc trusted nicks. (Autoaccept works for matching nicks, but not for gets from nicks which do not match trigger.)
       Copy files received which are not identified as triggers to current window.
       Colour DCC SEND channel messages so as to distinguish filenames and sending user and stats.
       If settings not AutoAccept (which uses temporary trust) then ask user (once per nick per session) if they want to Trust untrusted servers they are requesting files from.
@@ -56,7 +55,6 @@ dlFilter uses the following code from other people:
 
       Handle search response files where "-" is replaced by space. (Analyse sbserver to see how it handles special characters.)
         Does not auto-accept search results for search with a hyphenated word or fullstop.
-      Does not auto-accept when at least one manually trusted nick (probably a mIRC bug - do we want to code a workaround or perhaps a popup warning message).
       File Get retry clears input box.
       DCC RESUME doesn't seem to work properly.
       DCC RESUME should start again from the beginning if file is already fully downloaded.
@@ -195,7 +193,8 @@ dlFilter uses the following code from other people:
       Added check for searchbots in channel before requesting searchbot triggers
       Fixed over frequent @searchbot-trigger calls when a non-existent search trigger is used.
 
-2.12
+2.12  Update filters for trivia and server ads.
+      Fix issue with autoget in mIRC v7.57 and below only doing autoget on first trust entry by resequencing existing trust entries to after the new one.
 
 */
 
@@ -2104,7 +2103,6 @@ alias -l DLF.DccSend.Send {
     DLF.Halt Blocked: DCC Send - filename contains malicious unicode U+8238
   }
   var %trusted $DLF.DccSend.IsTrusted
-;echo -a DLF.DccSend.Send Trusted: %trusted Requested: $DLF.DccSend.IsRequest(%fn)
   if (%trusted) DLF.Watch.Log User is in your DCC trust list
   if ($DLF.DccSend.IsRequest(%fn)) {
     if ((%DLF.dccsend.autoaccept == 1) && (!%trusted)) DLF.DccSend.TrustAdd
@@ -2313,6 +2311,18 @@ alias -l DLF.DccSend.TrustAdd {
   [ $+(.timer,$DLF.DccSend.TrustTimer(%addr)) ] 1 5 .signal DLF.DccSend.TrustRemove %addr %desc
   .dcc trust %addr
   DLF.Watch.Log Trust: Added %desc
+  if ($version > 7.57) return
+  ; Workaround for mIRC bug in version up to 7.57 where autoaccept only works if the trust is first in the list
+  ; and .dcc trust adds it to the end of the list.
+  ; The code below removes all previous entries from the beginning and queues them again at the end -
+  ; thus putting the temporary trust at the beginning of the list.
+  var %i 1, %n $trust(0)
+  while (%i < %n) {
+    var %t $trust(1)
+    .dcc trust -r %t
+    .dcc trust %t
+    inc %i
+  }
 }
 
 on *:signal:DLF.DccSend.TrustRemove: DLF.DccSend.TrustRemove $1-
