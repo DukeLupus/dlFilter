@@ -5347,11 +5347,12 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.announce Priority
   DLF.hadd chantext.announce Server Priority
   DLF.hadd chantext.announce Servers Priority
-  DLF.hadd chantext.announce Mode: Normal
-  DLF.hadd chantext.announce Mode: Server* Priority
-  DLF.hadd chantext.announce ? Mode: Normal ?
-  DLF.hadd chantext.announce ? Mode: Server* Priority ?
+  DLF.hadd chantext.announce *Mode: Normal*
+  DLF.hadd chantext.announce *Mode: Server* Priority*
   DLF.hadd chantext.announce ø
+  DLF.hadd chantext.announce ¥
+  DLF.hadd chantext.announce ..
+  DLF.hadd chantext.announce stats ..
   DLF.hadd chantext.announce *Je Vient Juste De Reçevoir * De La Pars De * Pour Un Total De * Fichier(s)*
   DLF.hadd chantext.announce *The fastest Average Send Speeds captured last hour are*
   DLF.hadd chantext.announce *If your server doesn't work please turn it off*
@@ -5532,6 +5533,7 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia Last WEEKS Top 3 - *
   DLF.hadd chantext.trivia This MONTHS Top 1-10: *
   DLF.hadd chantext.trivia TOTAL points Top 10 - *
+  DLF.hadd chantext.trivia * is in pos #* this week
   DLF.hadd chantext.trivia All-time Records - Wins *
   DLF.hadd chantext.trivia BogusTrivia v*
   DLF.hadd chantext.trivia *TrivBot2001*
