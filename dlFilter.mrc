@@ -5589,6 +5589,9 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.trivia Cleared Top * Variables
   DLF.hadd chantext.trivia Cleared Top * Scores
   DLF.hadd chantext.trivia *Trivia* Loading...
+  DLF.hadd chantext.trivia Q?  *
+  DLF.hadd chantext.trivia Q??  *
+  DLF.hadd chantext.trivia Q???  *
   DLF.hadd chantext.trivia Q????  *
   DLF.hadd chantext.trivia *Matching answers so far: * from a possible * secs remaining
   DLF.hadd chantext.trivia * points for each matching answer. TOTAL: *
