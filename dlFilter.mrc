@@ -2308,7 +2308,7 @@ alias -l DLF.DccSend.GetFailed {
 alias -l DLF.DccSend.TrustAdd {
   var %addr $DLF.DccSend.TrustAddress
   var %desc $nick $br(%addr)
-  [ $+(.timer,$DLF.DccSend.TrustTimer(%addr)) ] 1 5 .signal DLF.DccSend.TrustRemove %addr %desc
+  [ $+(.timer,$DLF.DccSend.TrustTimer(%addr)) ] 1 1 .signal DLF.DccSend.TrustRemove %addr %desc
   .dcc trust %addr
   DLF.Watch.Log Trust: Added %desc
   if ($version > 7.57) return
@@ -2319,6 +2319,7 @@ alias -l DLF.DccSend.TrustAdd {
   var %i 1, %n $trust(0)
   while (%i < %n) {
     var %t $trust(1)
+    if (%t == %addr) break
     .dcc trust -r %t
     .dcc trust %t
     inc %i
