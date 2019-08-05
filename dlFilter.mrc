@@ -92,6 +92,8 @@ dlFilter uses the following code from other people:
         (Might be better as a separate script with documented commands you can paste in.
       Add right click menu items to @find windows to re-sort list by trigger and filename.
       Add @dlFilter / !dlFilter to serve dlFilter if running current version.
+      Split ads / announcements into two types - those that are also filtered and those that are displayed once (per absolutely identical) and then filtered.
+        (Voiced / Oped users would have option for all items filtered.)
 
 2.00  Major version number for release.
 2.01  Send file blocking messages to common channel.
@@ -195,6 +197,7 @@ dlFilter uses the following code from other people:
 
 2.12  Update filters for trivia and server ads.
       Fix issue with autoget in mIRC v7.57 and below only doing autoget on first trust entry by resequencing existing trust entries to after the new one.
+      Only save searchbot requests for 5 minutes instead of 24 hours (in case server is offline we don't want to requeue searchbot requests).
 
 */
 
@@ -1978,9 +1981,11 @@ alias -l DLF.Ops.AdvertPrivDLF {
 alias -l DLF.DccSend.Request {
   DLF.Watch.Called DLF.DccSend.Request $1 : $2-
   var %trig $strip($2), %sb $right(%trig,-1), %fn
+  var %trig $strip($2), %sb $right(%trig,-1), %fn, %ttl 86400
   if ((@* iswm %trig) && ($DLF.IsSearchbot(%sb))) {
     DLF.SearchBot.GetTriggers $1 %trig
     %fn = $DLF.DccSend.FixString($3-)
+    %ttl = 300
   }
   elseif (XDCC-* iswm %trig) %fn = $3-
   else %fn = $DLF.GetFileName($3-)
@@ -1991,6 +1996,7 @@ alias -l DLF.DccSend.Request {
   }
 
   hadd -mz DLF.dccsend.requests $+($network,|,$1,|,%trig,|,$replace(%fn,$space,_),|,$encode(%fn)) 86400
+  hadd -mz DLF.dccsend.requests $+($network,|,$1,|,%trig,|,$replace(%fn,$space,_),|,$encode(%fn)) %ttl
   DLF.Watch.Log DccSend request recorded: %trig %fn
 }
 
