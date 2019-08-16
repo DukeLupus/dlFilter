@@ -198,6 +198,7 @@ dlFilter uses the following code from other people:
 2.12  Update filters for trivia and server ads.
       Fix issue with autoget in mIRC v7.57 and below only doing autoget on first trust entry by resequencing existing trust entries to after the new one.
       Only save searchbot requests for 5 minutes instead of 24 hours (in case server is offline we don't want to requeue searchbot requests).
+      Fix messages being copied to active window from other connections.
 
 */
 
@@ -742,10 +743,23 @@ raw 438:*: { DLF.Redirect $1- }
 ; Channel requires authentication
 raw 477:*: { DLF.Redirect $1 $3-5 $2 $6- }
 
+; Echo messages to active window as well as status window
+; If active window is NOT on same CID, echo to all channel / private windows
 alias -l DLF.Redirect {
   DLF.Watch.Called DLF.Redirect $1-
   DLF.AlreadyHalted $1-
-  if (!$halted) echo -astc Normal $2-
+  if ($halted) halt
+  var %flags sti2fc
+  if ($dqwindow & 2) %flags = d $ %flags
+  if ($cid == $activecid) echo -a $+ %flags Normal $2-
+  else {
+    echo - $+ %flags Normal $2-
+    var %i $window(0)
+    while (%i) {
+      if (($window(%i).cid = $cid) && (($window(%i).type !isin status custom listbox) || ($left($active,2) == @#))) echo - $+ %flags Normal $2-
+      dec %i
+    }
+  }
   halt
 }
 
