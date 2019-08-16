@@ -1994,7 +1994,6 @@ alias -l DLF.Ops.AdvertPrivDLF {
 ; ========== DCC Send ==========
 alias -l DLF.DccSend.Request {
   DLF.Watch.Called DLF.DccSend.Request $1 : $2-
-  var %trig $strip($2), %sb $right(%trig,-1), %fn
   var %trig $strip($2), %sb $right(%trig,-1), %fn, %ttl 86400
   if ((@* iswm %trig) && ($DLF.IsSearchbot(%sb))) {
     DLF.SearchBot.GetTriggers $1 %trig
@@ -2009,7 +2008,6 @@ alias -l DLF.DccSend.Request {
     DLF.Win.Log Server Warning $target $nick Before your download starts either change this option to something else or delete the file.
   }
 
-  hadd -mz DLF.dccsend.requests $+($network,|,$1,|,%trig,|,$replace(%fn,$space,_),|,$encode(%fn)) 86400
   hadd -mz DLF.dccsend.requests $+($network,|,$1,|,%trig,|,$replace(%fn,$space,_),|,$encode(%fn)) %ttl
   DLF.Watch.Log DccSend request recorded: %trig %fn
 }
