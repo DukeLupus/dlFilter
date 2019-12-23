@@ -199,13 +199,14 @@ dlFilter uses the following code from other people:
       Fix issue with autoget in mIRC v7.57 and below only doing autoget on first trust entry by resequencing existing trust entries to after the new one.
       Only save searchbot requests for 5 minutes instead of 24 hours (in case server is offline we don't want to requeue searchbot requests).
       Fix messages being copied to active window from other connections.
+      Fix issue with update not working on IPv6 connections.
 
 */
 
 ; Increase this when you have sufficient changes to justify a release
 ; When you want to trigger updates for existing users, change the version file.
 alias -l DLF.SetVersion {
-  %DLF.version = 2.11
+  %DLF.version = 2.12
   return %DLF.version
 }
 
