@@ -5095,8 +5095,8 @@ alias -l DLF.Socket.Open {
   %hostport = $+(%host,:,$port)
 
   if ($sock(%socket)) sockclose %socket
-  var %flag
-  if (%protocol == https) %flag = -e
+  var %flag -46
+  if (%protocol == https) %flag = %flag $+ e
   sockopen %flag %socket %host %port
   sockmark %socket Opening %host %path %dialog %dialogid
 }
