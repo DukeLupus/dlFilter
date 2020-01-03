@@ -201,12 +201,14 @@ dlFilter uses the following code from other people:
       Fix messages being copied to active window from other connections.
       Fix issue with update not working on IPv6 connections.
 
+2.13  Fix reload doesn't work when current directory is not writeable.
+
 */
 
 ; Increase this when you have sufficient changes to justify a release
 ; When you want to trigger updates for existing users, change the version file.
 alias -l DLF.SetVersion {
-  %DLF.version = 2.12
+  %DLF.version = 2.13
   return %DLF.version
 }
 
@@ -243,9 +245,7 @@ on *:start: {
 ; Reload at defined position and reinitialise
 alias -l DLF.Reload {
   .timer -m 1 100 .signal DLF.Initialise
-  var %file $DLF.Script
-  .reload -rs $+ $DLF.LoadPosition $qt(%file)
-  if (%file != $script) .unload -rsn $qt($script)
+  .reload -rs $+ $DLF.LoadPosition $qt($script)
   halt
 }
 
