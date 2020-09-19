@@ -19,7 +19,8 @@ The best place to install scripts is in your mIRC settings directory (use the mI
 When you have placed the file in the directory you want, then use the mIRC command `//load -rs1 [directory]\dlFilter.mrc`.
 
 ## Upgrading
-The best way to upgrade if you are on dlFilter v2 is to use the built in upgrader. Otherwise, download the dlFilter.mrc script as above, repalce your old version with the new version and restart mIRC.
+The best way to upgrade if you are on dlFilter v2 is to use the built in upgrader. Otherwise, 
+download the dlFilter.mrc script as above, replace your old version with the new version and restart mIRC.
 
 ## Help & Support
 For full help and support, please read our [Wiki](https://github.com/DukeLupus/dlFilter/wiki).
