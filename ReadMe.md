@@ -11,7 +11,7 @@ Feedback on this new version is appreciated. Now that dlFilter is hosted on Gith
 The best way to download the latest formal release of the script is to 
 go to the [Releases Page](https://github.com/DukeLupus/dlFilter/releases) and download the zip file.
 
-Alternative to download the latest alpha version [right click here and select save](https://github.com/DukeLupus/dlFilter/blob/master/dlFilter.mrc).
+Alternative to download the latest alpha version [right click here and select save](https://raw.githubusercontent.com/DukeLupus/dlFilter/master/dlFilter.mrc).
 
 ## Installing
 The best place to install scripts is in your mIRC settings directory (use the mIRC command "//echo -a $mircdir" to find out where this is) or in a scripts subdirectory.
