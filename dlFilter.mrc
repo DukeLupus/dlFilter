@@ -60,6 +60,11 @@ dlFilter uses the following code from other people:
       DCC RESUME should start again from the beginning if file is already fully downloaded.
       DCC RESUME when file already fully downloaded says Resumed but never completes.
         Status window has: DCC Send from xxxxx rejected (invalid parameters)
+      Don't retry a get of search results that fails because it doesn't work!!
+      When starting to transfer a @search file, "waited" value is 23:59:xx which is clearly wrong.
+      Do not resume @search results
+      Validate resume i.e. don't resume if start point for resume is after entire stated file length.
+      When you open a query window, trawl for history in all other open windows for that network.
 
       Reset stats for a channel on JOIN.
       Sort out spaces in private DCC Send messages
@@ -77,6 +82,17 @@ dlFilter uses the following code from other people:
       Option to auto-open oNotice window when you are opped in a channel (if there are at least 2 ops).
       Autoaccept DCC chat from trusted nicks. May need to set autoaccept from everyone and then cancel those you don't want to accept.
       File transfer messages (red) from trusted nicks not appearing in windows.
+      Do not filter out dlFilter messages from other Ops in channels where you are an op if op filter checkbox is clear.
+      Error messages sent to too many windows i.e. nick name already in use.
+      Record voiced / ops users in DLF channels when they quit / part and show joins for these users if they rejoin.
+      Show kicks / bans if op actions displayed.
+      Ops option - When user says something that is not filtered, show quits / parts and triggers etc. until they do a trigger correctly. Also retrieve and display previous from filter window if available.
+      !seen in #ebooks gets a channel message which is erroneously sent to query window if open for that user.
+      Send responses to own /away to all server windows.
+      Add to "Blocked private message" instructions to whitelist user using mIRC notify.
+      File get DCC messages sent to current window not channel window where they were requested.
+      On LOAD enable dlFilter if disabled. BUT (obviously) NOT when you are simply restarting mIRC or dlF is reloading itself.
+      Only filter out topic when joining channel - dont filter if e.g. user types /topic #channel
 
   Ideas for possible future enhancements
       Create pop-up box option for channels to allow people to cut and paste a line which should be filtered but isn't and create a gitreports call.
@@ -94,6 +110,9 @@ dlFilter uses the following code from other people:
       Add @dlFilter / !dlFilter to serve dlFilter if running current version.
       Split ads / announcements into two types - those that are also filtered and those that are displayed once (per absolutely identical) and then filtered.
         (Voiced / Oped users would have option for all items filtered.)
+      Remote support - allow DLF to send watch logs via DCC chat.
+      Also send UNfiltered messages to the filter screen so that you get full context there.
+
 
 2.00  Major version number for release.
 2.01  Send file blocking messages to common channel.
@@ -203,12 +222,22 @@ dlFilter uses the following code from other people:
 
 2.13  Fix reload doesn't work when current directory is not writeable.
 
+2.14  Revert change in 2.13
+      Enhance socket error message for better diagnosis
+      Add auto open option for oNotice window for channels where you are an Op. Actual autoopen still to be coded.
+      Fix oNotice for joins parts etc.
+      Copy all Ops actions to oNotice window if open.
+      Additional filters
+      Fix issue with ops advertising period
+      Fix colours limited to 0-15 instead of 0-99
+
+
 */
 
 ; Increase this when you have sufficient changes to justify a release
 ; When you want to trigger updates for existing users, change the version file.
 alias -l DLF.SetVersion {
-  %DLF.version = 2.13
+  %DLF.version = 2.14
   return %DLF.version
 }
 
@@ -245,7 +274,9 @@ on *:start: {
 ; Reload at defined position and reinitialise
 alias -l DLF.Reload {
   .timer -m 1 100 .signal DLF.Initialise
-  .reload -rs $+ $DLF.LoadPosition $qt($script)
+  var %file $DLF.Script
+  .reload -rs $+ $DLF.LoadPosition $qt(%file)
+  if (%file != $script) .unload -rsn $qt($script)
   halt
 }
 
@@ -750,16 +781,26 @@ alias -l DLF.Redirect {
   DLF.Watch.Called DLF.Redirect $1-
   DLF.AlreadyHalted $1-
   if ($halted) halt
-  var %flags sti2fc
-  if ($dqwindow & 2) %flags = d $ %flags
-  if ($cid == $activecid) echo -a $+ %flags Normal $2-
-  else {
-    echo - $+ %flags Normal $2-
-    var %i $window(0)
-    while (%i) {
-      if (($window(%i).cid = $cid) && (($window(%i).type !isin status custom listbox) || ($left($active,2) == @#))) echo - $+ %flags Normal $2-
-      dec %i
-    }
+  var %single
+  if ($dqwindow & 2) %single = d
+  echo -ti2fcs $+ %single Normal $2-
+  ; Echo to channels
+  var %i $chan(0)
+  while (%i) {
+    echo -ti2fc Normal $chan(%i) $2-
+    dec %i
+  }
+  ; Echo to query windows
+  var %i $query(0)
+  while (%i) {
+    echo -ti2fc Normal $query(%i) $2-
+    dec %i
+  }
+  ; Echo to ops chat windows
+  var %i $window(@#*,0)
+  while (%i) {
+    if ($window(@#*,%i).type = custom) echo -ti2fc Normal $window(@#*,%i) $2-
+    dec %i
   }
   halt
 }
@@ -1614,6 +1655,7 @@ alias -l DLF.Priv.ctcpReply {
     halt
   }
   if ($hiswm(ctcp.reply,$1-)) DLF.Win.Filter $1-
+  DLF.Custom.Filter privctcp $1-
   DLF.Priv.QueryOpen $1-
   DLF.Priv.CommonChan $1-
   DLF.Priv.RegularUser ctcpreply $1-
@@ -4027,83 +4069,84 @@ dialog -l DLF.Options.GUI {
   tab "Ops", 7
   tab "Custom", 8
   tab "About", 9
-  check "Show/hide Filter wins", 30, 2 244 78 14, push
-  check "Show/hide Ads wins", 40, 82 244 78 14, push
-  button "Close", 50, 162 244 61 14, ok default flat
+  check "Show/hide Filter wins", 30, 3 244 78 14, push
+  check "Show/hide Ads wins", 40, 85 244 78 14, push
+  button "Close", 50, 167 244 61 14, ok default flat
 
   ; tab Channels
-  text "List the channels you want dlFilter to filter messages in. Use # by itself to make it filter all channels on all networks.", 105, 7 28 213 16, tab 1 multi
-  text "Channel to add (select dropdown / type #chan or net#chan):", 110, 7 46 213 8, tab 1 nowrap
-  combo 120, 6 55 213 8, tab 1 drop edit
-  button "Add", 130, 6 71 104 14, tab 1 flat disable
-  button "Remove", 135, 115 71 104 14, tab 1 flat disable
-  list 140, 7 87 212 90, tab 1 vsbar size sort extsel
-  box " Update ", 150, 6 179 213 58, tab 1
-  check "Check for updates", 160, 11 189 100 8, tab 1
-  check "Check for &beta versions", 165, 116 189 100 8, tab 1
-  button "dlFilter website", 170, 10 201 100 14, tab 1 flat
-  button "Update dlFilter", 180, 115 201 100 14, tab 1 flat disable
+  text "List the channels you want dlFilter to filter messages in. Use # by itself to make it filter all channels on all networks.", 105, 7 28 219 16, tab 1 multi
+  text "Channel to add (select dropdown / type #chan or net#chan):", 110, 7 45 219 8, tab 1 nowrap
+  combo 120, 6 55 219 8, tab 1 drop edit
+  button "Add", 130, 6 71 107 14, tab 1 flat disable
+  button "Remove", 135, 119 71 107 14, tab 1 flat disable
+  list 140, 7 87 218 90, tab 1 vsbar size sort extsel
+  box " Update ", 150, 6 179 219 58, tab 1
+  check "Check for updates", 160, 12 189 102 8, tab 1
+  check "Check for &beta versions", 165, 119 189 102 8, tab 1
+  button "dlFilter website", 170, 11 201 102 14, tab 1 flat
+  button "Update dlFilter", 180, 118 201 102 14, tab 1 flat disable
   text "Checking for dlFilter updates...", 190, 10 216 206 18, tab 1 center
 
   ; tab Filters
-  box " Channel messages ", 305, 6 26 213 113, tab 3
-  check "Filter other users @search / @file / @locator / !get requests", 310, 10 36 206 8, tab 3
-  check "Filter server adverts and announcements", 315, 10 46 206 8, tab 3
-  check "Filter channel topic updates", 320, 10 56 206 8, tab 3
-  check "Filter channel mode changes (e.g. maximum user limits)", 325, 10 66 206 8, tab 3
-  check "Filter trivia games", 330, 10 76 206 8, tab 3
-  check "Filter server responses to my requests to separate window", 335, 10 86 206 8, tab 3
-  check "Filter ALL coloured messages (last resort - use cautiously)", 340, 10 96 206 8, tab 3
-  check "Filter private msgs from regular users IN filtered channels", 345, 10 106 206 8, tab 3
-  check "Filter private msgs from reg. users NOT IN filtered channels", 350, 10 116 206 8, tab 3
-  check "Display dlFilter's channel filtering efficiency in title bar", 355, 10 126 206 8, tab 3
-  box " Advert / Filter Windows ", 360, 6 140 213 33, tab 3
-  check "Separate dlF windows per connection", 365, 10 150 206 8, tab 3
-  check "Keep Filter windows active in background", 370, 10 160 206 8, tab 3
-  box " Regular user events ", 375, 6 174 213 63, tab 3
-  check "Joins ...", 380, 10 184 68 8, tab 3
-  check "Parts ...", 382, 79 184 68 8, tab 3
-  check "Quits ...", 384, 148 184 68 8, tab 3
-  check "Nick changes ...", 386, 10 194 68 8, tab 3
-  check "Kicks ...", 388, 79 194 68 8, tab 3
-  check "Away and thank-you messages", 390, 10 204 206 8, tab 3
-  check "User mode changes", 395, 10 214 206 8, tab 3
-  check "Filter above user events for non-regular users", 397, 10 224 206 8, tab 3
+  box " Channel messages ", 305, 6 26 219 113, tab 3
+  check "Filter other users @search / @file / @locator / !get requests", 310, 10 36 212 8, tab 3
+  check "Filter server adverts and announcements", 315, 10 46 212 8, tab 3
+  check "Filter channel topic updates", 320, 10 56 212 8, tab 3
+  check "Filter channel mode changes (e.g. maximum user limits)", 325, 10 66 212 8, tab 3
+  check "Filter trivia games", 330, 10 76 212 8, tab 3
+  check "Filter server responses to my requests to separate window", 335, 10 86 212 8, tab 3
+  check "Filter ALL coloured messages (last resort - use cautiously)", 340, 10 96 212 8, tab 3
+  check "Filter private msgs from regular users IN filtered channels", 345, 10 106 212 8, tab 3
+  check "Filter private msgs from reg. users NOT IN filtered channels", 350, 10 116 212 8, tab 3
+  check "Display dlFilter's channel filtering efficiency in title bar", 355, 10 126 212 8, tab 3
+  box " Advert / Filter Windows ", 360, 6 140 219 33, tab 3
+  check "Separate dlF windows per connection", 365, 10 150 212 8, tab 3
+  check "Keep Filter windows active in background", 370, 10 160 212 8, tab 3
+  box " Regular user events ", 375, 6 174 219 63, tab 3
+  check "Joins ...", 380, 10 184 69 8, tab 3
+  check "Parts ...", 382, 82 184 69 8, tab 3
+  check "Quits ...", 384, 153 184 69 8, tab 3
+  check "Nick changes ...", 386, 10 194 69 8, tab 3
+  check "Kicks ...", 388, 82 194 69 8, tab 3
+  check "Away and thank-you messages", 390, 10 204 212 8, tab 3
+  check "User mode changes", 395, 10 214 212 8, tab 3
+  check "Filter above user events for non-regular users", 397, 10 224 212 8, tab 3
 
-  ; Tab Other
-  text "These functions apply to all channels on all networks:", 501, 6 27 213 8, tab 5 nowrap
-  box " Extra functions ", 505, 6 36 213 33, tab 5
-  check "Collect @find/@locator results into a single window", 510, 10 46 206 8, tab 5
-  check "Colour uncoloured fileservers in nickname list", 520, 10 56 206 8, tab 5
-  box " File requests ", 535, 6 70 213 83, tab 5
-  check "Auto accept files you have specifically requested", 540, 10 80 206 8, tab 5
-  check "Block ALL files you have NOT specifically requested. Or:", 545, 10 90 206 8, tab 5
-  check "Block potentially dangerous filetypes", 550, 21 100 195 8, tab 5
-  check "Block files from users not in a common channel", 555, 21 110 195 8, tab 5
-  check "Block files from users not in your mIRC DCC trust list", 560, 21 120 195 8, tab 5
-  check "Block files from regular users", 565, 21 130 195 8, tab 5
-  check "Retry incomplete file requests (up to 3 times)", 570, 10 140 206 8, tab 5
-  box " mIRC-wide ", 605, 6 154 213 83, tab 5
-  check "Check mIRC settings are secure (future enhancement)", 610, 10 164 206 8, tab 5 disable
-  check "Prevent non-Notify private message opening query window", 620, 10 174 206 8, tab 5
-  check "Filter private spam", 630, 10 184 206 8, tab 5
-  check "Filter private messages from users not in a common channel", 640, 10 194 206 8, tab 5
-  check "Block channel CTCP requests unless from an op", 655, 10 204 206 8, tab 5
-  check "Block IRC Finger requests (which share personal information)", 660, 10 214 206 8, tab 5
-  check "Load dlFilter last (rather than first)", 665, 10 224 206 8, tab 5
+  ; Tab Firewall
+  text "These functions apply to all channels on all networks:", 501, 6 28 219 8, tab 5 nowrap
+  box " Extra functions ", 505, 6 37 219 33, tab 5
+  check "Collect @find/@locator results into a single window", 510, 10 47 212 8, tab 5
+  check "Colour uncoloured fileservers in nickname list", 520, 10 57 212 8, tab 5
+  box " File requests ", 535, 6 71 219 83, tab 5
+  check "Auto accept files you have specifically requested", 540, 10 81 212 8, tab 5
+  check "Block ALL files you have NOT specifically requested. Or:", 545, 10 91 212 8, tab 5
+  check "Block potentially dangerous filetypes", 550, 21 101 201 8, tab 5
+  check "Block files from users not in a common channel", 555, 21 111 201 8, tab 5
+  check "Block files from users not in your mIRC DCC trust list", 560, 21 121 201 8, tab 5
+  check "Block files from regular users", 565, 21 131 201 8, tab 5
+  check "Retry incomplete file requests (up to 3 times)", 570, 10 141 212 8, tab 5
+  box " mIRC-wide ", 605, 6 154 219 83, tab 5
+  check "Check mIRC settings are secure (future enhancement)", 610, 10 164 212 8, tab 5 disable
+  check "Prevent non-Notify private message opening query window", 620, 10 174 212 8, tab 5
+  check "Filter private spam", 630, 10 184 212 8, tab 5
+  check "Filter private messages from users not in a common channel", 640, 10 194 212 8, tab 5
+  check "Block channel CTCP requests unless from an op", 655, 10 204 212 8, tab 5
+  check "Block IRC Finger requests (which share personal information)", 660, 10 214 212 8, tab 5
+  check "Load dlFilter last (rather than first)", 665, 10 224 212 8, tab 5
 
   ; tab Ops
-  text "These options are only enabled if you are an op on a filtered channel.", 705, 7 28 213 16, tab 7 multi
-  box " Channel Ops ", 710, 6 46 213 43, tab 7
-  check "Filter oNotices etc. to separate OpsTalk @#window ", 715, 10 56 206 8, tab 7
-  check "On channel spam, oNotify other ops", 725, 10 66 206 8, tab 7
-  check "On private spam, oNotify other ops in common channels", 730, 10 76 206 8, tab 7
-  box " dlFilter promotion ", 755, 6 89 213 43, tab 7
-  check "Advertise dlFilter in channels every", 760, 10 100 125 8, tab 7
-  edit "60", 765, 135 99 14 10, tab 7 right limit 2
-  text "mins", 770, 150 100 47 8, tab 7
-  check "... and filter them out", 780, 21 110 195 8, tab 7
-  check "Prompt individual existing dlFilter users to upgrade", 790, 10 120 206 8, tab 7
+  text "These options are only enabled if you are an op on a filtered channel.", 705, 6 27 219 16, tab 7 multi
+  box " Channel Ops ", 710, 6 44 219 53, tab 7
+  check "Filter oNotices etc. to separate OpsTalk @#window", 715, 10 54 212 8, tab 7
+  check "... and open an OpsTalk window when you become Op", 720, 21 64 201 8, tab 7 disable
+  check "On channel spam, oNotify other ops", 725, 10 74 212 8, tab 7
+  check "On private spam, oNotify other ops in common channels", 730, 10 84 212 8, tab 7
+  box " dlFilter promotion ", 755, 6 99 219 43, tab 7
+  check "Advertise dlFilter in channels every", 760, 10 109 125 8, tab 7
+  edit "60", 765, 135 108 14 10, tab 7 right limit 2
+  text "mins", 770, 150 109 47 8, tab 7
+  check "... and filter them out", 780, 21 119 201 8, tab 7
+  check "Prompt individual existing dlFilter users to upgrade", 790, 10 129 212 8, tab 7
 
   ; tab Custom
   check "Enable custom filters", 810, 6 30 95 8, tab 8
@@ -4122,9 +4165,17 @@ dialog -l DLF.Options.GUI {
   link "https://gitreports.com/issue/DukeLupus/dlFilter/", 995, 55 229 166 8, tab 9
 }
 
+; SetLinkedFields links fields so that when one checkbox field is checked or unchecked, other fields are enabled or disabled.
+; DLF.Options.LinkedFields master-id subid1,subid2,subid3
+;
+; If the master-id is positive, subids are enabled when the master-id checkbox is checked.
+; If the master-id is negative, subids are disabled when the master-id checkbox is checked.
+; If the subid is positive, the checkbox is checked by default when the field is enabled.
+; If the subid is negative, the checkbox is unchecked by default when the field is enabled.
 alias -l DLF.Options.SetLinkedFields {
-  DLF.Options.LinkedFields -545 550,555,560,565
   DLF.Options.LinkedFields 160 -165,190
+  DLF.Options.LinkedFields -545 550,555,560,565
+;  DLF.Options.LinkedFields 715 -720
 }
 
 ; Initialise dialog
@@ -4249,6 +4300,7 @@ alias -l DLF.Options.Initialise {
 
   ; Ops tab
   DLF.Options.InitOption win-onotice.enabled 1
+  DLF.Options.InitOption win-onotice.auto 0
   DLF.Options.InitOption opwarning.spamchan 1
   DLF.Options.InitOption opwarning.spampriv 1
   DLF.Options.InitOption ops.advertchan 0
@@ -4389,6 +4441,7 @@ alias -l DLF.Options.Init {
   if (%DLF.nofingers == 1) did -c DLF.Options.GUI 660
   if (%DLF.loadlast == 1) did -c DLF.Options.GUI 665
   if (%DLF.win-onotice.enabled == 1) did -c DLF.Options.GUI 715
+;  if (%DLF.win-onotice.auto == 1) did -c DLF.Options.GUI 720
   if (%DLF.opwarning.spamchan == 1) did -c DLF.Options.GUI 725
   if (%DLF.opwarning.spampriv == 1) did -c DLF.Options.GUI 730
   if (%DLF.ops.advertchan == 1) did -c DLF.Options.GUI 760
@@ -4473,6 +4526,7 @@ alias -l DLF.Options.Save {
   %DLF.nofingers = $did(DLF.Options.GUI,660).state
   %DLF.loadlast = $did(DLF.Options.GUI,665).state
   %DLF.win-onotice.enabled = $did(DLF.Options.GUI,715).state
+  %DLF.win-onotice.auto = $did(DLF.Options.GUI,720).state
   %DLF.opwarning.spamchan = $did(DLF.Options.GUI,725).state
   %DLF.opwarning.spampriv = $did(DLF.Options.GUI,730).state
   %DLF.ops.advertchan = $did(DLF.Options.GUI,760).state
@@ -4491,6 +4545,7 @@ alias -l DLF.Options.OpsTab {
   ; Disable Ops Tab if all ops options are off and not ops in any dlF channels
   if ($DLF.Options.IsOp) var %flags -e
   else var %flags -b
+;  did %flags DLF.Options.GUI 715,720,725,730,760,765,770,780,790
   did %flags DLF.Options.GUI 715,725,730,760,765,770,780,790
   if (%DLF.netchans == $hashtag) did -b DLF.Options.GUI 760,765,770,780,790
 }
@@ -4540,12 +4595,15 @@ alias -l DLF.Options.LoadLast {
 
 alias -l DLF.Options.OpsAdPeriod {
   var %period $did(DLF.Options.GUI,765)
-  if (%period !isnum 1-99) {
+  if (%period !isnum 0-99) {
     %period = $regsubex(DLF.Options.OpsAdPeriod,%period,/([^0-9]+)/g,$null)
     did -ra DLF.Options.GUI 765 %period
     return
   }
   DLF.Options.Save
+}
+
+alias -l DLF.Options.OpsAdMinimum {
 }
 
 alias -l DLF.Options.oNotice {
@@ -5175,7 +5233,7 @@ alias -l DLF.Socket.SockErr {
   var %err
   if ($sockerr == 3) %err = Failed to establish socket connection:
   elseif ($sockerr == 4) %err = DNS error resolving hostname:
-  DLF.Socket.Error $1: %err $sock($sockname).wsmsg
+  DLF.Socket.Error $sockerr $1 $sockerr $+ : %err $sock($sockname).wsmsg
 }
 
 alias -l DLF.Socket.Error {
@@ -5256,6 +5314,12 @@ alias -l DLF.CreateHashTables {
   DLF.hadd chantext.ads *For My Top Download Hit-chart, type @*
   DLF.hadd chantext.ads *Type*@* for my list*
   DLF.hadd chantext.ads *Type*@* to get my list*
+  DLF.hadd chantext.ads @* for my list*
+  DLF.hadd chantext.ads @* to get my list*
+  DLF.hadd chantext.ads *Type*@* for my full list*
+  DLF.hadd chantext.ads *Type*@* to get my full list*
+  DLF.hadd chantext.ads @* for my full list*
+  DLF.hadd chantext.ads @* to get my full list*
   DLF.hadd chantext.ads *FTP service*FTP*port*bookz*
   DLF.hadd chantext.ads *FTP*address*port*login*password*
   DLF.hadd chantext.ads *I have sent a total of*files and leeched a total of*since*
@@ -6236,8 +6300,8 @@ alias -l rev return $+($chr(22),$1-,$chr(22))
 alias -l c {
   var %code, %text
   if ($0 < 2) DLF.Error $ $+ c: Insufficient parameters to colour text
-  elseif ($1 !isnum 0-15) DLF.Error $ $+ c: Colour value invalid: $1
-  elseif (($0 >= 3) && ($2 isnum 0-15)) {
+  elseif ($1 !isnum 0-99) DLF.Error $ $+ c: Colour value invalid: $1
+  elseif (($0 >= 3) && ($2 isnum 0-99)) {
     %code = $+($chr(3),$right(0 $+ $1,2),$comma,$right(0 $+ $2,2))
     %text = $3-
   }
