@@ -1,3 +1,3 @@
 ;id|dlf-ver|min-mirc-ver|version improvements
-dlFilter|2.13|7.44|Minor fix for reload when directory is not writeable.
+dlFilter|2.14|7.44|Minor fix for reload when directory is not writeable.
 dlFilter.beta|2.08|7.44|You may need to download manually.
