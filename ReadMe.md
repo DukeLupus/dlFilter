@@ -5,7 +5,8 @@ dlFilter is a text filtering script for mIRC.
 It is created with file sharing channels in mind, and it filters out all the file sharing commands sent by other users, 
 leaving only the responses to your own file sharing comamnds and chat displayed.
 
-In 2017, dlFilter received a significant upgrade from the previous major release 1.16 with significant new functionality, which we hope will encourage strong take-up.
+dlFilter was originally written by DukeLupus. 
+In 2017 it was rewritten by Sophist as v2.0 and received a significant upgrade from the previous major release 1.16 with significant new functionality.
 
 This included:
 * Complete rewrite to make it more efficient
@@ -14,6 +15,9 @@ This included:
 * (For channel operators) oChat - a channel-like window whereby channel operators can chat amongst themselves behind the scenes 
 
 Feedback on this new version is appreciated. Now that dlFilter is hosted on Github, we welcome contributions of bug fixes and further improvement from the community.
+
+Unfortunately in 2024 DukeLupus passed away at an untimely early age - he is sorely missed.
+Consequently, this script is deedicated to his memory.
 
 ## Downloading
 The best way to download the latest formal release of the script is to 
