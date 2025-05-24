@@ -15,7 +15,9 @@ This script filters out the crud, leaving only the useful messages displayed in 
 
 Version 2 is a significant upgrade from the previous major release 1.16 with significant new functionality, which we hope will encourage strong take-up.
 
-Version 2.08 fixes the updater and makes the Options dialog work on high resolution e.g. 4K screens with Windows 10 Display Scaling > 100%.
+Version 2.15 fixes the updater and makes the Options dialog work on high resolution e.g. 4K screens with Windows 10 Display Scaling > 100%.
+
+Due to his unexpected death in 2024, dlFilter is now dedicated to the original author, DukeLupus.
 
 Feedback on this new version is appreciated. dlFilter is now also an Open Source project, hosted on Github, and we welcome contributions of bug fixes and further improvement from the community.
 
@@ -4179,13 +4181,13 @@ dialog -l DLF.Options.GUI {
   combo 120, 6 57 219 8, tab 1 drop edit
   button "Add", 130, 6 73 107 14, tab 1 flat disable
   button "Remove", 135, 119 73 107 14, tab 1 flat disable
-  list 140, 7 89 218 109, tab 1 vsbar size sort extsel
-  box " Update ", 150, 6 198 219 48, tab 1
-  check "Check for updates", 160, 12 208 102 8, tab 1
-  check "Check for &beta versions", 165, 119 208 102 8, tab 1
-  button "dlFilter website", 170, 11 220 102 14, tab 1 flat
-  button "Update dlFilter", 180, 118 220 102 14, tab 1 flat disable
-  text "Checking for dlFilter updates...", 190, 10 236 206 18, tab 1 center
+  list 140, 7 89 218 99, tab 1 vsbar size sort extsel
+  box " Update ", 150, 6 188 219 60, tab 1
+  check "Check for updates", 160, 12 198 102 8, tab 1
+  check "Check for &beta versions", 165, 119 198 102 8, tab 1
+  button "dlFilter website", 170, 11 210 102 14, tab 1 flat
+  button "Update dlFilter", 180, 118 210 102 14, tab 1 flat disable
+  text "Checking for dlFilter updates...", 190, 10 226 206 17, tab 1 center
 
   ; tab Filters
   box " Channel messages ", 305, 6 29 219 123, tab 3
