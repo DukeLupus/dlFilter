@@ -230,14 +230,15 @@ dlFilter uses the following code from other people:
       Additional filters
       Fix issue with ops advertising period
       Fix colours limited to 0-15 instead of 0-99
-
+      
+2.15  Delay resend of get requests for 5s after server rejoins the channel
 
 */
 
 ; Increase this when you have sufficient changes to justify a release
 ; When you want to trigger updates for existing users, change the version file.
 alias -l DLF.SetVersion {
-  %DLF.version = 2.14
+  %DLF.version = 2.15
   return %DLF.version
 }
 
@@ -897,7 +898,7 @@ alias -l DLF.Event.Join {
     ; Colour this users advertisement lines
     DLF.Ads.ColourLines $event $nick $chan
     ; Resend any pending triggers that would have been dropped when user parted
-    DLF.DccSend.Rejoin
+    .timer 1 5 .signal DLF.DccSend.Rejoin
     ; If advertising privately, see if they are running mIRC / dlf
     ; Wait for 5 sec for user's modes to be applied to avoid checking ops
     if ((%DLF.ops.advertpriv) && ($me isop $chan)) .timer 1 5 .signal DLF.Ops.RequestVersion $nick
@@ -2129,6 +2130,7 @@ alias -l DLF.DccSend.IsTrigger {
   return $false
 }
 
+on *:signal:DLF.DccSend.Rejoin: { DLF.DccSend.Rejoin $1- }
 alias -l DLF.DccSend.Rejoin {
   var %i $hget(DLF.dccsend.requests,0).item
   while (%i) {
